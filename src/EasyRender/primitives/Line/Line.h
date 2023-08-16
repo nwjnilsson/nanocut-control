@@ -1,15 +1,15 @@
 #ifndef LINE_
 #define LINE_
 
-#include "../PrimativeProperties.h"
+#include "../PrimitiveProperties.h"
 #include "../../json/json.h"
 #include "../../geometry/geometry.h"
 #include <string>
 
-class EasyPrimative::Line{
+class EasyPrimitive::Line{
     public:
         nlohmann::json mouse_event;
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
         
         double_point_t start;
         double_point_t end;
@@ -18,7 +18,7 @@ class EasyPrimative::Line{
 
         Line(double_point_t s, double_point_t e)
         {
-            this->properties = new PrimativeProperties();
+            this->properties = new PrimitiveProperties();
             this->start = s;
             this->end = e;
             this->width = 1;

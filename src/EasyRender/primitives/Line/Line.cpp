@@ -24,11 +24,11 @@
 #   error "Unknown compiler"
 #endif
 
-std::string EasyPrimative::Line::get_type_name()
+std::string EasyPrimitive::Line::get_type_name()
 {
     return "line";
 }
-void EasyPrimative::Line::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Line::process_mouse(float mpos_x, float mpos_y)
 {
     mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
     mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;
@@ -62,7 +62,7 @@ void EasyPrimative::Line::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-void EasyPrimative::Line::render()
+void EasyPrimitive::Line::render()
 {
     if (this->properties->visable == true)
     {
@@ -86,11 +86,11 @@ void EasyPrimative::Line::render()
         glPopMatrix();
     }
 }
-void EasyPrimative::Line::destroy()
+void EasyPrimitive::Line::destroy()
 {
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Line::serialize()
+nlohmann::json EasyPrimitive::Line::serialize()
 {
     nlohmann::json j;
     j["start"]["x"] = this->start.x;

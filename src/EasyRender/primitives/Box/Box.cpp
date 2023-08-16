@@ -27,11 +27,11 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-std::string EasyPrimative::Box::get_type_name()
+std::string EasyPrimitive::Box::get_type_name()
 {
     return "box";
 }
-void EasyPrimative::Box::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Box::process_mouse(float mpos_x, float mpos_y)
 {
     mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
     mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;
@@ -64,7 +64,7 @@ void EasyPrimative::Box::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-void EasyPrimative::Box::render_rectangle_with_radius(float x, float y, float width, float height, float radius)
+void EasyPrimitive::Box::render_rectangle_with_radius(float x, float y, float width, float height, float radius)
 {
     #define ROUNDING_POINT_COUNT 8
     double_point_t top_left[ROUNDING_POINT_COUNT];
@@ -126,7 +126,7 @@ void EasyPrimative::Box::render_rectangle_with_radius(float x, float y, float wi
     }
     glEnd();
 }
-void EasyPrimative::Box::render()
+void EasyPrimitive::Box::render()
 {
     if (this->properties->visable == true)
     {
@@ -138,11 +138,11 @@ void EasyPrimative::Box::render()
         glPopMatrix();
     }
 }
-void EasyPrimative::Box::destroy()
+void EasyPrimitive::Box::destroy()
 {
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Box::serialize()
+nlohmann::json EasyPrimitive::Box::serialize()
 {
     nlohmann::json j;
     j["bottom_left"]["x"] = this->bottom_left.x;

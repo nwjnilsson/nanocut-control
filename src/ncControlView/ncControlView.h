@@ -41,12 +41,12 @@ class ncControlView{
         static void zoom_event_handle(nlohmann::json e);
     public:
         preferences_data_t preferences;
-        EasyPrimative::Box *machine_plane;
-        EasyPrimative::Box *cuttable_plane;
-        EasyPrimative::Circle *torch_pointer;
+        EasyPrimitive::Box *machine_plane;
+        EasyPrimitive::Box *cuttable_plane;
+        EasyPrimitive::Circle *torch_pointer;
         machine_parameters_data_t machine_parameters;
         double_point_t way_point_position;
-        void (*view_matrix)(PrimativeContainer *p);
+        void (*view_matrix)(PrimitiveContainer *p);
 
         ncControlView(){
             //Do stuff here

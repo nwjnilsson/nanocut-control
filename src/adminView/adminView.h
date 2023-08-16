@@ -6,7 +6,7 @@
 class adminView{
     private:
         static void ZoomEventCallback(nlohmann::json e);
-        static void ViewMatrixCallback(PrimativeContainer *p);
+        static void ViewMatrixCallback(PrimitiveContainer *p);
         static void RenderUI(void *p);
     public:
         EasyRender::EasyRenderGui *ui;

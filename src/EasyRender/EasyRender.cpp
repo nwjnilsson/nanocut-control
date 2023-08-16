@@ -189,8 +189,8 @@ void EasyRender::mouse_button_callback(GLFWwindow* window, int button, int actio
                 }
             }
             double_point_t m = self->GetWindowMousePosition();
-            std::vector<PrimativeContainer*>::iterator it;
-            for ( it = self->primative_stack.end(); it != self->primative_stack.begin(); )
+            std::vector<PrimitiveContainer*>::iterator it;
+            for ( it = self->Primitive_stack.end(); it != self->Primitive_stack.begin(); )
             {
                 --it;
                 if ((*it)->properties->view == self->CurrentView)
@@ -287,68 +287,68 @@ void EasyRender::window_size_callback(GLFWwindow* window, int width, int height)
     }
 }
 /*
-    Each primative type must have a method
+    Each Primitive type must have a method
 */
-EasyPrimative::Line* EasyRender::PushPrimative(EasyPrimative::Line* l)
+EasyPrimitive::Line* EasyRender::PushPrimitive(EasyPrimitive::Line* l)
 {  
-    PrimativeContainer *c = new PrimativeContainer(l);
+    PrimitiveContainer *c = new PrimitiveContainer(l);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->line;
 }
-EasyPrimative::Text* EasyRender::PushPrimative(EasyPrimative::Text* t)
+EasyPrimitive::Text* EasyRender::PushPrimitive(EasyPrimitive::Text* t)
 {  
-    PrimativeContainer *c = new PrimativeContainer(t);
+    PrimitiveContainer *c = new PrimitiveContainer(t);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->text;
 }
-EasyPrimative::Image* EasyRender::PushPrimative(EasyPrimative::Image* i)
+EasyPrimitive::Image* EasyRender::PushPrimitive(EasyPrimitive::Image* i)
 {  
-    PrimativeContainer *c = new PrimativeContainer(i);
+    PrimitiveContainer *c = new PrimitiveContainer(i);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->image;
 }
-EasyPrimative::Path* EasyRender::PushPrimative(EasyPrimative::Path* p)
+EasyPrimitive::Path* EasyRender::PushPrimitive(EasyPrimitive::Path* p)
 {  
-    PrimativeContainer *c = new PrimativeContainer(p);
+    PrimitiveContainer *c = new PrimitiveContainer(p);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->path;
 }
-EasyPrimative::Part* EasyRender::PushPrimative(EasyPrimative::Part* p)
+EasyPrimitive::Part* EasyRender::PushPrimitive(EasyPrimitive::Part* p)
 {  
-    PrimativeContainer *c = new PrimativeContainer(p);
+    PrimitiveContainer *c = new PrimitiveContainer(p);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->part;
 }
-EasyPrimative::Arc* EasyRender::PushPrimative(EasyPrimative::Arc* a)
+EasyPrimitive::Arc* EasyRender::PushPrimitive(EasyPrimitive::Arc* a)
 {  
-    PrimativeContainer *c = new PrimativeContainer(a);
+    PrimitiveContainer *c = new PrimitiveContainer(a);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->arc;
 }
-EasyPrimative::Circle* EasyRender::PushPrimative(EasyPrimative::Circle* ci)
+EasyPrimitive::Circle* EasyRender::PushPrimitive(EasyPrimitive::Circle* ci)
 {  
-    PrimativeContainer *c = new PrimativeContainer(ci);
+    PrimitiveContainer *c = new PrimitiveContainer(ci);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->circle;
 }
-EasyPrimative::Box* EasyRender::PushPrimative(EasyPrimative::Box* b)
+EasyPrimitive::Box* EasyRender::PushPrimitive(EasyPrimitive::Box* b)
 {  
-    PrimativeContainer *c = new PrimativeContainer(b);
+    PrimitiveContainer *c = new PrimitiveContainer(b);
     c->properties->view = this->CurrentView;
-    primative_stack.push_back(c);
+    Primitive_stack.push_back(c);
     return c->box;
 }
-void EasyRender::PushTimer(unsigned long intervol, bool (*c)())
+void EasyRender::PushTimer(unsigned long interval, bool (*c)())
 {
     EasyRenderTimer *t = new EasyRenderTimer;
-    t->intervol = intervol;
+    t->interval = interval;
     t->timestamp = this->Millis();
     t->callback = c;
     t->view = this->CurrentView;
@@ -356,10 +356,10 @@ void EasyRender::PushTimer(unsigned long intervol, bool (*c)())
     t->callback_with_self = NULL;
     timer_stack.push_back(t);
 }
-void EasyRender::PushTimer(unsigned long intervol, bool (*c)(void*), void *s)
+void EasyRender::PushTimer(unsigned long interval, bool (*c)(void*), void *s)
 {
     EasyRenderTimer *t = new EasyRenderTimer;
-    t->intervol = intervol;
+    t->interval = interval;
     t->timestamp = this->Millis();
     t->callback = NULL;
     t->view = this->CurrentView;
@@ -617,15 +617,15 @@ std::string EasyRender::GetCurrentView()
 {
     return this->CurrentView;
 }
-std::vector<PrimativeContainer *> *EasyRender::GetPrimativeStack()
+std::vector<PrimitiveContainer *> *EasyRender::GetPrimitiveStack()
 {
-    return &this->primative_stack;
+    return &this->Primitive_stack;
 }
-nlohmann::json EasyRender::DumpPrimativeStack()
+nlohmann::json EasyRender::DumpPrimitiveStack()
 {
     nlohmann::json r;
-    std::vector<PrimativeContainer*>::iterator it;
-    for ( it = this->primative_stack.begin(); it != this->primative_stack.end(); )
+    std::vector<PrimitiveContainer*>::iterator it;
+    for ( it = this->Primitive_stack.begin(); it != this->Primitive_stack.end(); )
     {
         r.push_back((*it)->serialize());
         ++it;
@@ -684,16 +684,16 @@ void EasyRender::StringToFile(std::string filename, std::string s)
         LOG_F(ERROR, "(EasyRender::StringToFile) %s", e.what());
     }
 }
-void EasyRender::DeletePrimativesById(std::string id)
+void EasyRender::DeletePrimitivesById(std::string id)
 {
-    std::vector<PrimativeContainer*>::iterator it;
-    for ( it = this->primative_stack.begin(); it != this->primative_stack.end(); )
+    std::vector<PrimitiveContainer*>::iterator it;
+    for ( it = this->Primitive_stack.begin(); it != this->Primitive_stack.end(); )
     {
         if((*it)->properties->id == id)
         {
             (*it)->destroy();
             delete * it;  
-            it = this->primative_stack.erase(it);
+            it = this->Primitive_stack.erase(it);
         }
         else 
         {
@@ -800,18 +800,18 @@ bool EasyRender::Poll(bool should_quit)
     glLoadIdentity();
     glViewport(0, 0, this->WindowSize[0], this->WindowSize[1]);
     glClear(GL_COLOR_BUFFER_BIT);
-    sort(primative_stack.begin(), primative_stack.end(), [](auto* lhs, auto* rhs) {
+    sort(Primitive_stack.begin(), Primitive_stack.end(), [](auto* lhs, auto* rhs) {
         return lhs->properties->zindex < rhs->properties->zindex;
     });
     bool ignore_next_mouse_events = false;
-    for (size_t x = 0; x < this->primative_stack.size(); x ++)
+    for (size_t x = 0; x < this->Primitive_stack.size(); x ++)
     {
-        if (this->primative_stack[x]->properties->visable == true && this->primative_stack[x]->properties->view == this->CurrentView)
+        if (this->Primitive_stack[x]->properties->visable == true && this->Primitive_stack[x]->properties->view == this->CurrentView)
         {
-            primative_stack[x]->render();
+            Primitive_stack[x]->render();
             if ((!this->imgui_io->WantCaptureKeyboard || !this->imgui_io->WantCaptureMouse) && ignore_next_mouse_events == false)
             {
-                primative_stack[x]->process_mouse(window_mouse_pos.x, window_mouse_pos.y);
+                Primitive_stack[x]->process_mouse(window_mouse_pos.x, window_mouse_pos.y);
             }
         }
     }
@@ -823,7 +823,7 @@ bool EasyRender::Poll(bool should_quit)
     {
         if (this->timer_stack.at(x)->view == this->CurrentView)
         {
-            if ((this->Millis() - this->timer_stack.at(x)->timestamp) > this->timer_stack.at(x)->intervol)
+            if ((this->Millis() - this->timer_stack.at(x)->timestamp) > this->timer_stack.at(x)->interval)
             {
                 this->timer_stack[x]->timestamp = this->Millis();
                 if (this->timer_stack[x]->self_pointer == NULL)
@@ -857,7 +857,7 @@ bool EasyRender::Poll(bool should_quit)
         if (this->FPS_Label == NULL)
         {
             LOG_F(INFO, "Creating FPS label!");
-            this->FPS_Label = this->PushPrimative(new EasyPrimative::Text({0, 0}, "0", 30));
+            this->FPS_Label = this->PushPrimitive(new EasyPrimitive::Text({0, 0}, "0", 30));
             this->FPS_Label->properties->visable = false;
             this->FPS_Label->properties->id = "FPS";
             this->SetColorByName(this->FPS_Label->properties->color, "white");
@@ -886,10 +886,10 @@ bool EasyRender::Poll(bool should_quit)
 }
 void EasyRender::Close()
 {
-    for (size_t x = 0; x < this->primative_stack.size(); x++)
+    for (size_t x = 0; x < this->Primitive_stack.size(); x++)
     {
-        this->primative_stack.at(x)->destroy();
-        delete this->primative_stack.at(x);
+        this->Primitive_stack.at(x)->destroy();
+        delete this->Primitive_stack.at(x);
     }
     for (size_t x = 0; x < this->timer_stack.size(); x++)
     {

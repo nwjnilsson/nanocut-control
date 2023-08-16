@@ -31,11 +31,11 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-std::string EasyPrimative::Image::get_type_name()
+std::string EasyPrimitive::Image::get_type_name()
 {
     return "image";
 }
-void EasyPrimative::Image::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Image::process_mouse(float mpos_x, float mpos_y)
 {
     mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
     mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;
@@ -70,7 +70,7 @@ void EasyPrimative::Image::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-bool EasyPrimative::Image::ImageToTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height)
+bool EasyPrimitive::Image::ImageToTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height)
 {
     int image_width = 0;
     int image_height = 0;
@@ -99,7 +99,7 @@ bool EasyPrimative::Image::ImageToTextureFromFile(const char* filename, GLuint* 
     *out_height = image_height;
     return true;
 }
-void EasyPrimative::Image::render()
+void EasyPrimitive::Image::render()
 {
     glPushMatrix();
         glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);
@@ -149,12 +149,12 @@ void EasyPrimative::Image::render()
         }
     glPopMatrix();
 }
-void EasyPrimative::Image::destroy()
+void EasyPrimitive::Image::destroy()
 {
     glDeleteTextures(1, &this->texture);
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Image::serialize()
+nlohmann::json EasyPrimitive::Image::serialize()
 {
     nlohmann::json j;
     j["position"]["x"] = this->position[0];

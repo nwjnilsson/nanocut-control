@@ -1,7 +1,7 @@
-#include "PrimativeContainer.h"
+#include "PrimitiveContainer.h"
 #include "../logging/loguru.h"
 
-void PrimativeContainer::process_mouse(float mpos_x, float mpos_y)
+void PrimitiveContainer::process_mouse(float mpos_x, float mpos_y)
 {
     if (this->type == "line")
     {
@@ -100,7 +100,7 @@ void PrimativeContainer::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-void PrimativeContainer::render()
+void PrimitiveContainer::render()
 {
     if (this->properties->matrix_callback != NULL)
     {
@@ -139,7 +139,7 @@ void PrimativeContainer::render()
         this->box->render();
     }
 }
-void PrimativeContainer::destroy()
+void PrimitiveContainer::destroy()
 {
     if (this->type == "line")
     {
@@ -182,7 +182,7 @@ void PrimativeContainer::destroy()
         delete this->box;
     }
 }
-nlohmann::json PrimativeContainer::serialize()
+nlohmann::json PrimitiveContainer::serialize()
 {
     nlohmann::json j;
     if (this->type == "line")

@@ -1,30 +1,26 @@
-#ifndef ARC_
-#define ARC_
+#ifndef CIRCLE_
+#define CIRCLE_
 
-#include "../PrimativeProperties.h"
+#include "../PrimitiveProperties.h"
 #include "../../json/json.h"
 #include "../../geometry/geometry.h"
 #include <string>
 
-class EasyPrimative::Arc{
+class EasyPrimitive::Circle{
     public:
         nlohmann::json mouse_event;
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
         
         double_point_t center;
-        float start_angle;
-        float end_angle;
         float radius;
         float width;
         std::string style; //solid, dashed
 
-        Arc(double_point_t c, float r, float sa, float ea)
+        Circle(double_point_t c, float r)
         {
-            this->properties = new PrimativeProperties();
+            this->properties = new PrimitiveProperties();
             this->center = c;
             this->radius = r;
-            this->start_angle = sa;
-            this->end_angle = ea;
             this->width = 1;
             this->style = "solid";
             this->mouse_event = NULL;
@@ -37,4 +33,4 @@ class EasyPrimative::Arc{
         nlohmann::json serialize();
 };
 
-#endif //ARC_
+#endif //CIRCLE_

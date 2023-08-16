@@ -1,7 +1,7 @@
 #ifndef IMAGE_
 #define IMAGE_
 
-#include "../PrimativeProperties.h"
+#include "../PrimitiveProperties.h"
 #include "../../json/json.h"
 #include "../../geometry/geometry.h"
 #include "../../gui/stb_image.h"
@@ -30,10 +30,10 @@
 #endif
 
 
-class EasyPrimative::Image{
+class EasyPrimitive::Image{
     public:
         nlohmann::json mouse_event;
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
 
         float position[3];
         std::string image_file;
@@ -44,7 +44,7 @@ class EasyPrimative::Image{
         
         Image(double_point_t p, std::string f, float w, float h)
         {
-            this->properties = new PrimativeProperties();
+            this->properties = new PrimitiveProperties();
             this->position[0] = p.x;
             this->position[1] = p.y;
             this->position[2] = 0;

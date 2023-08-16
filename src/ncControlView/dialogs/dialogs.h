@@ -27,7 +27,7 @@ void dialogs_set_controller_homing_value(std::string i);
 
 void dialogs_show_thc_window(bool s);
 
-void dialogs_ask_yes_no(std::string a, void (*y)(PrimativeContainer *), void (*n)(PrimativeContainer *), PrimativeContainer *args);
+void dialogs_ask_yes_no(std::string a, void (*y)(PrimitiveContainer *), void (*n)(PrimitiveContainer *), PrimitiveContainer *args);
 
 void dialogs_init();
 

@@ -41,7 +41,7 @@ void jetCamView::ZoomEventCallback(nlohmann::json e)
     }
     else
     {
-        for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+        for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
         {
             if ((*it)->properties->view == globals->renderer->GetCurrentView())
             {
@@ -63,7 +63,7 @@ void jetCamView::ZoomEventCallback(nlohmann::json e)
         }
     }
 }
-void jetCamView::ViewMatrixCallback(PrimativeContainer *p)
+void jetCamView::ViewMatrixCallback(PrimitiveContainer *p)
 {
     p->properties->scale = globals->zoom;
     p->properties->offset[0] = globals->pan.x;
@@ -98,7 +98,7 @@ void jetCamView::MouseCallback(nlohmann::json e)
                 if (globals->jet_cam_view->left_click_state == true)
                 {
                     //LOG_F(INFO, "Dragging mouse!");
-                    for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                    for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                     {
                         if ((*it)->properties->view == globals->renderer->GetCurrentView())
                         {
@@ -123,7 +123,7 @@ void jetCamView::MouseCallback(nlohmann::json e)
         globals->jet_cam_view->left_click_state = false;
     }
 }
-void jetCamView::MouseEventCallback(PrimativeContainer* c,nlohmann::json e)
+void jetCamView::MouseEventCallback(PrimitiveContainer* c,nlohmann::json e)
 {
     //LOG_F(INFO, "%s", e.dump().c_str());
     if (globals->jet_cam_view->CurrentTool == JETCAM_TOOL_CONTOUR)
@@ -326,7 +326,7 @@ void jetCamView::RenderUI(void *self_pointer)
                 if (ImGui::MenuItem("Dump Stack", ""))
                 {
                     LOG_F(INFO, "Help->Dump Stack");
-                    globals->renderer->DumpJsonToFile("stack.json", globals->renderer->DumpPrimativeStack());
+                    globals->renderer->DumpJsonToFile("stack.json", globals->renderer->DumpPrimitiveStack());
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Documentation", "")) 
@@ -461,7 +461,7 @@ void jetCamView::RenderUI(void *self_pointer)
             ImGui::Combo("Choose Tool", &operation_tool, cp);
             static int layer_selection = -1;
             combo_options.clear();
-            for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+            for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
             {
                 if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part")
                 {
@@ -631,7 +631,7 @@ void jetCamView::RenderUI(void *self_pointer)
             }
             ImGui::End();
         }
-        static PrimativeContainer *selected_part = NULL;
+        static PrimitiveContainer *selected_part = NULL;
         if (selected_part != NULL)
         {
             ImGui::Begin("Properties", NULL, ImGuiWindowFlags_AlwaysAutoResize);
@@ -660,7 +660,7 @@ void jetCamView::RenderUI(void *self_pointer)
                 ImGui::TableSetupColumn("Parts Viewer");
                 ImGui::TableHeadersRow();
                 int count = 0;
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && !((*it)->part->part_name.find(":") != std::string::npos))
                     {
@@ -692,7 +692,7 @@ void jetCamView::RenderUI(void *self_pointer)
                             ImGui::Separator();
                             if (ImGui::MenuItem("Show Duplicate Parts"))
                             {
-                                for (std::vector<PrimativeContainer*>::iterator dup = globals->renderer->GetPrimativeStack()->begin(); dup != globals->renderer->GetPrimativeStack()->end(); ++dup)
+                                for (std::vector<PrimitiveContainer*>::iterator dup = globals->renderer->GetPrimitiveStack()->begin(); dup != globals->renderer->GetPrimitiveStack()->end(); ++dup)
                                 {
                                     if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name.find((*it)->part->part_name + ":") != std::string::npos))
                                     {
@@ -702,7 +702,7 @@ void jetCamView::RenderUI(void *self_pointer)
                             }
                             if (ImGui::MenuItem("Hide Duplicate Parts"))
                             {
-                                for (std::vector<PrimativeContainer*>::iterator dup = globals->renderer->GetPrimativeStack()->begin(); dup != globals->renderer->GetPrimativeStack()->end(); ++dup)
+                                for (std::vector<PrimitiveContainer*>::iterator dup = globals->renderer->GetPrimitiveStack()->begin(); dup != globals->renderer->GetPrimitiveStack()->end(); ++dup)
                                 {
                                     if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name.find((*it)->part->part_name + ":") != std::string::npos))
                                     {
@@ -738,7 +738,7 @@ void jetCamView::RenderUI(void *self_pointer)
                         if (tree_node_open)
                         {
                             int dup_count = 0;
-                            for (std::vector<PrimativeContainer*>::iterator dup = globals->renderer->GetPrimativeStack()->begin(); dup != globals->renderer->GetPrimativeStack()->end(); ++dup)
+                            for (std::vector<PrimitiveContainer*>::iterator dup = globals->renderer->GetPrimitiveStack()->begin(); dup != globals->renderer->GetPrimitiveStack()->end(); ++dup)
                             {
                                 if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name.find((*it)->part->part_name + ":") != std::string::npos))
                                 {
@@ -807,7 +807,7 @@ void jetCamView::RenderUI(void *self_pointer)
                 std::vector<std::string> layers_stack;
                 ImGui::TableSetupColumn("Layers Viewer");
                 ImGui::TableHeadersRow();
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part")
                     {
@@ -833,8 +833,8 @@ void jetCamView::RenderUI(void *self_pointer)
 }
 void jetCamView::DeletePart(std::string part_name)
 {
-    std::vector<PrimativeContainer*>::iterator it;
-    for ( it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+    std::vector<PrimitiveContainer*>::iterator it;
+    for ( it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
     {
         if ((*it)->properties->view == globals->renderer->GetCurrentView())
         {
@@ -844,7 +844,7 @@ void jetCamView::DeletePart(std::string part_name)
                 {
                     (*it)->destroy();
                     delete * it;  
-                    it = globals->renderer->GetPrimativeStack()->erase(it);
+                    it = globals->renderer->GetPrimitiveStack()->erase(it);
                 }
             }
         }
@@ -874,7 +874,7 @@ bool jetCamView::DxfFileOpen(std::string filename, std::string name)
     {
         this->dxf_nest = PolyNest::PolyNest();
         this->dxf_nest.SetExtents(PolyNest::PolyPoint(this->material_plane->bottom_left.x, this->material_plane->bottom_left.y), PolyNest::PolyPoint(this->material_plane->bottom_left.x + this->material_plane->width, this->material_plane->bottom_left.y + this->material_plane->height));
-        for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+        for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
         {
             if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part")
             {
@@ -918,7 +918,7 @@ bool jetCamView::DxfFileParseTimer(void *p)
             if (!self->dl_dxf->readDxfGroups(self->dxf_fp, self->DXFcreationInterface))
             {
                 self->DXFcreationInterface->Finish();
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && (*it)->part->part_name == self->DXFcreationInterface->filename)
                     {
@@ -1009,7 +1009,7 @@ void jetCamView::Init()
     globals->renderer->PushEvent("Tab", "keyup", &this->KeyCallback);
     this->menu_bar = globals->renderer->PushGui(true, &this->RenderUI, this);
     this->ProgressWindowHandle = globals->renderer->PushGui(false, &this->RenderProgressWindow, this);
-    this->material_plane = globals->renderer->PushPrimative(new EasyPrimative::Box({0, 0}, this->job_options.material_size[0], this->job_options.material_size[1], 0));
+    this->material_plane = globals->renderer->PushPrimitive(new EasyPrimitive::Box({0, 0}, this->job_options.material_size[0], this->job_options.material_size[1], 0));
     this->material_plane->properties->id = "material_plane";
     this->material_plane->properties->zindex = -20;
     this->material_plane->properties->color[0] = 100;
@@ -1021,7 +1021,7 @@ void jetCamView::Init()
 }
 void jetCamView::Tick()
 {
-    for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+    for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
     {
         if ((*it)->properties->view == globals->renderer->GetCurrentView())
         {
@@ -1037,7 +1037,7 @@ void jetCamView::Tick()
         {
             if (this->toolpath_operations[x].enabled != this->toolpath_operations[x].last_enabled)
             {
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView())
                     {
@@ -1066,7 +1066,7 @@ void jetCamView::Tick()
     }
     /*else
     {
-        for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+        for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
         {
             if ((*it)->properties->view == globals->renderer->GetCurrentView())
             {
@@ -1097,7 +1097,7 @@ void jetCamView::Tick()
                     for (size_t i = 0; i < this->toolpath_operations.size(); i++)
                     {
                         LOG_F(INFO, "Posting toolpath operation: %lu on layer: %s", i, this->toolpath_operations[i].layer.c_str());
-                        for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                        for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                         {
                             if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->properties->visable == true && (*it)->type == "part")
                             {
@@ -1133,7 +1133,7 @@ void jetCamView::Tick()
             }
             if (action.action_id == "rebuild_part_toolpaths")
             {
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part")
                     {
@@ -1155,14 +1155,14 @@ void jetCamView::Tick()
             }
             if (action.action_id == "delete_duplicate_parts")
             {
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end();)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end();)
                 {
                     std::string part_name = action.data["part_name"];
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && ((*it)->part->part_name.find(part_name + ":") != std::string::npos))
                     {
                         (*it)->destroy();
                         delete *it;  
-                        it = globals->renderer->GetPrimativeStack()->erase(it);
+                        it = globals->renderer->GetPrimitiveStack()->erase(it);
                     }
                     else
                     {
@@ -1172,14 +1172,14 @@ void jetCamView::Tick()
             }
             if (action.action_id == "delete_parts")
             {
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end();)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end();)
                 {
                     std::string part_name = action.data["part_name"];
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && ((*it)->part->part_name.find(part_name) != std::string::npos))
                     {
                         (*it)->destroy();
                         delete *it;  
-                        it = globals->renderer->GetPrimativeStack()->erase(it);
+                        it = globals->renderer->GetPrimitiveStack()->erase(it);
                     }
                     else
                     {
@@ -1189,14 +1189,14 @@ void jetCamView::Tick()
             }
             if (action.action_id == "delete_part")
             {
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end();)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end();)
                 {
                     std::string part_name = action.data["part_name"];
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && ((*it)->part->part_name.find(part_name) != std::string::npos))
                     {
                         (*it)->destroy();
                         delete *it;  
-                        it = globals->renderer->GetPrimativeStack()->erase(it);
+                        it = globals->renderer->GetPrimitiveStack()->erase(it);
                     }
                     else
                     {
@@ -1209,17 +1209,17 @@ void jetCamView::Tick()
             {
                 int dup_count = 1;
                 std::string part_name = action.data["part_name"];
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && ((*it)->part->part_name.find(part_name + ":") != std::string::npos))
                     {
                         dup_count++;
                     }
                 }
-                EasyPrimative::Part *p;
+                EasyPrimitive::Part *p;
                 this->dxf_nest = PolyNest::PolyNest();
                 this->dxf_nest.SetExtents(PolyNest::PolyPoint(this->material_plane->bottom_left.x, this->material_plane->bottom_left.y), PolyNest::PolyPoint(this->material_plane->bottom_left.x + this->material_plane->width, this->material_plane->bottom_left.y + this->material_plane->height));
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part")
                     {
@@ -1242,11 +1242,11 @@ void jetCamView::Tick()
                         this->dxf_nest.PushPlacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visable);
                     }
                 }
-                for (std::vector<PrimativeContainer*>::iterator it = globals->renderer->GetPrimativeStack()->begin(); it != globals->renderer->GetPrimativeStack()->end(); ++it)
+                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && ((*it)->part->part_name == part_name))
                     {
-                        std::vector<EasyPrimative::Part::path_t> paths;
+                        std::vector<EasyPrimitive::Part::path_t> paths;
                         std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
                         for (size_t x = 0; x < (*it)->part->paths.size(); x++)
                         {
@@ -1264,10 +1264,10 @@ void jetCamView::Tick()
                                 poly_part.push_back(points);
                             }
                         }
-                        p = globals->renderer->PushPrimative(new EasyPrimative::Part((*it)->part->part_name + ":" + std::to_string(dup_count), paths));
+                        p = globals->renderer->PushPrimitive(new EasyPrimitive::Part((*it)->part->part_name + ":" + std::to_string(dup_count), paths));
                         if (dup_count > 1)
                         {
-                            for (std::vector<PrimativeContainer*>::iterator dup = globals->renderer->GetPrimativeStack()->begin(); dup != globals->renderer->GetPrimativeStack()->end(); ++dup)
+                            for (std::vector<PrimitiveContainer*>::iterator dup = globals->renderer->GetPrimitiveStack()->begin(); dup != globals->renderer->GetPrimitiveStack()->end(); ++dup)
                             {
                                 if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name == part_name + ":" + std::to_string(dup_count-1)))
                                 {

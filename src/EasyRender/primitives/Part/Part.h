@@ -1,13 +1,13 @@
 #ifndef PART_
 #define PART_
 
-#include "../PrimativeProperties.h"
+#include "../PrimitiveProperties.h"
 #include "../../json/json.h"
 #include "../../geometry/geometry.h"
 #include <string>
 #include <vector>
 
-class EasyPrimative::Part{
+class EasyPrimitive::Part{
     public:
         struct path_t{
             std::vector<double_point_t> points;
@@ -34,7 +34,7 @@ class EasyPrimative::Part{
             }
         };
         nlohmann::json mouse_event;
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
 
         std::vector<path_t> paths;
         std::vector<std::vector<double_point_t>> tool_paths;
@@ -50,7 +50,7 @@ class EasyPrimative::Part{
 
         Part(std::string name, std::vector<path_t> p)
         {
-            this->properties = new PrimativeProperties();
+            this->properties = new PrimitiveProperties();
             this->paths = p;
             this->width = 1;
             this->style = "solid";

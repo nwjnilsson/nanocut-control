@@ -1,15 +1,15 @@
 #ifndef BOX_
 #define BOX_
 
-#include "../PrimativeProperties.h"
+#include "../PrimitiveProperties.h"
 #include "../../json/json.h"
 #include "../../geometry/geometry.h"
 #include <string>
 
-class EasyPrimative::Box{
+class EasyPrimitive::Box{
     public:
         nlohmann::json mouse_event;
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
         
         double_point_t bottom_left;
         float width;
@@ -18,7 +18,7 @@ class EasyPrimative::Box{
 
         Box(double_point_t bl, float w, float h, float cr)
         {
-            this->properties = new PrimativeProperties();
+            this->properties = new PrimitiveProperties();
             this->bottom_left = bl;
             this->width = w;
             this->height = h;

@@ -25,11 +25,11 @@
 #   error "Unknown compiler"
 #endif
 
-std::string EasyPrimative::Part::get_type_name()
+std::string EasyPrimitive::Part::get_type_name()
 {
     return "part";
 }
-void EasyPrimative::Part::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Part::process_mouse(float mpos_x, float mpos_y)
 {
     if (this->properties->visable == true)
     {
@@ -139,7 +139,7 @@ void EasyPrimative::Part::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-std::vector<std::vector<double_point_t>> EasyPrimative::Part::OffsetPath(std::vector<double_point_t> path, double offset)
+std::vector<std::vector<double_point_t>> EasyPrimitive::Part::OffsetPath(std::vector<double_point_t> path, double offset)
 {
     double scale = 100.0f;
     std::vector<std::vector<double_point_t>> ret;
@@ -177,7 +177,7 @@ std::vector<std::vector<double_point_t>> EasyPrimative::Part::OffsetPath(std::ve
     }
     return ret;
 }
-double EasyPrimative::Part::PerpendicularDistance(const double_point_t &pt, const double_point_t &lineStart, const double_point_t &lineEnd)
+double EasyPrimitive::Part::PerpendicularDistance(const double_point_t &pt, const double_point_t &lineStart, const double_point_t &lineEnd)
 {
 	double dx = lineEnd.x - lineStart.x;
 	double dy = lineEnd.y - lineStart.y;
@@ -205,7 +205,7 @@ double EasyPrimative::Part::PerpendicularDistance(const double_point_t &pt, cons
 
 	return pow(pow(ax,2.0)+pow(ay,2.0),0.5);
 }
-void EasyPrimative::Part::Simplify(const std::vector<double_point_t> &pointList, std::vector<double_point_t> &out, double epsilon)
+void EasyPrimitive::Part::Simplify(const std::vector<double_point_t> &pointList, std::vector<double_point_t> &out, double epsilon)
 {
 	if(pointList.size() < 2)
     {
@@ -248,7 +248,7 @@ void EasyPrimative::Part::Simplify(const std::vector<double_point_t> &pointList,
 		out.push_back(pointList[end]);
 	}
 }
-void EasyPrimative::Part::render()
+void EasyPrimitive::Part::render()
 {
     if (!(this->last_control == this->control))
     {
@@ -318,7 +318,7 @@ void EasyPrimative::Part::render()
             }
             catch (std::exception& e)
             {
-                LOG_F(ERROR, "(EasyPrimative::Part::render) Exception: %s, setting visability to false to avoid further exceptions!", e.what());
+                LOG_F(ERROR, "(EasyPrimitive::Part::render) Exception: %s, setting visability to false to avoid further exceptions!", e.what());
                 this->properties->visable = false;
             }
             this->GetBoundingBox(&this->bb_min, &this->bb_max);
@@ -355,7 +355,7 @@ void EasyPrimative::Part::render()
             }
             catch (std::exception& e)
             {
-                LOG_F(ERROR, "(EasyPrimative::Part::render) Exception: %s, setting visability to false to avoid further exceptions!", e.what());
+                LOG_F(ERROR, "(EasyPrimitive::Part::render) Exception: %s, setting visability to false to avoid further exceptions!", e.what());
                 this->properties->visable = false;
             }
             glEnd();
@@ -374,11 +374,11 @@ void EasyPrimative::Part::render()
         glDisable(GL_LINE_STIPPLE);
     glPopMatrix();
 }
-void EasyPrimative::Part::destroy()
+void EasyPrimitive::Part::destroy()
 {
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Part::serialize()
+nlohmann::json EasyPrimitive::Part::serialize()
 {
     nlohmann::json paths;
     for (std::vector<path_t>::iterator it = this->paths.begin(); it != this->paths.end(); ++it)
@@ -402,7 +402,7 @@ nlohmann::json EasyPrimative::Part::serialize()
     j["style"] = this->style;
     return j;
 }
-void EasyPrimative::Part::GetBoundingBox(double_point_t *bbox_min, double_point_t *bbox_max)
+void EasyPrimitive::Part::GetBoundingBox(double_point_t *bbox_min, double_point_t *bbox_max)
 {
     bbox_max->x = -1000000;
     bbox_max->y = -1000000;
@@ -419,7 +419,7 @@ void EasyPrimative::Part::GetBoundingBox(double_point_t *bbox_min, double_point_
         }
     }
 }
-bool EasyPrimative::Part::CheckIfPointIsInsidePath(std::vector<double_point_t> path, double_point_t point)
+bool EasyPrimitive::Part::CheckIfPointIsInsidePath(std::vector<double_point_t> path, double_point_t point)
 {
     size_t polyCorners = path.size();
     size_t j = polyCorners-1;
@@ -436,7 +436,7 @@ bool EasyPrimative::Part::CheckIfPointIsInsidePath(std::vector<double_point_t> p
     }
     return oddNodes;
 }
-bool EasyPrimative::Part::CheckIfPathIsInsidePath(std::vector<double_point_t> path1, std::vector<double_point_t> path2)
+bool EasyPrimitive::Part::CheckIfPathIsInsidePath(std::vector<double_point_t> path1, std::vector<double_point_t> path2)
 {
     for (std::vector<double_point_t>::iterator it = path1.begin(); it != path1.end(); ++it)
     {
@@ -447,7 +447,7 @@ bool EasyPrimative::Part::CheckIfPathIsInsidePath(std::vector<double_point_t> pa
     }
     return false;
 }
-std::vector<std::vector<double_point_t>> EasyPrimative::Part::GetOrderedToolpaths()
+std::vector<std::vector<double_point_t>> EasyPrimitive::Part::GetOrderedToolpaths()
 {
     Geometry g;
     std::vector<std::vector<double_point_t>> toolpaths = this->tool_paths;
@@ -479,7 +479,7 @@ std::vector<std::vector<double_point_t>> EasyPrimative::Part::GetOrderedToolpath
             }
             if (winner_index == -1)
             {
-                LOG_F(WARNING, "(EasyPrimative::Part::GetOrderedToolpaths) Discarded empty toolpath!");
+                LOG_F(WARNING, "(EasyPrimitive::Part::GetOrderedToolpaths) Discarded empty toolpath!");
             }
             else
             {
@@ -518,7 +518,7 @@ std::vector<std::vector<double_point_t>> EasyPrimative::Part::GetOrderedToolpath
     }
     return ret;
 }
-double_point_t *EasyPrimative::Part::GetClosestPoint(size_t *index, double_point_t point, std::vector<double_point_t> *points)
+double_point_t *EasyPrimitive::Part::GetClosestPoint(size_t *index, double_point_t point, std::vector<double_point_t> *points)
 {
     Geometry g;
     double smallest_distance = 1000000;
@@ -542,7 +542,7 @@ double_point_t *EasyPrimative::Part::GetClosestPoint(size_t *index, double_point
         return NULL;
     }
 }
-bool EasyPrimative::Part::CreateToolpathLeads(std::vector<double_point_t> *tpath, double length, double_point_t position, int direction)
+bool EasyPrimitive::Part::CreateToolpathLeads(std::vector<double_point_t> *tpath, double length, double_point_t position, int direction)
 {
     if (length == 0) return true;
     Geometry g;

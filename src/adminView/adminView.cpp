@@ -33,7 +33,7 @@ void adminView::ZoomEventCallback(nlohmann::json e)
         globals->pan.y += matrix_mouse.y * scalechange;
     }
 }
-void adminView::ViewMatrixCallback(PrimativeContainer *p)
+void adminView::ViewMatrixCallback(PrimitiveContainer *p)
 {
     p->properties->scale = globals->zoom;
     p->properties->offset[0] = globals->pan.x;

@@ -1,12 +1,12 @@
-#ifndef PRIMATIVES_
-#define PRIMATIVES_
+#ifndef PrimitiveS_
+#define PrimitiveS_
 
 #include <string>
 #include "../json/json.h"
 
-class PrimativeContainer;
+class PrimitiveContainer;
 
-namespace EasyPrimative
+namespace EasyPrimitive
 {
     class Arc;
     class Box;
@@ -19,9 +19,9 @@ namespace EasyPrimative
 };
 
 /*
-    Properties that all primatives will share
+    Properties that all Primitives will share
 */
-class PrimativeProperties{
+class PrimitiveProperties{
     public:
         bool visable;
         bool mouse_over;
@@ -36,10 +36,10 @@ class PrimativeProperties{
         nlohmann::json data;
 
         /* Event Callbacks */
-        void (*mouse_callback)(PrimativeContainer*, nlohmann::json);
-        void (*matrix_callback)(PrimativeContainer*);
+        void (*mouse_callback)(PrimitiveContainer*, nlohmann::json);
+        void (*matrix_callback)(PrimitiveContainer*);
 
-        PrimativeProperties()
+        PrimitiveProperties()
         {
             this->visable = true;
             this->zindex = 1;
@@ -61,4 +61,4 @@ class PrimativeProperties{
         }
 };
 
-#endif //PRIMATIVES_
+#endif //PrimitiveS_

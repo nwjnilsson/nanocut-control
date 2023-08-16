@@ -32,11 +32,11 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-std::string EasyPrimative::Text::get_type_name()
+std::string EasyPrimitive::Text::get_type_name()
 {
     return "text";
 }
-void EasyPrimative::Text::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Text::process_mouse(float mpos_x, float mpos_y)
 {
     mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
     mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;
@@ -71,7 +71,7 @@ void EasyPrimative::Text::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-bool EasyPrimative::Text::InitFontFromFile(const char* filename, float font_size)
+bool EasyPrimitive::Text::InitFontFromFile(const char* filename, float font_size)
 {
     unsigned char temp_bitmap[512 * 512];
     size_t ttf_buffer_size = 0;
@@ -127,7 +127,7 @@ bool EasyPrimative::Text::InitFontFromFile(const char* filename, float font_size
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     return true;
 }
-void EasyPrimative::Text::RenderFont(float pos_x, float pos_y, std::string text)
+void EasyPrimitive::Text::RenderFont(float pos_x, float pos_y, std::string text)
 {
     this->width = 0;
     this->height = 0;
@@ -157,7 +157,7 @@ void EasyPrimative::Text::RenderFont(float pos_x, float pos_y, std::string text)
         glPopMatrix();
     glDisable(GL_TEXTURE_2D);
 }
-void EasyPrimative::Text::render()
+void EasyPrimitive::Text::render()
 {
     glPushMatrix();
         glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);
@@ -182,12 +182,12 @@ void EasyPrimative::Text::render()
         }
     glPopMatrix();
 }
-void EasyPrimative::Text::destroy()
+void EasyPrimitive::Text::destroy()
 {
     glDeleteTextures(1, &this->texture);
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Text::serialize()
+nlohmann::json EasyPrimitive::Text::serialize()
 {
     nlohmann::json j;
     j["textval"] = this->textval;

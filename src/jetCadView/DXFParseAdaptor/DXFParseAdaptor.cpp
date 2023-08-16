@@ -5,7 +5,7 @@
 /**
  * Default constructor.
  */
-DXFParseAdaptor::DXFParseAdaptor(void *easy_render_instance, void (*v)(PrimativeContainer *), void (*m)(PrimativeContainer*, nlohmann::json)) 
+DXFParseAdaptor::DXFParseAdaptor(void *easy_render_instance, void (*v)(PrimitiveContainer *), void (*m)(PrimitiveContainer*, nlohmann::json)) 
 {
     this->current_layer = "default";
     this->filename = "";
@@ -110,7 +110,7 @@ void DXFParseAdaptor::Finish()
         int shared = 0; //Assume we are not shared
         double_point_t our_endpoint = this->polylines[x].points.back().point;
         double_point_t our_startpoint = this->polylines[x].points.front().point;
-        for (std::vector<PrimativeContainer*>::iterator it = this->easy_render_instance->GetPrimativeStack()->begin(); it != this->easy_render_instance->GetPrimativeStack()->end(); ++it)
+        for (std::vector<PrimitiveContainer*>::iterator it = this->easy_render_instance->GetPrimitiveStack()->begin(); it != this->easy_render_instance->GetPrimitiveStack()->end(); ++it)
         {
             if ((*it)->properties->view == this->easy_render_instance->GetCurrentView())
             {
@@ -205,7 +205,7 @@ void DXFParseAdaptor::addPoint(const DL_PointData& data)
 
 void DXFParseAdaptor::addLine(const DL_LineData& data)
 {
-    EasyPrimative::Line *l = this->easy_render_instance->PushPrimative(new EasyPrimative::Line({data.x1, data.y1, data.z1}, {data.x2, data.y2, data.z2}));
+    EasyPrimitive::Line *l = this->easy_render_instance->PushPrimitive(new EasyPrimitive::Line({data.x1, data.y1, data.z1}, {data.x2, data.y2, data.z2}));
     l->properties->data["layer"] = this->current_layer;
     l->properties->data["filename"] = this->filename;
     l->properties->mouse_callback = this->mouse_callback;
@@ -218,7 +218,7 @@ void DXFParseAdaptor::addXLine(const DL_XLineData& data)
 
 void DXFParseAdaptor::addArc(const DL_ArcData& data)
 {
-    EasyPrimative::Arc *a = this->easy_render_instance->PushPrimative(new EasyPrimative::Arc({data.cx, data.cy, data.cz}, (float)data.radius, (float)data.angle1, (float)data.angle2));
+    EasyPrimitive::Arc *a = this->easy_render_instance->PushPrimitive(new EasyPrimitive::Arc({data.cx, data.cy, data.cz}, (float)data.radius, (float)data.angle1, (float)data.angle2));
     a->properties->data["layer"] = this->current_layer;
     a->properties->data["filename"] = this->filename;
     a->properties->mouse_callback = this->mouse_callback;
@@ -227,7 +227,7 @@ void DXFParseAdaptor::addArc(const DL_ArcData& data)
 
 void DXFParseAdaptor::addCircle(const DL_CircleData& data)
 {
-   EasyPrimative::Circle *c = this->easy_render_instance->PushPrimative(new EasyPrimative::Circle({data.cx, data.cy, data.cz}, (float)data.radius));
+   EasyPrimitive::Circle *c = this->easy_render_instance->PushPrimitive(new EasyPrimitive::Circle({data.cx, data.cy, data.cz}, (float)data.radius));
     c->properties->data["layer"] = this->current_layer;
     c->properties->data["filename"] = this->filename;
     c->properties->mouse_callback = this->mouse_callback;

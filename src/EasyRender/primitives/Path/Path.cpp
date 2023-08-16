@@ -24,11 +24,11 @@
 #   error "Unknown compiler"
 #endif
 
-std::string EasyPrimative::Path::get_type_name()
+std::string EasyPrimitive::Path::get_type_name()
 {
     return "path";
 }
-void EasyPrimative::Path::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Path::process_mouse(float mpos_x, float mpos_y)
 {
     if (this->properties->visable == true)
     {
@@ -81,7 +81,7 @@ void EasyPrimative::Path::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-void EasyPrimative::Path::render()
+void EasyPrimitive::Path::render()
 {
     glPushMatrix();
         glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);
@@ -111,11 +111,11 @@ void EasyPrimative::Path::render()
         glDisable(GL_LINE_STIPPLE);
     glPopMatrix();
 }
-void EasyPrimative::Path::destroy()
+void EasyPrimitive::Path::destroy()
 {
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Path::serialize()
+nlohmann::json EasyPrimitive::Path::serialize()
 {
     nlohmann::json p;
     for (int i = 0; i < this->points.size(); i++)

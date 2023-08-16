@@ -8,11 +8,11 @@
 
 
 double hmi_backplane_width = 300;
-EasyPrimative::Box *hmi_backpane;
+EasyPrimitive::Box *hmi_backpane;
 double hmi_dro_backplane_height = 220;
-EasyPrimative::Box *hmi_dro_backpane;
-EasyPrimative::Box *hmi_button_backpane;
-EasyPrimative::Path *arc_okay_highlight_path;
+EasyPrimitive::Box *hmi_dro_backpane;
+EasyPrimitive::Box *hmi_button_backpane;
+EasyPrimitive::Path *arc_okay_highlight_path;
 dro_group_data_t dro;
 std::vector<hmi_button_group_t> button_groups;
 bool left_control_key_is_pressed = false;
@@ -27,7 +27,7 @@ template <typename T> std::string to_string_strip_zeros(const T a_value) //Fails
 
 void hmi_get_bounding_box(double_point_t *bbox_min, double_point_t *bbox_max)
 {
-    std::vector<PrimativeContainer*> *stack = globals->renderer->GetPrimativeStack();
+    std::vector<PrimitiveContainer*> *stack = globals->renderer->GetPrimitiveStack();
     bbox_max->x = -1000000;
     bbox_max->y = -1000000;
     bbox_min->x = 1000000;
@@ -261,7 +261,7 @@ void hmi_handle_button(std::string id)
         if (id == "Clean")
         {
             LOG_F(INFO, "Clicked Clean");
-            globals->renderer->DeletePrimativesById("gcode_highlights");
+            globals->renderer->DeletePrimitivesById("gcode_highlights");
         }
         else if (id == "Fit")
         {
@@ -327,7 +327,7 @@ void hmi_handle_button(std::string id)
     }
 }
 
-void hmi_jumpin(PrimativeContainer* p)
+void hmi_jumpin(PrimitiveContainer* p)
 {
     double_point_t bbox_min, bbox_max;
     hmi_get_bounding_box(&bbox_min, &bbox_max);
@@ -370,7 +370,7 @@ void hmi_jumpin(PrimativeContainer* p)
     }
 }
 
-void hmi_reverse(PrimativeContainer* p)
+void hmi_reverse(PrimitiveContainer* p)
 {
     std::vector<std::string> gcode_lines_before_reverse;
     std::vector<std::string> gcode_lines_to_reverse;
@@ -451,7 +451,7 @@ void hmi_reverse(PrimativeContainer* p)
     }
     
 }
-void hmi_mouse_callback(PrimativeContainer* c, nlohmann::json e)
+void hmi_mouse_callback(PrimitiveContainer* c, nlohmann::json e)
 {
     //LOG_F(INFO, "%s", e.dump().c_str());
     if (c->type == "path" && c->properties->id == "gcode")
@@ -525,7 +525,7 @@ void hmi_mouse_callback(PrimativeContainer* c, nlohmann::json e)
     }
 }
 
-void hmi_view_matrix(PrimativeContainer *p)
+void hmi_view_matrix(PrimitiveContainer *p)
 {
     if (p->type == "line")
     {
@@ -616,7 +616,7 @@ bool hmi_update_timer()
             {
                 std::vector<double_point_t> path;
                 path.push_back({(double)dro_data["WCS"]["x"], (double)dro_data["WCS"]["y"]});
-                arc_okay_highlight_path = globals->renderer->PushPrimative(new EasyPrimative::Path(path));
+                arc_okay_highlight_path = globals->renderer->PushPrimitive(new EasyPrimitive::Path(path));
                 arc_okay_highlight_path->properties->id = "gcode_highlights";
                 arc_okay_highlight_path->is_closed = false;
                 arc_okay_highlight_path->width = 3;
@@ -723,22 +723,22 @@ void hmi_push_button_group(std::string b1, std::string b2)
 {
     hmi_button_group_t group;
     group.button_one.name = b1;
-    group.button_one.object = globals->renderer->PushPrimative(new EasyPrimative::Box({-1000000, -1000000}, 1, 1, 5));
+    group.button_one.object = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-1000000, -1000000}, 1, 1, 5));
     group.button_one.object->properties->mouse_callback = &hmi_mouse_callback;
     globals->renderer->SetColorByName(group.button_one.object->properties->color, "black");
     group.button_one.object->properties->zindex = 200;
     group.button_one.object->properties->id = b1;
-    group.button_one.label = globals->renderer->PushPrimative(new EasyPrimative::Text({-1000000, -1000000}, group.button_one.name, 20));
+    group.button_one.label = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-1000000, -1000000}, group.button_one.name, 20));
     group.button_one.label->properties->zindex = 210;
     globals->renderer->SetColorByName(group.button_one.label->properties->color, "white");
 
     group.button_two.name = b2;
-    group.button_two.object = globals->renderer->PushPrimative(new EasyPrimative::Box({-1000000, -1000000}, 1, 1, 5));
+    group.button_two.object = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-1000000, -1000000}, 1, 1, 5));
     group.button_two.object->properties->mouse_callback = &hmi_mouse_callback;
     globals->renderer->SetColorByName(group.button_two.object->properties->color, "black");
     group.button_two.object->properties->zindex = 200;
     group.button_two.object->properties->id = b2;
-    group.button_two.label = globals->renderer->PushPrimative(new EasyPrimative::Text({-1000000, -1000000}, group.button_two.name, 20));
+    group.button_two.label = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-1000000, -1000000}, group.button_two.name, 20));
     group.button_two.label->properties->zindex = 210;
     globals->renderer->SetColorByName(group.button_two.label->properties->color, "white");
 
@@ -1029,7 +1029,7 @@ void hmi_init()
 {
     globals->nc_control_view->way_point_position = {-1000, -1000};
     
-    globals->nc_control_view->machine_plane = globals->renderer->PushPrimative(new EasyPrimative::Box({0, 0}, globals->nc_control_view->machine_parameters.machine_extents[0], globals->nc_control_view->machine_parameters.machine_extents[1], 0));
+    globals->nc_control_view->machine_plane = globals->renderer->PushPrimitive(new EasyPrimitive::Box({0, 0}, globals->nc_control_view->machine_parameters.machine_extents[0], globals->nc_control_view->machine_parameters.machine_extents[1], 0));
     globals->nc_control_view->machine_plane->properties->id = "machine_plane";
     globals->nc_control_view->machine_plane->properties->zindex = -20;
     globals->nc_control_view->machine_plane->properties->color[0] = globals->nc_control_view->preferences.machine_plane_color[0] * 255.0f;
@@ -1039,7 +1039,7 @@ void hmi_init()
     globals->nc_control_view->machine_plane->properties->mouse_callback = &hmi_mouse_callback;
 
 
-    globals->nc_control_view->cuttable_plane = globals->renderer->PushPrimative(new EasyPrimative::Box({globals->nc_control_view->machine_parameters.cutting_extents[0], globals->nc_control_view->machine_parameters.cutting_extents[1]}, (globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2]) - globals->nc_control_view->machine_parameters.cutting_extents[0], (globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3]) - globals->nc_control_view->machine_parameters.cutting_extents[1], 0));
+    globals->nc_control_view->cuttable_plane = globals->renderer->PushPrimitive(new EasyPrimitive::Box({globals->nc_control_view->machine_parameters.cutting_extents[0], globals->nc_control_view->machine_parameters.cutting_extents[1]}, (globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2]) - globals->nc_control_view->machine_parameters.cutting_extents[0], (globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3]) - globals->nc_control_view->machine_parameters.cutting_extents[1], 0));
     globals->nc_control_view->cuttable_plane->properties->id = "cuttable_plane";
     globals->nc_control_view->cuttable_plane->properties->zindex = -10;
     globals->nc_control_view->cuttable_plane->properties->color[0] = globals->nc_control_view->preferences.cuttable_plane_color[0] * 255.0f;
@@ -1047,20 +1047,20 @@ void hmi_init()
     globals->nc_control_view->cuttable_plane->properties->color[2] = globals->nc_control_view->preferences.cuttable_plane_color[2] * 255.0f;
     globals->nc_control_view->cuttable_plane->properties->matrix_callback = globals->nc_control_view->view_matrix;
     
-    hmi_backpane = globals->renderer->PushPrimative(new EasyPrimative::Box({-100000, -100000}, 1, 1, 5));
+    hmi_backpane = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-100000, -100000}, 1, 1, 5));
     hmi_backpane->properties->color[0] = 25;
     hmi_backpane->properties->color[1] = 44;
     hmi_backpane->properties->color[2] = 71;
     hmi_backpane->properties->zindex = 100;
 
   
-    hmi_dro_backpane = globals->renderer->PushPrimative(new EasyPrimative::Box({-100000, -100000}, 1, 1, 5));
+    hmi_dro_backpane = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-100000, -100000}, 1, 1, 5));
     hmi_dro_backpane->properties->color[0] = 29;
     hmi_dro_backpane->properties->color[1] = 32;
     hmi_dro_backpane->properties->color[2] = 48;
     hmi_dro_backpane->properties->zindex = 110;
 
-    hmi_button_backpane = globals->renderer->PushPrimative(new EasyPrimative::Box({-100000, -100000}, 1, 1, 5));
+    hmi_button_backpane = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-100000, -100000}, 1, 1, 5));
     hmi_button_backpane->properties->color[0] = 29;
     hmi_button_backpane->properties->color[1] = 32;
     hmi_button_backpane->properties->color[2] = 48;
@@ -1085,72 +1085,72 @@ void hmi_init()
         hmi_push_button_group("Run", "Abort");
     }
     
-    dro.x.label = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "X", 50));
+    dro.x.label = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "X", 50));
     dro.x.label->properties->zindex = 210;
     globals->renderer->SetColorByName(dro.x.label->properties->color, "white");
-    dro.x.work_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "0.0000", 40));
+    dro.x.work_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "0.0000", 40));
     dro.x.work_readout->properties->zindex = 210;
     dro.x.work_readout->properties->color[0] = 10;
     dro.x.work_readout->properties->color[1] = 150;
     dro.x.work_readout->properties->color[2] = 10;
-    dro.x.absolute_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "0.0000", 15));
+    dro.x.absolute_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "0.0000", 15));
     dro.x.absolute_readout->properties->zindex = 210;
     dro.x.absolute_readout->properties->color[0] = 247;
     dro.x.absolute_readout->properties->color[1] = 104;
     dro.x.absolute_readout->properties->color[2] = 15;
-    dro.x.divider = globals->renderer->PushPrimative(new EasyPrimative::Box({-100000, -10000}, 1, 1, 3));
+    dro.x.divider = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-100000, -10000}, 1, 1, 3));
     dro.x.divider->properties->zindex = 150;
     globals->renderer->SetColorByName(dro.x.divider->properties->color, "black");
 
 
-    dro.y.label = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "Y", 50));
+    dro.y.label = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "Y", 50));
     dro.y.label->properties->zindex = 210;
     globals->renderer->SetColorByName(dro.y.label->properties->color, "white");
-    dro.y.work_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "0.0000", 40));
+    dro.y.work_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "0.0000", 40));
     dro.y.work_readout->properties->zindex = 210;
     dro.y.work_readout->properties->color[0] = 10;
     dro.y.work_readout->properties->color[1] = 150;
     dro.y.work_readout->properties->color[2] = 10;
-    dro.y.absolute_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "0.0000", 15));
+    dro.y.absolute_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "0.0000", 15));
     dro.y.absolute_readout->properties->zindex = 210;
     dro.y.absolute_readout->properties->color[0] = 247;
     dro.y.absolute_readout->properties->color[1] = 104;
     dro.y.absolute_readout->properties->color[2] = 15;
-    dro.y.divider = globals->renderer->PushPrimative(new EasyPrimative::Box({-100000, -10000}, 1, 1, 3));
+    dro.y.divider = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-100000, -10000}, 1, 1, 3));
     dro.y.divider->properties->zindex = 150;
     globals->renderer->SetColorByName(dro.y.divider->properties->color, "black");
 
-    dro.z.label = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "Z", 50));
+    dro.z.label = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "Z", 50));
     dro.z.label->properties->zindex = 210;
     globals->renderer->SetColorByName(dro.z.label->properties->color, "white");
-    dro.z.work_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "0.0000", 40));
+    dro.z.work_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "0.0000", 40));
     dro.z.work_readout->properties->zindex = 210;
     dro.z.work_readout->properties->color[0] = 10;
     dro.z.work_readout->properties->color[1] = 150;
     dro.z.work_readout->properties->color[2] = 10;
-    dro.z.absolute_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "0.0000", 15));
+    dro.z.absolute_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "0.0000", 15));
     dro.z.absolute_readout->properties->zindex = 210;
     dro.z.absolute_readout->properties->color[0] = 247;
     dro.z.absolute_readout->properties->color[1] = 104;
     dro.z.absolute_readout->properties->color[2] = 15;
-    dro.z.divider = globals->renderer->PushPrimative(new EasyPrimative::Box({-100000, -10000}, 1, 1, 3));
+    dro.z.divider = globals->renderer->PushPrimitive(new EasyPrimitive::Box({-100000, -10000}, 1, 1, 3));
     dro.z.divider->properties->zindex = 150;
     globals->renderer->SetColorByName(dro.z.divider->properties->color, "black");
 
-    dro.feed = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "FEED: 0", 12));
+    dro.feed = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "FEED: 0", 12));
     dro.feed->properties->zindex = 210;
     dro.feed->properties->color[0] = 247;
     dro.feed->properties->color[1] = 104;
     dro.feed->properties->color[2] = 15;
 
-    dro.arc_readout = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "ARC: 0.0", 12));
+    dro.arc_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "ARC: 0.0", 12));
     dro.arc_readout->properties->zindex = 210;
     dro.arc_readout->properties->color[0] = 247;
     dro.arc_readout->properties->color[1] = 104;
     dro.arc_readout->properties->color[2] = 15;
 
 
-    dro.arc_set = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "SET: 0", 12));
+    dro.arc_set = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "SET: 0", 12));
     dro.arc_set->properties->zindex = 210;
     dro.arc_set->properties->color[0] = 247;
     dro.arc_set->properties->color[1] = 104;
@@ -1162,13 +1162,13 @@ void hmi_init()
         dro.arc_set->properties->visable = false;
     }
 
-    dro.run_time = globals->renderer->PushPrimative(new EasyPrimative::Text({-100000, -100000}, "RUN: 0:0:0", 12));
+    dro.run_time = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "RUN: 0:0:0", 12));
     dro.run_time->properties->zindex = 210;
     dro.run_time->properties->color[0] = 247;
     dro.run_time->properties->color[1] = 104;
     dro.run_time->properties->color[2] = 15;
 
-    globals->nc_control_view->torch_pointer = globals->renderer->PushPrimative(new EasyPrimative::Circle({-100000, -100000}, 5));
+    globals->nc_control_view->torch_pointer = globals->renderer->PushPrimitive(new EasyPrimitive::Circle({-100000, -100000}, 5));
     globals->nc_control_view->torch_pointer->properties->zindex = 500;
     globals->nc_control_view->torch_pointer->properties->id = "torch_pointer";
     globals->renderer->SetColorByName(globals->nc_control_view->torch_pointer->properties->color, "green");

@@ -40,9 +40,9 @@ bool gcode_open_file(std::string file)
     gcode.file.open(file);
     if (gcode.file.is_open())
     {
-        globals->renderer->DeletePrimativesById("gcode");
-        globals->renderer->DeletePrimativesById("gcode_arrows");
-        globals->renderer->DeletePrimativesById("gcode_highlights");
+        globals->renderer->DeletePrimitivesById("gcode");
+        globals->renderer->DeletePrimitivesById("gcode_arrows");
+        globals->renderer->DeletePrimitivesById("gcode_highlights");
         gcode.line_count = count_lines(file);
         gcode.lines_consumed = 0;
         gcode.filename = file;
@@ -126,7 +126,7 @@ void gcode_push_current_path_to_viewer(int rapid_line)
                         double_point_t p2 = geo.create_polar_line(midpoint, angle -30, 0.020).end;
                         arrow_path.push_back({p1.x, p1.y});
                         arrow_path.push_back({p2.x, p2.y});
-                        EasyPrimative::Path *direction_indicator = globals->renderer->PushPrimative(new EasyPrimative::Path(arrow_path));
+                        EasyPrimitive::Path *direction_indicator = globals->renderer->PushPrimitive(new EasyPrimitive::Path(arrow_path));
                         globals->renderer->SetColorByName(direction_indicator->properties->color, "blue");
                         direction_indicator->properties->id = "gcode_arrows";
                         direction_indicator->properties->matrix_callback = globals->nc_control_view->view_matrix;
@@ -139,7 +139,7 @@ void gcode_push_current_path_to_viewer(int rapid_line)
                         point_count = 0;
                     }
                 }
-                EasyPrimative::Path *g = globals->renderer->PushPrimative(new EasyPrimative::Path(path));
+                EasyPrimitive::Path *g = globals->renderer->PushPrimitive(new EasyPrimitive::Path(path));
                 g->is_closed = false;
                 g->properties->id = "gcode";
                 g->properties->data = {{"rapid_line", rapid_line}};
@@ -180,7 +180,7 @@ bool gcode_parse_timer()
                     current_path.points.push_back({ (double)g["x"], (double)g["y"]});
                     if (last_path_endpoint.x != -1000000 && last_path_endpoint.y != -1000000)
                     {
-                        EasyPrimative::Line *l = globals->renderer->PushPrimative(new EasyPrimative::Line(last_path_endpoint, {(double)g["x"], (double)g["y"]}));
+                        EasyPrimitive::Line *l = globals->renderer->PushPrimitive(new EasyPrimitive::Line(last_path_endpoint, {(double)g["x"], (double)g["y"]}));
                         l->properties->id = "gcode";
                         l->style = "dashed";
                         globals->renderer->SetColorByName(l->properties->color, "grey");
@@ -217,7 +217,7 @@ bool gcode_parse_timer()
             gcode.file.close();
             dialogs_set_progress_value(1.0f);
             dialogs_show_progress_window(false);
-            std::vector<PrimativeContainer *> *stack = globals->renderer->GetPrimativeStack();
+            std::vector<PrimitiveContainer *> *stack = globals->renderer->GetPrimitiveStack();
             for (size_t x = 0; x < stack->size(); x++)
             {
                 if (stack->at(x)->properties->id == "gcode" || stack->at(x)->properties->id == "gcode_arrows" || stack->at(x)->properties->id == "gcode_highlights")

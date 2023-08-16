@@ -52,7 +52,7 @@ struct spline_t{
 
 class DXFParseAdaptor : public DL_CreationAdapter {
 public:
-    DXFParseAdaptor(void *easy_render_pointer, void (*v)(PrimativeContainer *), void (*m)(PrimativeContainer*, nlohmann::json));
+    DXFParseAdaptor(void *easy_render_pointer, void (*v)(PrimitiveContainer *), void (*m)(PrimitiveContainer*, nlohmann::json));
 
     virtual void addLayer(const DL_LayerData& data);
     virtual void addPoint(const DL_PointData& data);
@@ -73,8 +73,8 @@ public:
     virtual void addKnot(const DL_KnotData& data);
 
     EasyRender *easy_render_instance;
-    void (*view_callback)(PrimativeContainer *);
-    void (*mouse_callback)(PrimativeContainer*, nlohmann::json);
+    void (*view_callback)(PrimitiveContainer *);
+    void (*mouse_callback)(PrimitiveContainer*, nlohmann::json);
 
     void printAttributes();
     void SetFilename(std::string f);

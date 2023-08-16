@@ -80,7 +80,7 @@ void menu_bar_render()
             if (ImGui::MenuItem("Dump Stack", ""))
             {
                 LOG_F(INFO, "Help->Dump Stack");
-                globals->renderer->DumpJsonToFile("stack.json", globals->renderer->DumpPrimativeStack());
+                globals->renderer->DumpJsonToFile("stack.json", globals->renderer->DumpPrimitiveStack());
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Documentation", "")) 

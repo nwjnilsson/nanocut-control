@@ -27,11 +27,11 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-std::string EasyPrimative::Arc::get_type_name()
+std::string EasyPrimitive::Arc::get_type_name()
 {
     return "arc";
 }
-void EasyPrimative::Arc::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Arc::process_mouse(float mpos_x, float mpos_y)
 {
     mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
     mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;
@@ -67,7 +67,7 @@ void EasyPrimative::Arc::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-void EasyPrimative::Arc::render_arc(double cx, double cy, double radius, double start_angle, double end_angle)
+void EasyPrimitive::Arc::render_arc(double cx, double cy, double radius, double start_angle, double end_angle)
 {
     double num_segments = 50;
     double_point_t start;
@@ -99,7 +99,7 @@ void EasyPrimative::Arc::render_arc(double cx, double cy, double radius, double 
         glVertex3f(end.x, end.y, 0);
     glEnd();
 }
-void EasyPrimative::Arc::render()
+void EasyPrimitive::Arc::render()
 {
     glPushMatrix();
         glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);
@@ -117,11 +117,11 @@ void EasyPrimative::Arc::render()
         glDisable(GL_LINE_STIPPLE);
     glPopMatrix();
 }
-void EasyPrimative::Arc::destroy()
+void EasyPrimitive::Arc::destroy()
 {
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Arc::serialize()
+nlohmann::json EasyPrimitive::Arc::serialize()
 {
     nlohmann::json j;
     j["center"]["x"] = this->center.x;

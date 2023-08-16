@@ -16,9 +16,9 @@ std::string controller_alarm_text;
 std::string info;
 EasyRender::EasyRenderGui *ask_window_handle;
 std::string ask_text;
-void (*ask_window_yes_callback)(PrimativeContainer *);
-void (*ask_window_no_callback)(PrimativeContainer *);
-PrimativeContainer *ask_window_args;
+void (*ask_window_yes_callback)(PrimitiveContainer *);
+void (*ask_window_no_callback)(PrimitiveContainer *);
+PrimitiveContainer *ask_window_args;
 
 void dialogs_file_open()
 {
@@ -272,7 +272,7 @@ void dialogs_controller_homing_window()
     ImGui::End();
 }
 
-void dialogs_ask_yes_no(std::string a, void (*y)(PrimativeContainer *), void (*n)(PrimativeContainer *), PrimativeContainer *args)
+void dialogs_ask_yes_no(std::string a, void (*y)(PrimitiveContainer *), void (*n)(PrimitiveContainer *), PrimitiveContainer *args)
 {
     ask_text = a;
     ask_window_yes_callback = y;

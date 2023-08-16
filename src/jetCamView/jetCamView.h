@@ -41,15 +41,15 @@ class jetCamView{
         };
         struct action_t{
             nlohmann::json data;
-            std::vector<PrimativeContainer*> parts;
+            std::vector<PrimitiveContainer*> parts;
             std::string action_id;
         };
         std::vector<action_t> action_stack;
         EasyRender::EasyRenderGui *menu_bar;
         static void ZoomEventCallback(nlohmann::json e);
-        static void ViewMatrixCallback(PrimativeContainer *p);
+        static void ViewMatrixCallback(PrimitiveContainer *p);
         static void MouseCallback(nlohmann::json e);
-        static void MouseEventCallback(PrimativeContainer* c,nlohmann::json e);
+        static void MouseEventCallback(PrimitiveContainer* c,nlohmann::json e);
         static void KeyCallback(nlohmann::json e);
         static void RenderUI(void *p);
 
@@ -74,8 +74,8 @@ class jetCamView{
         static void RenderProgressWindow(void *p);
         
     public:
-        PrimativeContainer* mouse_over_part;
-        PrimativeContainer* edit_contour_part;
+        PrimitiveContainer* mouse_over_part;
+        PrimitiveContainer* edit_contour_part;
         size_t mouse_over_path;
         size_t edit_contour_path;
 
@@ -88,7 +88,7 @@ class jetCamView{
         job_options_data_t job_options;
         std::vector<tool_data_t> tool_library;
         std::vector<toolpath_operation_t> toolpath_operations;
-        EasyPrimative::Box *material_plane;
+        EasyPrimitive::Box *material_plane;
 
         jetCamView(){
             dxf_fp = NULL;

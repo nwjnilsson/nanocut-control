@@ -10,7 +10,7 @@
 #include "gui/imgui.h"
 #include "geometry/geometry.h"
 #include "json/json.h"
-#include "primatives/PrimativeContainer.h"
+#include "primitives/PrimitiveContainer.h"
 
 #ifdef __APPLE__
 #define GL_SILENCE_DEPRECATION
@@ -48,7 +48,7 @@ class EasyRender{
         struct EasyRenderTimer{
             std::string view;
             unsigned long timestamp;
-            unsigned long intervol;
+            unsigned long interval;
             bool (*callback)();
             bool (*callback_with_self)(void *self);
             void *self_pointer;
@@ -61,7 +61,7 @@ class EasyRender{
         bool ShowCursor;
         bool AutoMaximize;
         bool ShowFPS;
-        EasyPrimative::Text *FPS_Label;
+        EasyPrimitive::Text *FPS_Label;
         std::vector<float> FPS_Average;
         char* GuiIniFileName;
         char* GuiLogFileName;
@@ -69,7 +69,7 @@ class EasyRender{
         std::string GuiStyle;
         std::string CurrentView;
 
-        std::vector<PrimativeContainer *> primative_stack;
+        std::vector<PrimitiveContainer *> Primitive_stack;
         std::vector<EasyRenderTimer *> timer_stack;
 
         static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -113,19 +113,19 @@ class EasyRender{
             this->FPS_Label = NULL;
             this->imgui_io = NULL;
         };
-        /* Primative Creation */
-        EasyPrimative::Line* PushPrimative(EasyPrimative::Line* l);
-        EasyPrimative::Text* PushPrimative(EasyPrimative::Text* t);
-        EasyPrimative::Image* PushPrimative(EasyPrimative::Image* i);
-        EasyPrimative::Path* PushPrimative(EasyPrimative::Path* i);
-        EasyPrimative::Arc* PushPrimative(EasyPrimative::Arc* i);
-        EasyPrimative::Circle* PushPrimative(EasyPrimative::Circle* ci);
-        EasyPrimative::Box* PushPrimative(EasyPrimative::Box* b);
-        EasyPrimative::Part* PushPrimative(EasyPrimative::Part* p);
+        /* Primitive Creation */
+        EasyPrimitive::Line* PushPrimitive(EasyPrimitive::Line* l);
+        EasyPrimitive::Text* PushPrimitive(EasyPrimitive::Text* t);
+        EasyPrimitive::Image* PushPrimitive(EasyPrimitive::Image* i);
+        EasyPrimitive::Path* PushPrimitive(EasyPrimitive::Path* i);
+        EasyPrimitive::Arc* PushPrimitive(EasyPrimitive::Arc* i);
+        EasyPrimitive::Circle* PushPrimitive(EasyPrimitive::Circle* ci);
+        EasyPrimitive::Box* PushPrimitive(EasyPrimitive::Box* b);
+        EasyPrimitive::Part* PushPrimitive(EasyPrimitive::Part* p);
 
         /* Timer Creation */
-        void PushTimer(unsigned long intervol, bool (*c)());
-        void PushTimer(unsigned long intervol, bool (*c)(void*), void *s);
+        void PushTimer(unsigned long interval, bool (*c)());
+        void PushTimer(unsigned long interval, bool (*c)(void*), void *s);
 
         /* Gui Creation */
         EasyRenderGui *PushGui(bool v, void (*c)());
@@ -159,10 +159,10 @@ class EasyRender{
         double_point_t  GetWindowSize();
         uint8_t GetFramesPerSecond();
         std::string GetCurrentView();
-        std::vector<PrimativeContainer *> *GetPrimativeStack();
+        std::vector<PrimitiveContainer *> *GetPrimitiveStack();
 
         /* Debugging */
-        nlohmann::json DumpPrimativeStack();
+        nlohmann::json DumpPrimitiveStack();
 
         /* File I/O */
         nlohmann::json ParseJsonFromFile(std::string filename);
@@ -170,8 +170,8 @@ class EasyRender{
         std::string FileToString(std::string filename);
         void StringToFile(std::string filename, std::string s);
 
-        /* Primative Manipulators */
-        void DeletePrimativesById(std::string id);
+        /* Primitive Manipulators */
+        void DeletePrimitivesById(std::string id);
 
         /* Main Operators */
         bool Init(int argc, char** argv);

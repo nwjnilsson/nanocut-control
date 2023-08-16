@@ -9,7 +9,7 @@
 /**
  * Default constructor.
  */
-DXFParsePathAdaptor::DXFParsePathAdaptor(void *easy_render_instance, void (*v)(PrimativeContainer *), void (*m)(PrimativeContainer*, nlohmann::json)) 
+DXFParsePathAdaptor::DXFParsePathAdaptor(void *easy_render_instance, void (*v)(PrimitiveContainer *), void (*m)(PrimitiveContainer*, nlohmann::json)) 
 {
     this->current_layer = "default";
     this->filename = "";
@@ -310,12 +310,12 @@ void DXFParsePathAdaptor::Finish()
         }
     }
     std::vector<std::vector<double_point_t>> chains = this->Chainify(this->line_stack, this->chain_tolorance);
-    std::vector<EasyPrimative::Part::path_t> paths;
+    std::vector<EasyPrimitive::Part::path_t> paths;
     double_point_t bb_min, bb_max;
     this->GetBoundingBox(chains, &bb_min, &bb_max);
     for (size_t x = 0; x < chains.size(); x++)
     {
-        EasyPrimative::Part::path_t path;
+        EasyPrimitive::Part::path_t path;
         path.is_inside_contour = false;
         if (g.distance(chains[x].front(), chains[x].back()) > this->chain_tolorance)
         {
@@ -357,7 +357,7 @@ void DXFParsePathAdaptor::Finish()
             }
         }
     }
-    EasyPrimative::Part *p = this->easy_render_instance->PushPrimative(new EasyPrimative::Part(this->filename, paths));
+    EasyPrimitive::Part *p = this->easy_render_instance->PushPrimitive(new EasyPrimitive::Part(this->filename, paths));
     p->control.smoothing = this->smoothing;
     p->control.scale = this->scale;
     //p->properties->id = this->filename;

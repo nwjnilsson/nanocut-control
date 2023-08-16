@@ -27,11 +27,11 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-std::string EasyPrimative::Circle::get_type_name()
+std::string EasyPrimitive::Circle::get_type_name()
 {
     return "circle";
 }
-void EasyPrimative::Circle::process_mouse(float mpos_x, float mpos_y)
+void EasyPrimitive::Circle::process_mouse(float mpos_x, float mpos_y)
 {
 
     mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
@@ -67,7 +67,7 @@ void EasyPrimative::Circle::process_mouse(float mpos_x, float mpos_y)
         }
     }
 }
-void EasyPrimative::Circle::render_arc(double cx, double cy, double radius, double start_angle, double end_angle)
+void EasyPrimitive::Circle::render_arc(double cx, double cy, double radius, double start_angle, double end_angle)
 {
     double num_segments = 50;
     double_point_t start;
@@ -99,7 +99,7 @@ void EasyPrimative::Circle::render_arc(double cx, double cy, double radius, doub
         glVertex3f(end.x, end.y, 0);
     glEnd();
 }
-void EasyPrimative::Circle::render()
+void EasyPrimitive::Circle::render()
 {
     if (this->properties->visable == true)
     {
@@ -121,11 +121,11 @@ void EasyPrimative::Circle::render()
         glPopMatrix();
     }
 }
-void EasyPrimative::Circle::destroy()
+void EasyPrimitive::Circle::destroy()
 {
     delete this->properties;
 }
-nlohmann::json EasyPrimative::Circle::serialize()
+nlohmann::json EasyPrimitive::Circle::serialize()
 {
     nlohmann::json j;
     j["center"]["x"] = this->center.x;

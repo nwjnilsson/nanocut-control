@@ -1,7 +1,7 @@
 #ifndef TEXT_
 #define TEXT_
 
-#include "../PrimativeProperties.h"
+#include "../PrimitiveProperties.h"
 #include "../../json/json.h"
 #include "../../geometry/geometry.h"
 #include "../../gui/stb_truetype.h"
@@ -30,10 +30,10 @@
 #endif
 
 
-class EasyPrimative::Text{
+class EasyPrimitive::Text{
     public:
         nlohmann::json mouse_event;
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
 
         std::string textval;
         std::string font_file;
@@ -46,7 +46,7 @@ class EasyPrimative::Text{
         
         Text(double_point_t p, std::string t, float s)
         {
-            this->properties = new PrimativeProperties();
+            this->properties = new PrimitiveProperties();
             this->position = p;
             this->width = 0;
             this->height = 0;

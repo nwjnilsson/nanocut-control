@@ -1,5 +1,5 @@
-#ifndef PRIMATIVE_CONTAINTER_
-#define PRIMATIVE_CONTAINTER_
+#ifndef Primitive_CONTAINTER_
+#define Primitive_CONTAINTER_
 
 #include <string>
 #include <vector>
@@ -7,7 +7,7 @@
 #include <sys/time.h>
 #include <ctime>
 #include <algorithm> 
-#include "PrimativeProperties.h"
+#include "PrimitiveProperties.h"
 #include "Line/Line.h"
 #include "Text/Text.h"
 #include "Image/Image.h"
@@ -17,68 +17,68 @@
 #include "Box/Box.h"
 #include "Part/Part.h"
 
-class PrimativeContainer{
+class PrimitiveContainer{
     public:
-        PrimativeProperties *properties;
+        PrimitiveProperties *properties;
         std::string type;
-        EasyPrimative::Line *line;
-        EasyPrimative::Text *text;
-        EasyPrimative::Image *image;
-        EasyPrimative::Path *path;
-        EasyPrimative::Arc *arc;
-        EasyPrimative::Circle *circle;
-        EasyPrimative::Box *box;
-        EasyPrimative::Part *part;
+        EasyPrimitive::Line *line;
+        EasyPrimitive::Text *text;
+        EasyPrimitive::Image *image;
+        EasyPrimitive::Path *path;
+        EasyPrimitive::Arc *arc;
+        EasyPrimitive::Circle *circle;
+        EasyPrimitive::Box *box;
+        EasyPrimitive::Part *part;
 
         void process_mouse(float mpos_x, float mpos_y);
         void render();
         void destroy();
         nlohmann::json serialize();
 
-        PrimativeContainer(EasyPrimative::Line *l)
+        PrimitiveContainer(EasyPrimitive::Line *l)
         {
             line = l;
             this->type = line->get_type_name();
             properties = line->properties;
         }
-        PrimativeContainer(EasyPrimative::Text *t)
+        PrimitiveContainer(EasyPrimitive::Text *t)
         {
             text = t;
             this->type = text->get_type_name();
             properties = text->properties;
             this->text->render(); //Make sure height and width are calculated right away
         }
-        PrimativeContainer(EasyPrimative::Image *i)
+        PrimitiveContainer(EasyPrimitive::Image *i)
         {
             image = i;
             this->type = image->get_type_name();
             properties = image->properties;
         }
-        PrimativeContainer(EasyPrimative::Path *p)
+        PrimitiveContainer(EasyPrimitive::Path *p)
         {
             path = p;
             this->type = path->get_type_name();
             properties = path->properties;
         }
-        PrimativeContainer(EasyPrimative::Part *p)
+        PrimitiveContainer(EasyPrimitive::Part *p)
         {
             part = p;
             this->type = part->get_type_name();
             properties = part->properties;
         }
-        PrimativeContainer(EasyPrimative::Arc *a)
+        PrimitiveContainer(EasyPrimitive::Arc *a)
         {
             arc = a;
             this->type = arc->get_type_name();
             properties = arc->properties;
         }
-        PrimativeContainer(EasyPrimative::Circle *c)
+        PrimitiveContainer(EasyPrimitive::Circle *c)
         {
             circle = c;
             this->type = circle->get_type_name();
             properties = circle->properties;
         }
-        PrimativeContainer(EasyPrimative::Box *b)
+        PrimitiveContainer(EasyPrimitive::Box *b)
         {
             box = b;
             this->type = box->get_type_name();
@@ -86,4 +86,4 @@ class PrimativeContainer{
         }
 };
 
-#endif //PRIMATIVE_CONTAINTER_
+#endif //Primitive_CONTAINTER_
