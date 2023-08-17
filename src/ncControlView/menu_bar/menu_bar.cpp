@@ -6,6 +6,7 @@ EasyRender::EasyRenderGui *menu_bar;
 
 void menu_bar_render()
 {
+    // TODO: make prettier
     if (ImGui::BeginMainMenuBar())
     {
         if (ImGui::BeginMenu("File"))

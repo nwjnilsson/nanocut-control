@@ -27,6 +27,8 @@ class ncControlView{
             bool soft_limits_enabled = false;
             bool homing_enabled = false;
             bool homing_dir_invert[4] = { false, false, false, false };
+            bool invert_step_enable;
+            bool invert_limit_pins;
             float homing_feed = 0.0f;
             float homing_seek = 0.0f;
             float homing_debounce = 0.0f;

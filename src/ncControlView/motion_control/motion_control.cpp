@@ -598,6 +598,8 @@ void motion_controller_save_machine_parameters()
     preferences["homing_debounce"] = globals->nc_control_view->machine_parameters.homing_debounce;
     preferences["homing_pull_off"] = globals->nc_control_view->machine_parameters.homing_pull_off;
     preferences["machine_type"] = globals->nc_control_view->machine_parameters.machine_type;
+    preferences["invert_limit_pins"] = globals->nc_control_view->machine_parameters.invert_limit_pins;
+    preferences["invert_step_enable"] = globals->nc_control_view->machine_parameters.invert_step_enable;
 
     globals->nc_control_view->machine_plane->bottom_left.x = 0;
     globals->nc_control_view->machine_plane->bottom_left.y = 0;
@@ -634,20 +636,24 @@ void motion_controller_write_parameters_to_controller()
         if (globals->nc_control_view->machine_parameters.homing_dir_invert[3]) homing_dir_invert_mask |= 0b00000100;
         if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) homing_dir_invert_mask |= 0b00001000;
         
-        motion_controller_push_stack("$X"); //Step Pulse, usec
+        motion_controller_push_stack("$X");
         motion_controller_push_stack("$0=" + std::to_string(50)); //Step Pulse, usec
         motion_controller_push_stack("$1=" + std::to_string(25)); //Step Idle Delay, usec
         motion_controller_push_stack("$3=" + std::to_string(dir_invert_mask));
-        motion_controller_push_stack("$4=" + std::to_string(0)); //Step enable invert
-        motion_controller_push_stack("$5=" + std::to_string(0)); //Limit Pins invert
-        motion_controller_push_stack("$6=" + std::to_string(0)); //Probe Pin invert
+
+        motion_controller_push_stack("$4=" + std::to_string((int)globals->nc_control_view->machine_parameters.invert_step_enable)); // Step enable invert
+        motion_controller_push_stack("$5=" + std::to_string((int)globals->nc_control_view->machine_parameters.invert_limit_pins)); // Limit Pins invert
+        motion_controller_push_stack("$6=" + std::to_string(0)); //Probe Pin invert (not yet supported)
         motion_controller_push_stack("$10=" + std::to_string(3)); //Status report mask
+
         motion_controller_push_stack("$11=" + std::to_string(globals->nc_control_view->machine_parameters.junction_deviation));
-        motion_controller_push_stack("$12=" + std::to_string(0.002)); //Arc Tolorance
-        motion_controller_push_stack("$13=" + std::to_string(0)); //Report Inches
+        motion_controller_push_stack("$12=" + std::to_string(0.002)); //Arc Tolerance
+        
+        motion_controller_push_stack("$13=" + std::to_string(0)); //Report Inches (TODO: not yet supported)
+        
         motion_controller_push_stack("$22=" + std::to_string((int)globals->nc_control_view->machine_parameters.homing_enabled)); //Homing Cycle Enable (Homing must be enbled before soft-limits...)
         motion_controller_push_stack("$20=" + std::to_string((int)globals->nc_control_view->machine_parameters.soft_limits_enabled)); //Soft Limits Enable
-        motion_controller_push_stack("$21=" + std::to_string(0)); //Hard Limits Enable
+        motion_controller_push_stack("$21=" + std::to_string(0)); //Hard Limits Enable (TODO: not yet supported)
         motion_controller_push_stack("$23=" + std::to_string(homing_dir_invert_mask));
         motion_controller_push_stack("$24=" + std::to_string(globals->nc_control_view->machine_parameters.homing_feed));
         motion_controller_push_stack("$25=" + std::to_string(globals->nc_control_view->machine_parameters.homing_seek));

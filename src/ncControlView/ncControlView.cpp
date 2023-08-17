@@ -124,6 +124,8 @@ void ncControlView::PreInit()
             this->machine_parameters.homing_debounce = (float)parameters["homing_debounce"];
             this->machine_parameters.homing_pull_off = (float)parameters["homing_pull_off"];
             this->machine_parameters.machine_type = (int)parameters["machine_type"];
+            this->machine_parameters.invert_limit_pins = (bool)parameters["invert_limit_pins"];
+            this->machine_parameters.invert_step_enable = (bool)parameters["invert_step_enable"];
         }
         catch(...)
         {
@@ -171,6 +173,8 @@ void ncControlView::PreInit()
         this->machine_parameters.homing_debounce = 250;
         this->machine_parameters.homing_pull_off = 0.750;
         this->machine_parameters.machine_type = 0;
+        this->machine_parameters.invert_limit_pins = false;
+        this->machine_parameters.invert_step_enable = false;
     }
     this->view_matrix = &hmi_view_matrix;
 }

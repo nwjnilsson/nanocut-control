@@ -128,23 +128,28 @@ void dialogs_machine_parameters()
     ImGui::Checkbox("Invert Y2", &globals->nc_control_view->machine_parameters.axis_invert[2]);
     ImGui::SameLine();
     ImGui::Checkbox("Invert Z", &globals->nc_control_view->machine_parameters.axis_invert[3]);
+    ImGui::SameLine();
+    ImGui::Checkbox("Invert stepper enable bit", &globals->nc_control_view->machine_parameters.invert_step_enable);
     ImGui::Separator();
 
     ImGui::Text("Homing and Soft Limits. Homing must be enabled to use soft limits!");
-    ImGui::Checkbox("Enable Soft Limits?", &globals->nc_control_view->machine_parameters.soft_limits_enabled);
-    ImGui::Checkbox("Enable Homing?", &globals->nc_control_view->machine_parameters.homing_enabled);
-    ImGui::Checkbox("Homing Direction X", &globals->nc_control_view->machine_parameters.homing_dir_invert[0]);
+    ImGui::Checkbox("Enable Soft Limits", &globals->nc_control_view->machine_parameters.soft_limits_enabled);
+    ImGui::Checkbox("Enable Homing", &globals->nc_control_view->machine_parameters.homing_enabled);
+    ImGui::Checkbox("Invert homing direction X", &globals->nc_control_view->machine_parameters.homing_dir_invert[0]);
     ImGui::SameLine();
-    ImGui::Checkbox("Homing Direction Y1", &globals->nc_control_view->machine_parameters.homing_dir_invert[1]);
+    ImGui::Checkbox("Invert homing direction Y1", &globals->nc_control_view->machine_parameters.homing_dir_invert[1]);
     ImGui::SameLine();
-    ImGui::Checkbox("Homing Direction Y2", &globals->nc_control_view->machine_parameters.homing_dir_invert[2]);
+    ImGui::Checkbox("Invert homing direction Y2", &globals->nc_control_view->machine_parameters.homing_dir_invert[2]);
     ImGui::SameLine();
-    ImGui::Checkbox("Homing Direction Z", &globals->nc_control_view->machine_parameters.homing_dir_invert[3]);
+    ImGui::Checkbox("Invert homing direction Z", &globals->nc_control_view->machine_parameters.homing_dir_invert[3]);
+    ImGui::Checkbox("Invert limit pins", &globals->nc_control_view->machine_parameters.invert_limit_pins);
     ImGui::InputFloat("Homing Feedrate", &globals->nc_control_view->machine_parameters.homing_feed);
     ImGui::InputFloat("Homing Seekrate", &globals->nc_control_view->machine_parameters.homing_seek);
     ImGui::InputFloat("Homing Debounce", &globals->nc_control_view->machine_parameters.homing_debounce);
     ImGui::InputFloat("Homing Pull-Off", &globals->nc_control_view->machine_parameters.homing_pull_off);
 
+
+    ImGui::Separator();
     ImGui::Text("Each axis maximum allowable velocity in units per minute. E.g. Inch/Min or MM/MIN");
     ImGui::InputFloat3("Max Velocity (X, Y, Z)", globals->nc_control_view->machine_parameters.max_vel);
     ImGui::Separator();
@@ -159,6 +164,9 @@ void dialogs_machine_parameters()
     ImGui::Separator();
     ImGui::Text("The amount of time after motion starts after a probing cycle to consider the arc stabalized. This will affect Smart THC accuracy!");
     ImGui::InputFloat("Arc Stabalization Time (ms)", &globals->nc_control_view->machine_parameters.arc_stablization_time);
+
+
+
     ImGui::Spacing();
     if (ImGui::Button("OK"))
     {
