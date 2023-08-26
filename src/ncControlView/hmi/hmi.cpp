@@ -858,7 +858,12 @@ void hmi_right_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging X Positive Continuous!");
-                    motion_controller_push_stack("G53 G0 X" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[0]));
+                    float x_extent = globals->nc_control_view->machine_parameters.machine_extents[0];
+                    if(x_extent < 0)
+                        motion_controller_push_stack("G53 G0 X0");
+                    else
+                        motion_controller_push_stack("G53 G0 X" + std::to_string(x_extent));
+                    
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -896,7 +901,11 @@ void hmi_left_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging X Negative Continuous!");
-                    motion_controller_push_stack("G53 G0 X0");
+                    float x_extent = globals->nc_control_view->machine_parameters.machine_extents[0];
+                    if(x_extent < 0)
+                        motion_controller_push_stack("G53 G0 X" + std::to_string(x_extent));
+                    else
+                        motion_controller_push_stack("G53 G0 X0");
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
