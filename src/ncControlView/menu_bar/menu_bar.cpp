@@ -46,21 +46,7 @@ void menu_bar_render()
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Tools"))
-        {
-            /*if (ImGui::MenuItem("Check for Updates", ""))
-            {
-                LOG_F(INFO, "Tools->Checking for Updates");
-            }
-            ImGui::Separator();*/
-            if (ImGui::MenuItem("Update Firmware", ""))
-            {
-                LOG_F(INFO, "Tools->Update Firmware");
-                dialogs_set_info_value("Updating firmware on motion controller.\nThe screen will seem frozen during this process, please wait until it's complete!");
-                globals->renderer->PushTimer(1000, &motion_control_update_firmware);
-            }
-            ImGui::EndMenu();
-        }
+
         if (ImGui::BeginMenu("Workbench"))
         {
             if (ImGui::MenuItem("Machine Control", ""))

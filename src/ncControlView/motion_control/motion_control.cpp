@@ -744,26 +744,12 @@ bool motion_control_status_timer()
     motion_controller_send("?");
     return true;
 }
-bool motion_control_update_firmware_hide_info_window()
-{
-    dialogs_show_info_window(false);
-    return false;
-}
+
 void motion_controller_set_needs_homed(bool h)
 {
     needs_homed = h;
 }
-bool motion_control_update_firmware()
-{
-    /*
-        First we need to download the firmware...
-    */
-    motion_controller.serial.close();
-    controller_ready = false;
-    stk500_write_program(std::string(globals->renderer->GetConfigDirectory() + "firmware.hex").c_str(), motion_controller.serial_port.c_str());
-    globals->renderer->PushTimer(1000, &motion_control_update_firmware_hide_info_window);
-    return false;
-}
+
 void motion_control_init()
 {
     controller_ready = false;
