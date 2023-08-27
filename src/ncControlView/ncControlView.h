@@ -39,6 +39,7 @@ class ncControlView{
             //Not Included in machine_parameters.json
             int thc_set_value = 0;
             bool smart_thc_on = false;
+            float precise_jog_units = 0.0f;
         };
         static void zoom_event_handle(nlohmann::json e);
     public:

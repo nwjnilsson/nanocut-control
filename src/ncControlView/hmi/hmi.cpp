@@ -747,7 +747,7 @@ void hmi_push_button_group(std::string b1, std::string b2)
 
 void hmi_tab_key_up_callback(nlohmann::json e)
 {
-    if (globals->nc_control_view->way_point_position.x != -1000 & globals->nc_control_view->way_point_position.y != -1000)
+    if (globals->nc_control_view->way_point_position.x != -1000 && globals->nc_control_view->way_point_position.y != -1000)
     {
         LOG_F(INFO, "Going to waypoint position: X%.4f Y%.4f", globals->nc_control_view->way_point_position.x, globals->nc_control_view->way_point_position.y);
         motion_controller_push_stack("G53 G0 X" + to_string_strip_zeros(globals->nc_control_view->way_point_position.x) + " Y" + to_string_strip_zeros(globals->nc_control_view->way_point_position.y));
@@ -773,8 +773,9 @@ void hmi_up_key_callback(nlohmann::json e)
             {
                 if (left_control_key_is_pressed == true)
                 {
-                    LOG_F(INFO, "Jogging Y positive 0.010!");
-                    motion_controller_push_stack("G91 Y0.010");
+                    std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
+                    LOG_F(INFO, "Jogging Y positive %s", dist.c_str()); 
+                    motion_controller_push_stack("G91 Y" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -811,8 +812,9 @@ void hmi_down_key_callback(nlohmann::json e)
             {
                 if (left_control_key_is_pressed == true)
                 {
-                    LOG_F(INFO, "Jogging Y positive 0.010!");
-                    motion_controller_push_stack("G91 Y-0.010");
+                    std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
+                    LOG_F(INFO, "Jogging Y negative %s!", dist.c_str());
+                    motion_controller_push_stack("G91 Y-" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -849,8 +851,9 @@ void hmi_right_key_callback(nlohmann::json e)
             {
                 if (left_control_key_is_pressed == true)
                 {
-                    LOG_F(INFO, "Jogging X positive 0.010!");
-                    motion_controller_push_stack("G91 X0.010");
+                    std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
+                    LOG_F(INFO, "Jogging X positive %s!", dist.c_str());
+                    motion_controller_push_stack("G91 X" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -892,8 +895,9 @@ void hmi_left_key_callback(nlohmann::json e)
             {
                 if (left_control_key_is_pressed == true)
                 {
-                    LOG_F(INFO, "Jogging X negative 0.010!");
-                    motion_controller_push_stack("G91 X-0.010");
+                    std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
+                    LOG_F(INFO, "Jogging X negative %s!", dist.c_str());
+                    motion_controller_push_stack("G91 X-" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }

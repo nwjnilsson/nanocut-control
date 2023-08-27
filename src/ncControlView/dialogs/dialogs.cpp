@@ -118,8 +118,10 @@ void dialogs_machine_parameters()
     ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents (X2 and Y2 must be negative!)");
     ImGui::InputFloat4("Cutting Extents (X1, Y1, X2, Y2)", globals->nc_control_view->machine_parameters.cutting_extents);
     ImGui::Separator();
-    ImGui::Text("Scale is in steps per your desired units. E.G. To use machine in\nInches, set scales to steps per inch");
+    ImGui::Text("Scale is in steps per your desired units. E.G. To use machine in\nInches, set scales to steps per inch.");
     ImGui::InputFloat3("Axis Scale (X, Y, Z)", globals->nc_control_view->machine_parameters.axis_scale);
+    ImGui::Text("Manual precision jogging (ctrl + [MOVE]) can be used for small movements. The distance can be adjusted below.");
+    ImGui::InputFloat("Precision jogging distance (units)", &globals->nc_control_view->machine_parameters.precise_jog_units);
     ImGui::Separator();
     ImGui::Checkbox("Invert X", &globals->nc_control_view->machine_parameters.axis_invert[0]);
     ImGui::SameLine();
@@ -153,7 +155,7 @@ void dialogs_machine_parameters()
     ImGui::Text("Each axis maximum allowable velocity in units per minute. E.g. Inch/Min or MM/MIN");
     ImGui::InputFloat3("Max Velocity (X, Y, Z)", globals->nc_control_view->machine_parameters.max_vel);
     ImGui::Separator();
-    ImGui::Text("Each axis maximum allowable acceleration in units per seconds squared");
+    ImGui::Text("Each axis maximum allowable acceleration in units per minute squared");
     ImGui::InputFloat3("Max Acceleration (X, Y, Z)", globals->nc_control_view->machine_parameters.max_accel);
     ImGui::Separator();
     ImGui::Text("The distance the floating head moves off of it's gravity stop to where it closes the probe switch. Ohmic sensing should have 0.0000 value");
@@ -168,7 +170,7 @@ void dialogs_machine_parameters()
 
 
     ImGui::Spacing();
-    if (ImGui::Button("OK"))
+    if (ImGui::Button("Save and write to controller"))
     {
         motion_controller_save_machine_parameters();
         motion_controller_write_parameters_to_controller();

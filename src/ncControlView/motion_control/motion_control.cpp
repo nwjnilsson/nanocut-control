@@ -600,6 +600,7 @@ void motion_controller_save_machine_parameters()
     preferences["machine_type"] = globals->nc_control_view->machine_parameters.machine_type;
     preferences["invert_limit_pins"] = globals->nc_control_view->machine_parameters.invert_limit_pins;
     preferences["invert_step_enable"] = globals->nc_control_view->machine_parameters.invert_step_enable;
+    preferences["precise_jog_units"] = globals->nc_control_view->machine_parameters.precise_jog_units;
 
     globals->nc_control_view->machine_plane->bottom_left.x = 0;
     globals->nc_control_view->machine_plane->bottom_left.y = 0;
