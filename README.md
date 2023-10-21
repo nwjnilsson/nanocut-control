@@ -11,6 +11,12 @@ Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware
 - User configurable Layout
 - Built in torch touchoff routine. Instead of a gcode, use fire_torch [pierce_height] [pierce_delay] [cut_height]. torch_off to shut torch off
 - Built-in Toolpath workbench. Setup job options material size. Lay parts out in any configuration and post Gcode ready to run on the machine. Also has an early Auto-Nesting feature.
+## Changes made by me
+- Add support limit pin inversion
+- Add support non-standard homing position for X-axis
+- Remove firmware update feature
+- Add customizable precise jog distance
+- Add support for click-and-drag movement of the control view (press and hold right click)
 
 # Post Processors
 - SheetCAM post processor is included with the NanoCut firmware repository at [nanocut-firmware](https://github.com/Applooza/nanocut-firmware)
