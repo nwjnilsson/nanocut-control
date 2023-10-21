@@ -39,6 +39,14 @@ void ncControlView::zoom_event_handle(nlohmann::json e)
     }
 }
 
+void ncControlView::click_and_drag_event_handle(nlohmann::json e)
+{
+    if (e["event"] == "right_click_down")
+        globals->move_view = true;
+    else if (e["event"] == "right_click_up")
+        globals->move_view = false;
+}
+
 void ncControlView::PreInit()
 {
     nlohmann::json preferences = globals->renderer->ParseJsonFromFile(globals->renderer->GetConfigDirectory() + "preferences.json");
@@ -185,10 +193,13 @@ void ncControlView::Init()
     globals->renderer->SetCurrentView("ncControlView");
     globals->renderer->PushEvent("up", "scroll", &this->zoom_event_handle);
     globals->renderer->PushEvent("down", "scroll", &this->zoom_event_handle);
+    globals->renderer->PushEvent("down", "right_click_down", &this->click_and_drag_event_handle);
+    globals->renderer->PushEvent("up", "right_click_up", &this->click_and_drag_event_handle);
     menu_bar_init();
     dialogs_init();
     motion_control_init();
     hmi_init();
+    globals->move_view = false;
 }
 void ncControlView::Tick()
 {

@@ -1032,7 +1032,13 @@ void hmi_control_key_callback(nlohmann::json e)
 }
 void hmi_mouse_motion_callback(nlohmann::json e)
 {
-    globals->mouse_pos_in_screen_coordinates = {(double)e["pos"]["x"], (double)e["pos"]["y"]};
+    double_point_t point = {(double)e["pos"]["x"], (double)e["pos"]["y"]};
+    if (globals->move_view)
+    {
+        globals->pan.x += (point.x - globals->mouse_pos_in_screen_coordinates.x);
+        globals->pan.y += (point.y - globals->mouse_pos_in_screen_coordinates.y);
+    }
+    globals->mouse_pos_in_screen_coordinates = point;
     globals->mouse_pos_in_matrix_coordinates = {
         ((double)e["pos"]["x"] / globals->zoom) - (globals->pan.x / globals->zoom),
         ((double)e["pos"]["y"] / globals->zoom) - (globals->pan.y / globals->zoom)

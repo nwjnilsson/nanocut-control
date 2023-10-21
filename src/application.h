@@ -35,6 +35,7 @@ struct global_variables_t{
     bool quit;
     double zoom;
     double_point_t pan;
+    bool move_view;
     double_point_t mouse_pos_in_screen_coordinates;
     double_point_t mouse_pos_in_matrix_coordinates;
     unsigned long start_timestamp;

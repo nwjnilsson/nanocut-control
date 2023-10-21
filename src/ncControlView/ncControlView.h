@@ -42,6 +42,7 @@ class ncControlView{
             float precise_jog_units = 0.0f;
         };
         static void zoom_event_handle(nlohmann::json e);
+        static void click_and_drag_event_handle(nlohmann::json e);
     public:
         preferences_data_t preferences;
         EasyPrimitive::Box *machine_plane;
@@ -50,7 +51,6 @@ class ncControlView{
         machine_parameters_data_t machine_parameters;
         double_point_t way_point_position;
         void (*view_matrix)(PrimitiveContainer *p);
-
         ncControlView(){
             //Do stuff here
         };
