@@ -67,17 +67,17 @@ void ncControlView::PreInit()
     else
     {
         LOG_F(WARNING, "Preferences file does not exist, creating it!");
-        this->preferences.background_color[0] = 8.0f / 255.0f;
-        this->preferences.background_color[1] = 14.0f / 255.0f;
-        this->preferences.background_color[2] = 84.0f / 255.0f;
+        this->preferences.background_color[0] = 0.f;
+        this->preferences.background_color[1] = 0.f;
+        this->preferences.background_color[2] = 0.f;
         this->preferences.machine_plane_color[0] = 100.0f / 255.0f;
         this->preferences.machine_plane_color[1] = 100.0f / 255.0f;
         this->preferences.machine_plane_color[2] = 100.0f / 255.0f;
         this->preferences.cuttable_plane_color[0] = 151.0f / 255.0f;
         this->preferences.cuttable_plane_color[1] = 5.0f / 255.0f;
         this->preferences.cuttable_plane_color[2] = 5.0f / 255.0f;
-        this->preferences.window_size[0] = 800;
-        this->preferences.window_size[1] = 600;
+        this->preferences.window_size[0] = 1280;
+        this->preferences.window_size[1] = 720;
     }
 
     nlohmann::json parameters = globals->renderer->ParseJsonFromFile(globals->renderer->GetConfigDirectory() + "machine_parameters.json");
