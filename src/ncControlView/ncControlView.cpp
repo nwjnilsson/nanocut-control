@@ -184,7 +184,7 @@ void ncControlView::PreInit()
         this->machine_parameters.machine_type = 0;
         this->machine_parameters.invert_limit_pins = false;
         this->machine_parameters.invert_step_enable = false;
-        this->machine_parameters.precise_jog_units = 0.f;
+        this->machine_parameters.precise_jog_units = 1.f;
     }
     this->view_matrix = &hmi_view_matrix;
 }
