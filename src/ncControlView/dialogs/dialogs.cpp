@@ -115,7 +115,7 @@ void dialogs_machine_parameters()
     ImGui::InputFloat3("Machine Extents (X, Y, Z)", globals->nc_control_view->machine_parameters.machine_extents);
     
     ImGui::Separator();
-    ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents (X2 and Y2 must be negative!)");
+    ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents");
     ImGui::InputFloat4("Cutting Extents (X1, Y1, X2, Y2)", globals->nc_control_view->machine_parameters.cutting_extents);
     ImGui::Separator();
     ImGui::Text("Scale is in steps per your desired units. E.G. To use machine in\nInches, set scales to steps per inch.");
