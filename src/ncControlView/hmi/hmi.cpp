@@ -277,13 +277,15 @@ void hmi_handle_button(std::string id)
                 if ((MAX((double)globals->renderer->GetWindowSize().y, (double)globals->nc_control_view->machine_parameters.machine_extents[1]) - MIN((double)globals->renderer->GetWindowSize().y, (double)globals->nc_control_view->machine_parameters.machine_extents[1])) < 
                     MAX((double)globals->renderer->GetWindowSize().x - hmi_backplane_width, (double)globals->nc_control_view->machine_parameters.machine_extents[0]) - MIN((double)globals->renderer->GetWindowSize().x, (double)globals->nc_control_view->machine_parameters.machine_extents[0]))
                 {
-                    globals->zoom = ((double)globals->renderer->GetWindowSize().y - 100) / ((double)globals->nc_control_view->machine_parameters.machine_extents[1]);
+                    double machine_y = std::abs(globals->nc_control_view->machine_parameters.machine_extents[1]);
+                    globals->zoom = ((double)globals->renderer->GetWindowSize().y - 100) / machine_y;
                     globals->pan.x += ((double)globals->nc_control_view->machine_parameters.machine_extents[0] / 2) * (1 - globals->zoom);
                     globals->pan.y += ((double)globals->nc_control_view->machine_parameters.machine_extents[1] / 2) * (1 - globals->zoom);
                 }
                 else //Fit X
                 {
-                    globals->zoom = ((double)globals->renderer->GetWindowSize().x - (hmi_backplane_width / 2) - 200) / ((double)globals->nc_control_view->machine_parameters.machine_extents[0]);
+                    double machine_x = std::abs(globals->nc_control_view->machine_parameters.machine_extents[0]);
+                    globals->zoom = ((double)globals->renderer->GetWindowSize().x - (hmi_backplane_width / 2) - 200) / machine_x;
                     globals->pan.x += ((double)globals->nc_control_view->machine_parameters.machine_extents[0] / 2) * (1 - globals->zoom) - (hmi_backplane_width / 2) + 50;
                     globals->pan.y += ((double)globals->nc_control_view->machine_parameters.machine_extents[1] / 2) * (1 - globals->zoom);
                 }
@@ -291,25 +293,27 @@ void hmi_handle_button(std::string id)
             else
             {
                 LOG_F(INFO, "Calculated bounding box: => bbox_min = (%.4f, %.4f) and bbox_max = (%.4f, %.4f)", bbox_min.x, bbox_min.y, bbox_max.x, bbox_max.y);
+                double y_diff = std::abs(bbox_max.y) - std::abs(bbox_min.y);
+                double x_diff = std::abs(bbox_max.x) - std::abs(bbox_min.x);
                 globals->zoom = 1;
-                globals->pan.x = ((bbox_max.x - bbox_min.x) / 2) - (hmi_backplane_width / 2);
-                globals->pan.y = ((((bbox_max.y - bbox_min.y) / 2) + 10) * -1); //10 is for the menu bar
+                globals->pan.x = (x_diff / 2) - (hmi_backplane_width / 2);
+                globals->pan.y = (((y_diff / 2) + 10) * -1); //10 is for the menu bar
                 if ((MAX((double)globals->renderer->GetWindowSize().y, (bbox_max.x - bbox_min.x)) - MIN((double)globals->renderer->GetWindowSize().y, (bbox_max.y - bbox_min.y))) < 
                     MAX((double)globals->renderer->GetWindowSize().x - hmi_backplane_width, (bbox_max.x - bbox_min.x)) - MIN((double)globals->renderer->GetWindowSize().x, (bbox_max.y - bbox_min.y)))
                 {
                     LOG_F(INFO, "Fitting to Y");
-                    globals->zoom = ((double)globals->renderer->GetWindowSize().y - 300) / (bbox_max.y - bbox_min.y);
-                    globals->pan.x += (bbox_max.x - bbox_min.x) * (1 - globals->zoom) + (hmi_backplane_width / 2);
-                    globals->pan.y += (bbox_max.y - bbox_min.y) * (1 - globals->zoom);
+                    globals->zoom = ((double)globals->renderer->GetWindowSize().y - 300) / std::abs(y_diff);
+                    globals->pan.x += x_diff * (1 - globals->zoom) + (hmi_backplane_width / 2);
+                    globals->pan.y += y_diff * (1 - globals->zoom);
                     globals->pan.x -= globals->nc_control_view->machine_parameters.work_offset[0] * globals->zoom;
                     globals->pan.y -= globals->nc_control_view->machine_parameters.work_offset[1] * globals->zoom;
                 }
                 else //Fit X
                 {
                     LOG_F(INFO, "Fitting to X");
-                    globals->zoom = ((double)globals->renderer->GetWindowSize().x - (hmi_backplane_width / 2) - 200) / (bbox_max.x - bbox_min.x);
-                    globals->pan.x += (bbox_max.x - bbox_min.x) * (1 - globals->zoom) + (hmi_backplane_width / 2);
-                    globals->pan.y += (bbox_max.y - bbox_min.y) * (1 - globals->zoom);
+                    globals->zoom = ((double)globals->renderer->GetWindowSize().x - (hmi_backplane_width / 2) - 200) / std::abs(x_diff);
+                    globals->pan.x += x_diff * (1 - globals->zoom) + (hmi_backplane_width / 2);
+                    globals->pan.y += y_diff * (1 - globals->zoom);
                     globals->pan.x -= globals->nc_control_view->machine_parameters.work_offset[0] * globals->zoom;
                     globals->pan.y -= globals->nc_control_view->machine_parameters.work_offset[1] * globals->zoom;
                 }
