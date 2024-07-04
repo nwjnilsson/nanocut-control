@@ -18,7 +18,7 @@ Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware
 - Add customizable precise jog distance
 - Add support for click-and-drag movement of the control view (press and hold right click)
 
-** NOTE:** In its current state, this software does not fully support negative machine extents.
+**NOTE:** In its current state, this software does not fully support negative machine extents.
 Positioning in the negative quadrant is apparently common traditionally for CNC machines, and GRBL
 reports positions like this by default. I have instead decided to wire the motors and set the axis
 inversion so that the machine operates in the positive quadrant so that I don't have to change
