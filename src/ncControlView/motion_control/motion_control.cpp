@@ -638,8 +638,8 @@ void motion_controller_write_parameters_to_controller()
         if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) homing_dir_invert_mask |= 0b00001000;
         
         motion_controller_push_stack("$X");
-        motion_controller_push_stack("$0=" + std::to_string(50)); //Step Pulse, usec
-        motion_controller_push_stack("$1=" + std::to_string(25)); //Step Idle Delay, usec
+        motion_controller_push_stack("$0=" + std::to_string(10)); //Step Pulse, usec
+        motion_controller_push_stack("$1=" + std::to_string(255)); //Step Idle Delay, usec (always on)
         motion_controller_push_stack("$3=" + std::to_string(dir_invert_mask));
 
         motion_controller_push_stack("$4=" + std::to_string((int)globals->nc_control_view->machine_parameters.invert_step_enable)); // Step enable invert

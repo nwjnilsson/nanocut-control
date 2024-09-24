@@ -112,7 +112,7 @@ void dialogs_machine_parameters()
     ImGui::InputInt("Machine Type. 0=Plasma & 1=Router", &globals->nc_control_view->machine_parameters.machine_type);
     ImGui::Separator();
     ImGui::Text("Machine extents is the max distance each axis can travel freely. X0 is the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
-    ImGui::InputFloat3("Machine Extents (X, Y, Z)", globals->nc_control_view->machine_parameters.machine_extents);
+    ImGui::InputFloat3("Machine Extents (X, Y, Z). Z must be negative for THC to work.", globals->nc_control_view->machine_parameters.machine_extents);
     
     ImGui::Separator();
     ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents");
@@ -152,14 +152,14 @@ void dialogs_machine_parameters()
 
 
     ImGui::Separator();
-    ImGui::Text("Each axis maximum allowable velocity in units per minute. E.g. Inch/Min or MM/MIN");
+    ImGui::Text("Each axis maximum allowable velocity in units per minute. E.g. inch/min or mm/min");
     ImGui::InputFloat3("Max Velocity (X, Y, Z)", globals->nc_control_view->machine_parameters.max_vel);
     ImGui::Separator();
-    ImGui::Text("Each axis maximum allowable acceleration in units per minute squared");
+    ImGui::Text("Each axis maximum allowable acceleration in units per second squared");
     ImGui::InputFloat3("Max Acceleration (X, Y, Z)", globals->nc_control_view->machine_parameters.max_accel);
     ImGui::Separator();
     ImGui::Text("The distance the floating head moves off of it's gravity stop to where it closes the probe switch. Ohmic sensing should have 0.0000 value");
-    ImGui::InputFloat("Floating Head Takup", &globals->nc_control_view->machine_parameters.floating_head_backlash);
+    ImGui::InputFloat("Floating Head Backlash", &globals->nc_control_view->machine_parameters.floating_head_backlash);
     ImGui::Separator();
     ImGui::Text("Velocity in units per minute when probing the torch");
     ImGui::InputFloat("Z Probe Feed", &globals->nc_control_view->machine_parameters.z_probe_feedrate);
