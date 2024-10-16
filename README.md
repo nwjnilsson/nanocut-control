@@ -1,5 +1,5 @@
 # NanoCut Control
-Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/Applooza/nanocut-firmware)). NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine. NanoCut is Native Cross-Platform (Windows, Linux, and MacOS), but I have currently only tested it on Linux (Debian).
+Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)). NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine. NanoCut is Native Cross-Platform (Windows, Linux, and MacOS), but I have currently only tested it on Linux (Debian).
 
 # Features
 - 2D Gcode Viewer
