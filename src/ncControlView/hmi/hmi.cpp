@@ -2,6 +2,7 @@
 #include "../motion_control/motion_control.h"
 #include "../dialogs/dialogs.h"
 #include "../gcode/gcode.h"
+#include <limits>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -28,10 +29,12 @@ template <typename T> std::string to_string_strip_zeros(const T a_value) //Fails
 void hmi_get_bounding_box(double_point_t *bbox_min, double_point_t *bbox_max)
 {
     std::vector<PrimitiveContainer*> *stack = globals->renderer->GetPrimitiveStack();
-    bbox_max->x = -1000000;
-    bbox_max->y = -1000000;
-    bbox_min->x = 1000000;
-    bbox_min->y = 1000000;
+    auto min = std::numeric_limits<int>::min();
+    auto max = std::numeric_limits<int>::max();
+    bbox_max->x = min;
+    bbox_max->y = min;
+    bbox_min->x = max;
+    bbox_min->y = max;
     for (int x = 0; x < stack->size(); x++)
     {
         if (stack->at(x)->type == "path")
@@ -169,8 +172,8 @@ void hmi_handle_button(std::string id)
                 hmi_get_bounding_box(&bbox_min, &bbox_max);
                 if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
                     bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
-                    bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] - globals->nc_control_view->machine_parameters.cutting_extents[2] &&
-                    bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] - globals->nc_control_view->machine_parameters.cutting_extents[3])
+                    bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
+                    bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
                 {
                     try
                     {
@@ -210,8 +213,8 @@ void hmi_handle_button(std::string id)
                 hmi_get_bounding_box(&bbox_min, &bbox_max);
                 if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
                     bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
-                    bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] - globals->nc_control_view->machine_parameters.cutting_extents[2] &&
-                    bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] - globals->nc_control_view->machine_parameters.cutting_extents[3])
+                    bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
+                    bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
                 {
                     try
                     {
@@ -337,8 +340,8 @@ void hmi_jumpin(PrimitiveContainer* p)
     hmi_get_bounding_box(&bbox_min, &bbox_max);
     if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
         bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
-        bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] - globals->nc_control_view->machine_parameters.cutting_extents[2] &&
-        bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] - globals->nc_control_view->machine_parameters.cutting_extents[3])
+        bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
+        bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
     {
         try
         {
