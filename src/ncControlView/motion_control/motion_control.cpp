@@ -482,7 +482,7 @@ void line_handler(std::string line)
                 motion_controller_send("$X");
             }
             else {
-                LOG_F(INFO, "Controller is locked, homing required");
+                LOG_F(WARNING, "Controller is locked. Homing required.");
                 needs_homed = true;
             }
         }
@@ -495,7 +495,7 @@ void line_handler(std::string line)
             }
             else
             {
-                LOG_F(WARNING, "(motion_controll) Communication checksum error, resending last send communication!");
+                LOG_F(WARNING, "(motion_control) Communication checksum error, resending last send communication!");
                 last_checksum_error = EasyRender::Millis();
                 motion_controller.resend();
             }
@@ -536,9 +536,10 @@ void line_handler(std::string line)
         {
             if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos)
             {
-                LOG_F(INFO, "Controller ready!");
+                LOG_F(INFO, "Controller ready, but needs homing!");
                 controller_ready = true;
-                motion_controller_push_stack("$X");
+                needs_homed = true;
+                // motion_controller_push_stack("$X");
                 motion_controller_push_stack("G10 L2 P0 X" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[0]) + " Y" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[1]) + " Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
                 motion_controller_push_stack("M30");
                 motion_controller_run_stack();
