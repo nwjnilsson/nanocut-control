@@ -3,6 +3,7 @@
 #include <EasyRender/geometry/geometry.h>
 #include "../dialogs/dialogs.h"
 #include "../hmi/hmi.h"
+#include "ncControlView/ncControlView.h"
 
 gcode_global_t gcode;
 gcode_path_t current_path;

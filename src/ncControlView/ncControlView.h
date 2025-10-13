@@ -12,30 +12,29 @@ class ncControlView{
             int window_size[2] = { 0, 0 };
         };
         struct machine_parameters_data_t{
-            float work_offset[3] = { 0.0f, 0.0f, 0.0f };
+            // GRBL
+            float homing_feed = 0.0f;
+            float homing_seek = 0.0f;
+            float homing_debounce = 0.0f;
+            float homing_pull_off = 0.0f;
             float machine_extents[3] = { 0.0f, 0.0f, 0.0f };
             float cutting_extents[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
             float axis_scale[3] = { 0.0f, 0.0f, 0.0f };
             float max_vel[3] = { 0.0f, 0.0f, 0.0f };
             float max_accel[3] = { 0.0f, 0.0f, 0.0f };
             float junction_deviation = 0;
-            float floating_head_backlash = 0;
             float z_probe_feedrate = 0;
-            float arc_stabilization_time = 0;
             bool axis_invert[4] = { false, false, false, false };
-            
             bool soft_limits_enabled = false;
             bool homing_enabled = false;
             bool homing_dir_invert[4] = { false, false, false, false };
-            bool invert_step_enable;
-            bool invert_limit_pins;
-            float homing_feed = 0.0f;
-            float homing_seek = 0.0f;
-            float homing_debounce = 0.0f;
-            float homing_pull_off = 0.0f;
+            bool invert_step_enable{ false };
+            bool invert_limit_pins{ false };
 
-            int machine_type = 0; //0 for Plasma, 1 for Router
-
+            // Non-GRBL
+            float work_offset[3] = { 0.0f, 0.0f, 0.0f };
+            float arc_stabilization_time = 0;
+            float floating_head_backlash = 0;
             //Not Included in machine_parameters.json
             int thc_set_value = 0;
             bool smart_thc_on = false;

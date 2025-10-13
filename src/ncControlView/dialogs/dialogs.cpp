@@ -1,6 +1,7 @@
 #include "dialogs.h"
 #include <EasyRender/gui/ImGuiFileDialog.h>
 #include "../motion_control/motion_control.h"
+#include "ncControlView/ncControlView.h"
 #include "../gcode/gcode.h"
 
 EasyRender::EasyRenderGui *thc_window_handle;
@@ -109,7 +110,6 @@ void dialogs_show_machine_parameters(bool s)
 void dialogs_machine_parameters()
 {
     ImGui::Begin("Machine Parameters", &machine_parameters_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::InputInt("Machine Type. 0=Plasma & 1=Router", &globals->nc_control_view->machine_parameters.machine_type);
     ImGui::Separator();
     ImGui::Text("Machine extents is the max distance each axis can travel freely. X0 is the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
     ImGui::InputFloat3("Machine Extents (X, Y, Z). Z must be negative for THC to work.", globals->nc_control_view->machine_parameters.machine_extents);

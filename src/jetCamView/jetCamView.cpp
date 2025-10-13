@@ -6,6 +6,7 @@
 #include <dxf/dxflib/dl_dxf.h>
 #include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"
 #include "PolyNest/PolyNest.h"
+#include "ncControlView/ncControlView.h"
 
 void jetCamView::ZoomEventCallback(nlohmann::json e)
 {

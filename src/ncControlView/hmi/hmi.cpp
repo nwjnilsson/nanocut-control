@@ -1,5 +1,6 @@
 #include "hmi.h"
 #include "../motion_control/motion_control.h"
+#include "ncControlView/ncControlView.h"
 #include "../dialogs/dialogs.h"
 #include "../gcode/gcode.h"
 #include <limits>
@@ -48,6 +49,20 @@ void hmi_get_bounding_box(double_point_t *bbox_min, double_point_t *bbox_max)
             }
         }
     }
+}
+
+static bool check_path_bounds() {
+    double_point_t bbox_min, bbox_max;
+    hmi_get_bounding_box(&bbox_min, &bbox_max);
+    if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
+            bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
+            bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
+            bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
+    { 
+        return true;
+    }
+    LOG_F(WARNING, "Code paths outside machine extents:\n  bbox{[%f, %f], [%f, %f]}", bbox_min.x, bbox_min.y, bbox_max.x, bbox_max.y);
+    return false;
 }
 
 void hmi_handle_button(std::string id)
@@ -168,12 +183,7 @@ void hmi_handle_button(std::string id)
             else if (id == "Run")
             {
                 LOG_F(INFO, "Clicked Run");
-                double_point_t bbox_min, bbox_max;
-                hmi_get_bounding_box(&bbox_min, &bbox_max);
-                if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
-                    bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
-                    bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
-                    bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
+                if (check_path_bounds())
                 {
                     try
                     {
@@ -209,12 +219,7 @@ void hmi_handle_button(std::string id)
             else if (id == "Test Run")
             {
                 LOG_F(INFO, "Clicked Test Run");
-                double_point_t bbox_min, bbox_max;
-                hmi_get_bounding_box(&bbox_min, &bbox_max);
-                if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
-                    bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
-                    bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
-                    bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
+                if (check_path_bounds())
                 {
                     try
                     {
@@ -259,6 +264,7 @@ void hmi_handle_button(std::string id)
         if (id == "Abort")
         {
             LOG_F(INFO, "Clicked Abort");
+            check_path_bounds();
             motion_controller_cmd("abort");
         }
         if (id == "Clean")
@@ -336,12 +342,7 @@ void hmi_handle_button(std::string id)
 
 void hmi_jumpin(PrimitiveContainer* p)
 {
-    double_point_t bbox_min, bbox_max;
-    hmi_get_bounding_box(&bbox_min, &bbox_max);
-    if (bbox_min.x > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[0] &&
-        bbox_min.y > 0.0f + globals->nc_control_view->machine_parameters.cutting_extents[1] &&
-        bbox_max.x < globals->nc_control_view->machine_parameters.machine_extents[0] + globals->nc_control_view->machine_parameters.cutting_extents[2] &&
-        bbox_max.y < globals->nc_control_view->machine_parameters.machine_extents[1] + globals->nc_control_view->machine_parameters.cutting_extents[3])
+    if (check_path_bounds())
     {
         try
         {
@@ -1100,24 +1101,12 @@ void hmi_init()
     hmi_button_backpane->properties->color[2] = 48;
     hmi_button_backpane->properties->zindex = 115;
 
-    if (globals->nc_control_view->machine_parameters.machine_type == 0) //Plasma
-    {
-        hmi_push_button_group("Zero X", "Zero Y");
-        hmi_push_button_group("Touch", "Retract");
-        hmi_push_button_group("Fit", "Clean");
-        hmi_push_button_group("Wpos", "Park");
-        hmi_push_button_group("Test Run", "ATHC");
-        hmi_push_button_group("Run", "Abort");
-    }
-    if (globals->nc_control_view->machine_parameters.machine_type == 1) //Router
-    {
-        hmi_push_button_group("Zero X", "Zero Y");
-        hmi_push_button_group("Zero Z", "Retract");
-        hmi_push_button_group("Fit", "Clean");
-        hmi_push_button_group("Wpos", "Park");
-        hmi_push_button_group("Spindle On", "Spindle Off");
-        hmi_push_button_group("Run", "Abort");
-    }
+    hmi_push_button_group("Zero X", "Zero Y");
+    hmi_push_button_group("Touch", "Retract");
+    hmi_push_button_group("Fit", "Clean");
+    hmi_push_button_group("Wpos", "Park");
+    hmi_push_button_group("Test Run", "ATHC");
+    hmi_push_button_group("Run", "Abort");
     
     dro.x.label = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "X", 50));
     dro.x.label->properties->zindex = 210;
@@ -1189,12 +1178,6 @@ void hmi_init()
     dro.arc_set->properties->color[0] = 247;
     dro.arc_set->properties->color[1] = 104;
     dro.arc_set->properties->color[2] = 15;
-
-    if (globals->nc_control_view->machine_parameters.machine_type == 1) //Router
-    {
-        dro.arc_readout->properties->visible = false;
-        dro.arc_set->properties->visible = false;
-    }
 
     dro.run_time = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "RUN: 0:0:0", 12));
     dro.run_time->properties->zindex = 210;

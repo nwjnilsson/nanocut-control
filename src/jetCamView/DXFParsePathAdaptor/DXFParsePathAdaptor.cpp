@@ -2,6 +2,7 @@
 #include <dxf/spline/Bezier.h>
 #include <EasyRender/logging/loguru.h>
 #include "application.h"
+#include "jetCamView/jetCamView.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))

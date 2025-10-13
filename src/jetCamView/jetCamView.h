@@ -2,9 +2,10 @@
 #define JET_CAM_VIEW_
 
 #include <application.h>
-#include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"
 #include <dxf/dxflib/dl_dxf.h>
 #include "PolyNest/PolyNest.h"
+
+class DXFParsePathAdaptor;
 
 class jetCamView{
     private:
@@ -15,7 +16,7 @@ class jetCamView{
             float background_color[3] = { 0.0f, 0.0f, 0.0f };
         };
         struct job_options_data_t{
-            float material_size[2] = { 48.0f, 48.0f };
+            float material_size[2] = { DEFAULT_MATERIAL_SIZE, DEFAULT_MATERIAL_SIZE };
             int origin_corner = 2;
         };
         struct tool_data_t{

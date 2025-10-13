@@ -19,6 +19,8 @@ Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware
 - Add support for click-and-drag movement of the control view (press and hold right click)
 
 ## Important notes on using this software
+- If you intend to use imperial units for your machine, go into `include/config.h`
+and uncomment the `#define USE_INCH_DEFAULTS`.
 - Negative machine extents is not supported.
 Positioning in the negative quadrant is apparently common traditionally for CNC machines, and GRBL
 reports positions like this by default. I have instead decided to wire the motors and set the axis

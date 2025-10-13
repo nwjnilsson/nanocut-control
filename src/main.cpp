@@ -7,6 +7,9 @@
 #include "EasyRender/gui/imgui.h"
 #include "WebsocketServer/WebsocketServer.h"
 #include "WebsocketClient/WebsocketClient.h"
+#include "ncControlView/ncControlView.h"
+#include "adminView/adminView.h"
+#include "jetCamView/jetCamView.h"
 
 global_variables_t *globals;
 

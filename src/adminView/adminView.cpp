@@ -2,6 +2,9 @@
 #include <EasyRender/EasyRender.h>
 #include <EasyRender/logging/loguru.h>
 #include <EasyRender/gui/imgui.h>
+#include "ncControlView/ncControlView.h"
+#include "jetCamView/jetCamView.h"
+#include "WebsocketClient/WebsocketClient.h"
 
 void adminView::ZoomEventCallback(nlohmann::json e)
 {

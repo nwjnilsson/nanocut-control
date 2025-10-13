@@ -15,12 +15,9 @@
 #include <dirent.h>
 #include <ftw.h>
 #include <EasyRender/EasyRender.h>
-#include "ncControlView/ncControlView.h"
-#include "jetCamView/jetCamView.h"
-#include "adminView/adminView.h"
-#include "WebsocketClient/WebsocketClient.h"
+#include <../include/config.h>
 
-
+#define DEFAULT_UNIT          SCALE(1.f)
 
 /*
     Primary structure to store global variables in

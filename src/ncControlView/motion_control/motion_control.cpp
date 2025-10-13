@@ -1,7 +1,12 @@
 #include <sstream>
 #include <iomanip>
 #include "motion_control.h"
+#include "ncControlView/ncControlView.h"
 #include "../dialogs/dialogs.h"
+
+#define DEFAULT_PIERCE_HEIGHT SCALE(2.8f)
+#define DEFAULT_CUT_HEIGHT SCALE(1.75f)
+#define DEFAULT_PIERCE_DELAY_S 1.2f
 
 easy_serial motion_controller("arduino|USB", byte_handler, line_handler);
 
@@ -89,9 +94,10 @@ bool arc_okay_expire_timer()
         gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z0"); //Retract
         gcode_stack.insert(gcode_stack.begin(), "G90"); //Absolute mode
         gcode_stack.insert(gcode_stack.begin(), "M5"); //Torch Off
-        LOG_F(INFO, "Running callback => arc_okay_expire_timer() - retry count: %d", arc_retry_count);
-        run_pop();
+        
         arc_retry_count++;
+        LOG_F(WARNING, "No arc OK received! Running retry callback => arc_okay_expire_timer() - retry count: %d", arc_retry_count);
+        run_pop();
     }
     return false; //Don't repeat
 }
@@ -191,10 +197,10 @@ void run_pop()
             }
             else
             {
-                LOG_F(WARNING, "[fire_torch] No arguments - Using default!");
-                callback_args["pierce_height"] = 3.000f;
-                callback_args["pierce_delay"] = 1.2f;
-                callback_args["cut_height"] = 1.500f;
+                LOG_F(ERROR, "[fire_torch] Invalid arguments - Using defaults!");
+                callback_args["pierce_height"] = DEFAULT_PIERCE_HEIGHT;
+                callback_args["pierce_delay"] = DEFAULT_PIERCE_DELAY_S;
+                callback_args["cut_height"] = DEFAULT_CUT_HEIGHT;
             }
             if (arc_retry_count > 3)
             {
@@ -223,9 +229,9 @@ void run_pop()
             else
             {
                 LOG_F(WARNING, "[touch_torch] No arguments - Using default!");
-                callback_args["pierce_height"] = 3.000f;
-                callback_args["pierce_delay"] = 1.2f;
-                callback_args["cut_height"] = 1.500f;
+                callback_args["pierce_height"] = DEFAULT_PIERCE_HEIGHT;
+                callback_args["pierce_delay"] = DEFAULT_PIERCE_DELAY_S;
+                callback_args["cut_height"] = DEFAULT_CUT_HEIGHT;
             }
             okay_callback = NULL;
             probe_callback = &touch_torch_and_pierce;
@@ -601,7 +607,6 @@ void motion_controller_save_machine_parameters()
     preferences["homing_seek"] = globals->nc_control_view->machine_parameters.homing_seek;
     preferences["homing_debounce"] = globals->nc_control_view->machine_parameters.homing_debounce;
     preferences["homing_pull_off"] = globals->nc_control_view->machine_parameters.homing_pull_off;
-    preferences["machine_type"] = globals->nc_control_view->machine_parameters.machine_type;
     preferences["invert_limit_pins"] = globals->nc_control_view->machine_parameters.invert_limit_pins;
     preferences["invert_step_enable"] = globals->nc_control_view->machine_parameters.invert_step_enable;
     preferences["precise_jog_units"] = globals->nc_control_view->machine_parameters.precise_jog_units;

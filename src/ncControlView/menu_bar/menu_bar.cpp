@@ -1,6 +1,8 @@
 #include "menu_bar.h"
 #include "../dialogs/dialogs.h"
 #include "../motion_control/motion_control.h"
+#include "jetCamView/jetCamView.h"
+#include "ncControlView/ncControlView.h"
 
 EasyRender::EasyRenderGui *menu_bar;
 

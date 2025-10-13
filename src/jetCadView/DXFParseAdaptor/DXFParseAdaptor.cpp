@@ -1,6 +1,7 @@
 #include "DXFParseAdaptor.h"
 #include <dxf/spline/Bezier.h>
 #include <EasyRender/logging/loguru.h>
+#include "jetCamView/jetCamView.h"
 
 /**
  * Default constructor.
