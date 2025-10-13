@@ -188,14 +188,13 @@ void run_pop()
                 callback_args["pierce_height"] = (double)atof(args[1].c_str());
                 callback_args["pierce_delay"] = (double)atof(args[2].c_str());
                 callback_args["cut_height"] = (double)atof(args[3].c_str());
-                LOG_F(INFO, "Found arguments - %s", callback_args.dump().c_str());
             }
             else
             {
-                callback_args["pierce_height"] = 0.150f;
+                LOG_F(WARNING, "[fire_torch] No arguments - Using default!");
+                callback_args["pierce_height"] = 3.000f;
                 callback_args["pierce_delay"] = 1.2f;
-                callback_args["cut_height"] = 0.060f;
-                LOG_F(INFO, "No arguments - Using default!");
+                callback_args["cut_height"] = 1.500f;
             }
             if (arc_retry_count > 3)
             {
@@ -223,9 +222,10 @@ void run_pop()
             }
             else
             {
-                callback_args["pierce_height"] = 0.150f;
+                LOG_F(WARNING, "[touch_torch] No arguments - Using default!");
+                callback_args["pierce_height"] = 3.000f;
                 callback_args["pierce_delay"] = 1.2f;
-                callback_args["cut_height"] = 0.060f;
+                callback_args["cut_height"] = 1.500f;
             }
             okay_callback = NULL;
             probe_callback = &touch_torch_and_pierce;
@@ -472,8 +472,12 @@ void line_handler(std::string line)
         {
             if (globals->nc_control_view->machine_parameters.homing_enabled == false)
             {
-                LOG_F(WARNING, "Controller Lockout for Unknown Reason, Automatically Unlocking!");
+                LOG_F(WARNING, "Controller lockout for unknown reason. Automatically unlocking!");
                 motion_controller_send("$X");
+            }
+            else {
+                LOG_F(INFO, "Controller is locked, homing required");
+                needs_homed = true;
             }
         }
         else if (line.find("[CHECKSUM_FAILURE]") != std::string::npos)
@@ -580,7 +584,7 @@ void motion_controller_save_machine_parameters()
     preferences["max_accel"]["y"] = globals->nc_control_view->machine_parameters.max_accel[1];
     preferences["max_accel"]["z"] = globals->nc_control_view->machine_parameters.max_accel[2];
     preferences["junction_deviation"] = globals->nc_control_view->machine_parameters.junction_deviation;
-    preferences["arc_stablization_time"] = globals->nc_control_view->machine_parameters.arc_stablization_time;
+    preferences["arc_stabilization_time"] = globals->nc_control_view->machine_parameters.arc_stabilization_time;
     preferences["floating_head_backlash"] = globals->nc_control_view->machine_parameters.floating_head_backlash;
     preferences["z_probe_feedrate"] = globals->nc_control_view->machine_parameters.z_probe_feedrate;
     preferences["axis_invert"]["x"] = globals->nc_control_view->machine_parameters.axis_invert[0];
@@ -775,7 +779,7 @@ void motion_control_tick()
 {
     motion_controller.tick();
     dialogs_show_controller_offline_window(!motion_controller.is_connected);
-    if (needs_homed == true && globals->nc_control_view->machine_parameters.homing_enabled == true && motion_controller.is_connected == true && controller_ready == true && dialogs_controller_alarm_window_visable() == false)
+    if (needs_homed == true && globals->nc_control_view->machine_parameters.homing_enabled == true && motion_controller.is_connected == true && controller_ready == true && dialogs_controller_alarm_window_visible() == false)
     {
         dialogs_show_controller_homing_window(true);
     }
@@ -787,11 +791,10 @@ void motion_control_tick()
     {
         controller_ready = false;
         needs_homed = true;
-        
     }
     try
     {
-        if (torch_on == true && (EasyRender::Millis() - arc_okay_timer) > (globals->nc_control_view->machine_parameters.arc_stablization_time + ((float)callback_args["pierce_delay"] * 1000)))
+        if (torch_on == true && (EasyRender::Millis() - arc_okay_timer) > (globals->nc_control_view->machine_parameters.arc_stabilization_time + ((float)callback_args["pierce_delay"] * 1000)))
         {
             //LOG_F(INFO, "Arc is stabalized!");
             /*

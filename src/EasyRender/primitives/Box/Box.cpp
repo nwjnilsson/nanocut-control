@@ -128,7 +128,7 @@ void EasyPrimitive::Box::render_rectangle_with_radius(float x, float y, float wi
 }
 void EasyPrimitive::Box::render()
 {
-    if (this->properties->visable == true)
+    if (this->properties->visible == true)
     {
         glPushMatrix();
             glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);

@@ -38,7 +38,7 @@ namespace PolyNest{
             double *offset_x;
             double *offset_y;
             double *angle;
-            bool *visable;
+            bool *visible;
             std::string part_name;
             PolyPart()
             {
@@ -70,7 +70,7 @@ namespace PolyNest{
             double MeasureDistanceBetweenPoints(PolyPoint a, PolyPoint b);
             double PerpendicularDistance(const PolyPoint &pt, const PolyPoint &lineStart, const PolyPoint &lineEnd);
             void Simplify(const std::vector<PolyPoint> &pointList, std::vector<PolyPoint> &out, double epsilon);
-            PolyPart BuildPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visable);
+            PolyPart BuildPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible);
         public:
             PolyNest()
             {
@@ -85,8 +85,8 @@ namespace PolyNest{
                 this->placed_parts.clear();
             };
             void SetExtents(PolyPoint min, PolyPoint max);
-            void PushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visable);
-            void PushPlacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visable);
+            void PushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible);
+            void PushPlacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible);
             void BeginPlaceUnplacedPolyParts();
             static bool PlaceUnplacedPolyPartsTick(void *p);
     };

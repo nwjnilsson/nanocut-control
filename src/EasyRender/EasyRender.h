@@ -82,7 +82,7 @@ class EasyRender{
         ImGuiIO *imgui_io;
         struct EasyRenderGui{
             std::string view;
-            bool visable;
+            bool visible;
             void (*callback)();
             void (*callback_with_self)(void *self);
             void *self_pointer;

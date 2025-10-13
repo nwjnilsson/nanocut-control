@@ -1192,8 +1192,8 @@ void hmi_init()
 
     if (globals->nc_control_view->machine_parameters.machine_type == 1) //Router
     {
-        dro.arc_readout->properties->visable = false;
-        dro.arc_set->properties->visable = false;
+        dro.arc_readout->properties->visible = false;
+        dro.arc_set->properties->visible = false;
     }
 
     dro.run_time = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "RUN: 0:0:0", 12));

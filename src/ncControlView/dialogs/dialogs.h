@@ -20,7 +20,7 @@ void dialogs_set_controller_offline_value(std::string i);
 
 void dialogs_show_controller_alarm_window(bool s);
 void dialogs_set_controller_alarm_value(std::string i);
-bool dialogs_controller_alarm_window_visable();
+bool dialogs_controller_alarm_window_visible();
 
 void dialogs_show_controller_homing_window(bool s);
 void dialogs_set_controller_homing_value(std::string i);

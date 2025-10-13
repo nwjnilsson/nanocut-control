@@ -195,7 +195,7 @@ void EasyRender::mouse_button_callback(GLFWwindow* window, int button, int actio
                 --it;
                 if ((*it)->properties->view == self->CurrentView)
                 {
-                    if ((*it)->properties->visable == true && (*it)->properties->mouse_over == true)
+                    if ((*it)->properties->visible == true && (*it)->properties->mouse_over == true)
                     {
                         if ((*it)->properties->mouse_callback != NULL)
                         {
@@ -370,7 +370,7 @@ void EasyRender::PushTimer(unsigned long interval, bool (*c)(void*), void *s)
 EasyRender::EasyRenderGui *EasyRender::PushGui(bool v, void (*c)())
 {
     EasyRender::EasyRenderGui *g = new EasyRender::EasyRenderGui;
-    g->visable = v;
+    g->visible = v;
     g->callback = c;
     g->view = this->CurrentView;
     g->self_pointer = NULL;
@@ -381,7 +381,7 @@ EasyRender::EasyRenderGui *EasyRender::PushGui(bool v, void (*c)())
 EasyRender::EasyRenderGui *EasyRender::PushGui(bool v, void (*c)(void *p), void *s)
 {
     EasyRender::EasyRenderGui *g = new EasyRender::EasyRenderGui;
-    g->visable = v;
+    g->visible = v;
     g->callback = NULL;
     g->view = this->CurrentView;
     g->self_pointer = s;
@@ -773,7 +773,7 @@ bool EasyRender::Poll(bool should_quit)
     ImGui::NewFrame();
     for (size_t x = 0; x < this->gui_stack.size(); x++)
     {
-        if (this->gui_stack[x]->visable == true && this->gui_stack[x]->view == this->CurrentView)
+        if (this->gui_stack[x]->visible == true && this->gui_stack[x]->view == this->CurrentView)
         {
             if (this->gui_stack[x]->self_pointer == NULL)
             {
@@ -806,7 +806,7 @@ bool EasyRender::Poll(bool should_quit)
     bool ignore_next_mouse_events = false;
     for (size_t x = 0; x < this->Primitive_stack.size(); x ++)
     {
-        if (this->Primitive_stack[x]->properties->visable == true && this->Primitive_stack[x]->properties->view == this->CurrentView)
+        if (this->Primitive_stack[x]->properties->visible == true && this->Primitive_stack[x]->properties->view == this->CurrentView)
         {
             Primitive_stack[x]->render();
             if ((!this->imgui_io->WantCaptureKeyboard || !this->imgui_io->WantCaptureMouse) && ignore_next_mouse_events == false)
@@ -858,7 +858,7 @@ bool EasyRender::Poll(bool should_quit)
         {
             LOG_F(INFO, "Creating FPS label!");
             this->FPS_Label = this->PushPrimitive(new EasyPrimitive::Text({0, 0}, "0", 30));
-            this->FPS_Label->properties->visable = false;
+            this->FPS_Label->properties->visible = false;
             this->FPS_Label->properties->id = "FPS";
             this->SetColorByName(this->FPS_Label->properties->color, "white");
         } 
@@ -874,7 +874,7 @@ bool EasyRender::Poll(bool should_quit)
                 }
                 avg = avg / this->FPS_Average.size();
                 this->FPS_Label->textval = std::to_string((int)avg);
-                this->FPS_Label->properties->visable = true;
+                this->FPS_Label->properties->visible = true;
                 this->FPS_Label->position.x = -(this->WindowSize[0] / 2.0f) + 10;
                 this->FPS_Label->position.y = -(this->WindowSize[1] / 2.0f) + 10;
                 this->FPS_Average.erase(this->FPS_Average.begin());

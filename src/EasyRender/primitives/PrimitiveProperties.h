@@ -23,7 +23,7 @@ namespace EasyPrimitive
 */
 class PrimitiveProperties{
     public:
-        bool visable;
+        bool visible;
         bool mouse_over;
         float mouse_over_padding;
         int zindex;
@@ -41,7 +41,7 @@ class PrimitiveProperties{
 
         PrimitiveProperties()
         {
-            this->visable = true;
+            this->visible = true;
             this->zindex = 1;
             this->color[0] = 255;
             this->color[1] = 255;

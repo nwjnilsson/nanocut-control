@@ -332,7 +332,7 @@ void DXFParsePathAdaptor::Finish()
         }
         path.layer = "default";
         path.toolpath_offset = 0.0f;
-        path.toolpath_visable = false;
+        path.toolpath_visible = false;
         paths.push_back(path);
     }
     for (size_t x = 0; x < paths.size(); x++)

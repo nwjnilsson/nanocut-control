@@ -21,7 +21,7 @@ class ncControlView{
             float junction_deviation = 0;
             float floating_head_backlash = 0;
             float z_probe_feedrate = 0;
-            float arc_stablization_time = 0;
+            float arc_stabilization_time = 0;
             bool axis_invert[4] = { false, false, false, false };
             
             bool soft_limits_enabled = false;

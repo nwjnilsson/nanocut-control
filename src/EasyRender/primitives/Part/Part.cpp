@@ -31,7 +31,7 @@ std::string EasyPrimitive::Part::get_type_name()
 }
 void EasyPrimitive::Part::process_mouse(float mpos_x, float mpos_y)
 {
-    if (this->properties->visable == true)
+    if (this->properties->visible == true)
     {
         mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
         mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;
@@ -269,7 +269,7 @@ void EasyPrimitive::Part::render()
                     it->built_points.push_back({(rotated.x + this->control.offset.x) * this->control.scale, (rotated.y + this->control.offset.y) * this->control.scale, (rotated.z + this->control.offset.z) * this->control.scale});
                     this->number_of_verticies++;
                 }
-                if (it->toolpath_visable == true)
+                if (it->toolpath_visible == true)
                 {
                     if (it->is_closed == true)
                     {
@@ -319,7 +319,7 @@ void EasyPrimitive::Part::render()
             catch (std::exception& e)
             {
                 LOG_F(ERROR, "(EasyPrimitive::Part::render) Exception: %s, setting visability to false to avoid further exceptions!", e.what());
-                this->properties->visable = false;
+                this->properties->visible = false;
             }
             this->GetBoundingBox(&this->bb_min, &this->bb_max);
         }
@@ -356,7 +356,7 @@ void EasyPrimitive::Part::render()
             catch (std::exception& e)
             {
                 LOG_F(ERROR, "(EasyPrimitive::Part::render) Exception: %s, setting visability to false to avoid further exceptions!", e.what());
-                this->properties->visable = false;
+                this->properties->visible = false;
             }
             glEnd();
         }

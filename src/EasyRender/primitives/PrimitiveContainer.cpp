@@ -219,7 +219,7 @@ nlohmann::json PrimitiveContainer::serialize()
     }
     j["type"] = this->type;
     nlohmann::json p;
-    p["visable"] = this->properties->visable;
+    p["visible"] = this->properties->visible;
     p["zindex"] = this->properties->zindex;
     p["color"]["r"] = this->properties->color[0];
     p["color"]["g"] = this->properties->color[1];

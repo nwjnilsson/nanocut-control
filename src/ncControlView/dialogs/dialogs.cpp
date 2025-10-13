@@ -44,11 +44,11 @@ void dialogs_file_open()
 
 void dialogs_show_preferences(bool s) 
 {
-    preferences_window_handle->visable = s;
+    preferences_window_handle->visible = s;
 }
 void dialogs_preferences()
 {
-    ImGui::Begin("Preferences", &preferences_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Preferences", &preferences_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::ColorEdit3("Background Color", globals->nc_control_view->preferences.background_color);
     ImGui::ColorEdit3("Machine Plane Color", globals->nc_control_view->preferences.machine_plane_color);
     ImGui::ColorEdit3("Cuttable Plane Color", globals->nc_control_view->preferences.cuttable_plane_color);
@@ -104,18 +104,18 @@ void dialogs_preferences()
 
 void dialogs_show_machine_parameters(bool s)
 {
-    machine_parameters_window_handle->visable = s;
+    machine_parameters_window_handle->visible = s;
 }
 void dialogs_machine_parameters()
 {
-    ImGui::Begin("Machine Parameters", &machine_parameters_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Machine Parameters", &machine_parameters_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::InputInt("Machine Type. 0=Plasma & 1=Router", &globals->nc_control_view->machine_parameters.machine_type);
     ImGui::Separator();
     ImGui::Text("Machine extents is the max distance each axis can travel freely. X0 is the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
     ImGui::InputFloat3("Machine Extents (X, Y, Z). Z must be negative for THC to work.", globals->nc_control_view->machine_parameters.machine_extents);
     
     ImGui::Separator();
-    ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents");
+    ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents, i.e X2 and Y2 should be negative");
     ImGui::InputFloat4("Cutting Extents (X1, Y1, X2, Y2)", globals->nc_control_view->machine_parameters.cutting_extents);
     ImGui::Separator();
     ImGui::Text("Scale is in steps per your desired units. E.G. To use machine in\nInches, set scales to steps per inch.");
@@ -164,8 +164,8 @@ void dialogs_machine_parameters()
     ImGui::Text("Velocity in units per minute when probing the torch");
     ImGui::InputFloat("Z Probe Feed", &globals->nc_control_view->machine_parameters.z_probe_feedrate);
     ImGui::Separator();
-    ImGui::Text("The amount of time after motion starts after a probing cycle to consider the arc stabalized. This will affect Smart THC accuracy!");
-    ImGui::InputFloat("Arc Stabalization Time (ms)", &globals->nc_control_view->machine_parameters.arc_stablization_time);
+    ImGui::Text("The amount of time after motion starts after a probing cycle to consider the arc stabilized. This will affect THC accuracy!");
+    ImGui::InputFloat("Arc Stabalization Time (ms)", &globals->nc_control_view->machine_parameters.arc_stabilization_time);
 
 
 
@@ -186,7 +186,7 @@ void dialogs_machine_parameters()
 
 void dialogs_show_progress_window(bool s)
 {
-    progress_window_handle->visable = s;
+    progress_window_handle->visible = s;
 }
 void dialogs_set_progress_value(float p)
 {
@@ -194,7 +194,7 @@ void dialogs_set_progress_value(float p)
 }
 void dialogs_progress_window()
 {
-    ImGui::Begin("Progress", &progress_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Progress", &progress_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
     ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
     ImGui::Text("Progress");
@@ -203,7 +203,7 @@ void dialogs_progress_window()
 
 void dialogs_show_info_window(bool s)
 {
-    info_window_handle->visable = s;
+    info_window_handle->visible = s;
 }
 void dialogs_set_info_value(std::string i)
 {
@@ -213,7 +213,7 @@ void dialogs_set_info_value(std::string i)
 }
 void dialogs_info_window()
 {
-    ImGui::Begin("Info", &info_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Info", &info_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("%s", info.c_str());
     if (ImGui::Button("Close"))
     {
@@ -224,7 +224,7 @@ void dialogs_info_window()
 
 void dialogs_show_controller_offline_window(bool s)
 {
-    controller_offline_window_handle->visable = s;
+    controller_offline_window_handle->visible = s;
 }
 void dialogs_set_controller_offline_window_value(std::string i)
 {
@@ -234,14 +234,14 @@ void dialogs_set_controller_offline_window_value(std::string i)
 }
 void dialogs_controller_offline_window()
 {
-    ImGui::Begin("Controller Offline", &controller_offline_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Controller Offline", &controller_offline_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("The motion controller is offline! Verify that USB connection is secure!");
     ImGui::End();
 }
 
 void dialogs_show_controller_alarm_window(bool s)
 {
-    controller_alarm_window_handle->visable = s;
+    controller_alarm_window_handle->visible = s;
 }
 void dialogs_set_controller_alarm_value(std::string i)
 {
@@ -249,7 +249,7 @@ void dialogs_set_controller_alarm_value(std::string i)
 }
 void dialogs_controller_alarm_window()
 {
-    ImGui::Begin("Controller Alarm", &controller_alarm_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Controller Alarm", &controller_alarm_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("%s", controller_alarm_text.c_str());
     if (ImGui::Button("Clear Alarm"))
     {
@@ -259,18 +259,18 @@ void dialogs_controller_alarm_window()
     }
     ImGui::End();
 }
-bool dialogs_controller_alarm_window_visable()
+bool dialogs_controller_alarm_window_visible()
 {
-    return controller_alarm_window_handle->visable;
+    return controller_alarm_window_handle->visible;
 }
 
 void dialogs_show_controller_homing_window(bool s)
 {
-    controller_homing_window_handle->visable = s;
+    controller_homing_window_handle->visible = s;
 }
 void dialogs_controller_homing_window()
 {
-    ImGui::Begin("Home Machine", &controller_homing_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Home Machine", &controller_homing_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("Machine needs to be homed. Click on Home button when ready!");
     if (ImGui::Button("Home"))
     {
@@ -289,33 +289,33 @@ void dialogs_ask_yes_no(std::string a, void (*y)(PrimitiveContainer *), void (*n
     ask_window_no_callback = n;
     ask_window_args = args;
     LOG_F(INFO, "Ask Window => %s", ask_text.c_str());
-    ask_window_handle->visable = true;
+    ask_window_handle->visible = true;
 }
 void dialogs_ask_window()
 {
-    ImGui::Begin("Question?", &ask_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Question?", &ask_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("%s", ask_text.c_str());
     if (ImGui::Button("Yes"))
     {
         if (ask_window_yes_callback != NULL) ask_window_yes_callback(ask_window_args);
-        ask_window_handle->visable = false;
+        ask_window_handle->visible = false;
     }
     ImGui::SameLine();
     if (ImGui::Button("No"))
     {
         if (ask_window_no_callback != NULL) ask_window_no_callback(ask_window_args);
-        ask_window_handle->visable = false;
+        ask_window_handle->visible = false;
     }
     ImGui::End();
 }
 
 void dialogs_show_thc_window(bool s)
 {
-    thc_window_handle->visable = s;
+    thc_window_handle->visible = s;
 }
 void dialogs_thc_window()
 {
-    ImGui::Begin("Torch Height Control", &thc_window_handle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Torch Height Control", &thc_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     //ImGui::Text("Smart THC mode automatically sets the \"set voltage\" that is measured shortly\nafter the torch pierces and moves negative to cut height.\n By doing this, the THC should maintain approximately\nthe same cut height as is set in the cutting parameters.");
     //ImGui::BulletText("Smart THC Should not be used on thin materials that warp when the torch touches off!");
     //ImGui::Separator();

@@ -64,7 +64,7 @@ void EasyPrimitive::Line::process_mouse(float mpos_x, float mpos_y)
 }
 void EasyPrimitive::Line::render()
 {
-    if (this->properties->visable == true)
+    if (this->properties->visible == true)
     {
         glPushMatrix();
             glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);

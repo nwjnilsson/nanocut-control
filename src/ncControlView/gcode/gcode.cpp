@@ -130,7 +130,7 @@ void gcode_push_current_path_to_viewer(int rapid_line)
                         globals->renderer->SetColorByName(direction_indicator->properties->color, "blue");
                         direction_indicator->properties->id = "gcode_arrows";
                         direction_indicator->properties->matrix_callback = globals->nc_control_view->view_matrix;
-                        direction_indicator->properties->visable = false;
+                        direction_indicator->properties->visible = false;
                     }
                     path.push_back({simplified[i].x, simplified[i].y});
                     point_count++;
@@ -146,7 +146,7 @@ void gcode_push_current_path_to_viewer(int rapid_line)
                 globals->renderer->SetColorByName(g->properties->color, "white");
                 g->properties->matrix_callback = globals->nc_control_view->view_matrix;
                 g->properties->mouse_callback = &hmi_mouse_callback;
-                g->properties->visable = false;
+                g->properties->visible = false;
             }
         }
         catch(const std::exception& e)
@@ -185,7 +185,7 @@ bool gcode_parse_timer()
                         l->style = "dashed";
                         globals->renderer->SetColorByName(l->properties->color, "grey");
                         l->properties->matrix_callback = globals->nc_control_view->view_matrix;
-                        l->properties->visable = false;
+                        l->properties->visible = false;
                     }
                 }
                 catch(...)
@@ -222,7 +222,7 @@ bool gcode_parse_timer()
             {
                 if (stack->at(x)->properties->id == "gcode" || stack->at(x)->properties->id == "gcode_arrows" || stack->at(x)->properties->id == "gcode_highlights")
                 {
-                    stack->at(x)->properties->visable = true;
+                    stack->at(x)->properties->visible = true;
                 }
             }
             return false;

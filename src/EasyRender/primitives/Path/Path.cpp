@@ -30,7 +30,7 @@ std::string EasyPrimitive::Path::get_type_name()
 }
 void EasyPrimitive::Path::process_mouse(float mpos_x, float mpos_y)
 {
-    if (this->properties->visable == true)
+    if (this->properties->visible == true)
     {
         mpos_x = (mpos_x - this->properties->offset[0]) / this->properties->scale;
         mpos_y = (mpos_y - this->properties->offset[1]) / this->properties->scale;

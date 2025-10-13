@@ -666,7 +666,7 @@ void jetCamView::RenderUI(void *self_pointer)
                     {
                         ImGui::TableNextRow();
                         ImGui::TableSetColumnIndex(0);
-                        ImGui::Checkbox(std::string("##" + (*it)->part->part_name).c_str(), &(*it)->properties->visable);
+                        ImGui::Checkbox(std::string("##" + (*it)->part->part_name).c_str(), &(*it)->properties->visible);
                         ImGui::SameLine();
                         bool tree_node_open = ImGui::TreeNode((*it)->part->part_name.c_str());
                         if (ImGui::BeginPopupContextItem())
@@ -696,7 +696,7 @@ void jetCamView::RenderUI(void *self_pointer)
                                 {
                                     if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name.find((*it)->part->part_name + ":") != std::string::npos))
                                     {
-                                        (*dup)->properties->visable = true;
+                                        (*dup)->properties->visible = true;
                                     }
                                 }
                             }
@@ -706,7 +706,7 @@ void jetCamView::RenderUI(void *self_pointer)
                                 {
                                     if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name.find((*it)->part->part_name + ":") != std::string::npos))
                                     {
-                                        (*dup)->properties->visable = false;
+                                        (*dup)->properties->visible = false;
                                     }
                                 }
                             }
@@ -742,7 +742,7 @@ void jetCamView::RenderUI(void *self_pointer)
                             {
                                 if ((*dup)->properties->view == globals->renderer->GetCurrentView() && (*dup)->type == "part" && ((*dup)->part->part_name.find((*it)->part->part_name + ":") != std::string::npos))
                                 {
-                                    ImGui::Checkbox(std::string("Duplicate " + std::to_string(dup_count) + "##" + (*dup)->part->part_name).c_str(), &(*dup)->properties->visable);
+                                    ImGui::Checkbox(std::string("Duplicate " + std::to_string(dup_count) + "##" + (*dup)->part->part_name).c_str(), &(*dup)->properties->visible);
                                     if (ImGui::BeginPopupContextItem())
                                     {
                                         if (ImGui::MenuItem("Delete Duplicate"))
@@ -855,7 +855,7 @@ void jetCamView::RenderProgressWindow(void *p)
     jetCamView *self = reinterpret_cast<jetCamView *>(p);
     if (self != NULL)
     {
-        ImGui::Begin("Progress", &self->ProgressWindowHandle->visable, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Begin("Progress", &self->ProgressWindowHandle->visible, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::ProgressBar(self->ProgressWindowProgress, ImVec2(0.0f, 0.0f));
             ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
             ImGui::Text("Progress");
@@ -865,7 +865,7 @@ void jetCamView::RenderProgressWindow(void *p)
 void jetCamView::ShowProgressWindow(bool v)
 {
     this->ProgressWindowProgress = 0.0;
-    this->ProgressWindowHandle->visable = true;
+    this->ProgressWindowHandle->visible = true;
 }
 bool jetCamView::DxfFileOpen(std::string filename, std::string name)
 {
@@ -894,7 +894,7 @@ bool jetCamView::DxfFileOpen(std::string filename, std::string name)
                         poly_part.push_back(points);
                     }
                 }
-                this->dxf_nest.PushPlacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visable);
+                this->dxf_nest.PushPlacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visible);
             }
         }
         this->dl_dxf = new DL_Dxf();
@@ -938,8 +938,8 @@ bool jetCamView::DxfFileParseTimer(void *p)
                                 poly_part.push_back(points);
                             }
                         }
-                        (*it)->part->properties->visable = true;
-                        self->dxf_nest.PushUnplacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visable);
+                        (*it)->part->properties->visible = true;
+                        self->dxf_nest.PushUnplacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visible);
                     }
                 }
                 self->dxf_nest.BeginPlaceUnplacedPolyParts();
@@ -1041,7 +1041,7 @@ void jetCamView::Tick()
                 {
                     if ((*it)->properties->view == globals->renderer->GetCurrentView())
                     {
-                        if ((*it)->type == "part" && (*it)->properties->visable == true)
+                        if ((*it)->type == "part" && (*it)->properties->visible == true)
                         {
                             for (size_t y = 0; y < (*it)->part->paths.size(); y++)
                             {
@@ -1051,7 +1051,7 @@ void jetCamView::Tick()
                                     {
                                         (*it)->part->paths[y].toolpath_offset = this->tool_library[this->toolpath_operations[x].tool_number].kerf_width;
                                     }
-                                    (*it)->part->paths[y].toolpath_visable = this->toolpath_operations[x].enabled;
+                                    (*it)->part->paths[y].toolpath_visible = this->toolpath_operations[x].enabled;
                                     (*it)->part->control.lead_in_length = this->toolpath_operations[x].lead_in_length;
                                     (*it)->part->control.lead_out_length = this->toolpath_operations[x].lead_out_length;
                                     (*it)->part->last_control.angle = 1; //Triggers rebuild
@@ -1075,7 +1075,7 @@ void jetCamView::Tick()
                     (*it)->part->last_control.angle = 1; //Triggers rebuild
                     for (size_t y = 0; y < (*it)->part->paths.size(); y++)
                     {
-                        (*it)->part->paths[y].toolpath_visable = false;
+                        (*it)->part->paths[y].toolpath_visible = false;
                     }
                 }
             }
@@ -1099,7 +1099,7 @@ void jetCamView::Tick()
                         LOG_F(INFO, "Posting toolpath operation: %lu on layer: %s", i, this->toolpath_operations[i].layer.c_str());
                         for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
                         {
-                            if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->properties->visable == true && (*it)->type == "part")
+                            if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->properties->visible == true && (*it)->type == "part")
                             {
                                 std::vector<std::vector<double_point_t>> tool_paths = (*it)->part->GetOrderedToolpaths();
                                 if (this->tool_library.size() > this->toolpath_operations[i].tool_number)
@@ -1239,7 +1239,7 @@ void jetCamView::Tick()
                                 poly_part.push_back(points);
                             }
                         }
-                        this->dxf_nest.PushPlacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visable);
+                        this->dxf_nest.PushPlacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visible);
                     }
                 }
                 for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
@@ -1284,7 +1284,7 @@ void jetCamView::Tick()
                         p->control.scale = (*it)->part->control.scale;
                         p->properties->mouse_callback = (*it)->properties->mouse_callback;
                         p->properties->matrix_callback = (*it)->properties->matrix_callback;
-                        this->dxf_nest.PushUnplacedPolyPart(poly_part, &p->control.offset.x, &p->control.offset.y, &p->control.angle, &p->properties->visable);
+                        this->dxf_nest.PushUnplacedPolyPart(poly_part, &p->control.offset.x, &p->control.offset.y, &p->control.angle, &p->properties->visible);
                         break;
                     }
                 }

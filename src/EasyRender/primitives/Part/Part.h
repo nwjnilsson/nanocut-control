@@ -14,7 +14,7 @@ class EasyPrimitive::Part{
             std::vector<double_point_t> built_points;
             std::string layer;
             double toolpath_offset;
-            bool toolpath_visable;
+            bool toolpath_visible;
             bool is_closed;
             bool is_inside_contour;
             float color[4];

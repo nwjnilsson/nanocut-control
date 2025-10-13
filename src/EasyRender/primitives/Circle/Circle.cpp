@@ -101,7 +101,7 @@ void EasyPrimitive::Circle::render_arc(double cx, double cy, double radius, doub
 }
 void EasyPrimitive::Circle::render()
 {
-    if (this->properties->visable == true)
+    if (this->properties->visible == true)
     {
         glPushMatrix();
             glTranslatef(this->properties->offset[0], this->properties->offset[1], this->properties->offset[2]);

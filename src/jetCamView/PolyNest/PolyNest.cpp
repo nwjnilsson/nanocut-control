@@ -185,7 +185,7 @@ void PolyNest::PolyNest::Simplify(const std::vector<PolyPoint> &pointList, std::
 		out.push_back(pointList[end]);
 	}
 }
-PolyNest::PolyPart PolyNest::PolyNest::BuildPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visable)
+PolyNest::PolyPart PolyNest::PolyNest::BuildPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible)
 {
     PolyPart part;
     for (size_t x = 0; x < p.size(); x++)
@@ -253,16 +253,16 @@ PolyNest::PolyPart PolyNest::PolyNest::BuildPart(std::vector<std::vector<PolyPoi
     part.offset_x = offset_x;
     part.offset_y = offset_y;
     part.angle = angle;
-    part.visable = visable;
+    part.visible = visible;
     part.MoveOutsidePolyGonToBack();
     part.Build();
     return part;
 }
-void PolyNest::PolyNest::PushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visable)
+void PolyNest::PolyNest::PushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible)
 {
     try
     {
-        PolyPart part = this->BuildPart(p, offset_x, offset_y, angle, visable);
+        PolyPart part = this->BuildPart(p, offset_x, offset_y, angle, visible);
         this->unplaced_parts.push_back(part);
     }
     catch(const std::exception& e)
@@ -270,11 +270,11 @@ void PolyNest::PolyNest::PushUnplacedPolyPart(std::vector<std::vector<PolyPoint>
         LOG_F(ERROR, "(PolyNest::PolyNest::PushUnplacedPolyPart) Caught Exception: %s", e.what());
     }
 }
-void PolyNest::PolyNest::PushPlacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visable)
+void PolyNest::PolyNest::PushPlacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible)
 {
     try
     {
-        PolyPart part = this->BuildPart(p, offset_x, offset_y, angle, visable);
+        PolyPart part = this->BuildPart(p, offset_x, offset_y, angle, visible);
         this->placed_parts.push_back(part);
     }
     catch(const std::exception& e)
@@ -314,7 +314,7 @@ bool PolyNest::PolyNest::PlaceUnplacedPolyPartsTick(void *p)
                 if (self->found_valid_placement == true)
                 {
                     LOG_F(INFO, "Found valid placement at offset(%.4f, %.4f)", *self->unplaced_parts.front().offset_x, *self->unplaced_parts.front().offset_y);
-                    *self->unplaced_parts.front().visable = true;
+                    *self->unplaced_parts.front().visible = true;
                     self->found_valid_placement = false;
                     self->placed_parts.push_back(self->unplaced_parts.front());
                     self->unplaced_parts.erase(self->unplaced_parts.begin());
@@ -357,7 +357,7 @@ bool PolyNest::PolyNest::PlaceUnplacedPolyPartsTick(void *p)
                         if (*self->unplaced_parts.front().offset_y > (self->max_extents.y - ((self->unplaced_parts.front().bbox_max.y - self->unplaced_parts.front().bbox_min.y) / 2)))
                         {
                             LOG_F(INFO, "Not enough material to place part!");
-                            *self->unplaced_parts.front().visable = true;
+                            *self->unplaced_parts.front().visible = true;
                             return false;
                         }
                         self->unplaced_parts.front().Build();

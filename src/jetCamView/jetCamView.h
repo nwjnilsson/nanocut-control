@@ -9,7 +9,7 @@
 class jetCamView{
     private:
         struct duplicate_part_t{
-            bool visable;
+            bool visible;
         };
         struct preferences_data_t{
             float background_color[3] = { 0.0f, 0.0f, 0.0f };
