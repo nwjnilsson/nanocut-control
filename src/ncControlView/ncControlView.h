@@ -34,6 +34,7 @@ class ncControlView{
             // Non-GRBL
             float work_offset[3] = { 0.0f, 0.0f, 0.0f };
             float arc_stabilization_time = 0;
+            float arc_voltage_divider = 0;
             float floating_head_backlash = 0;
             //Not Included in machine_parameters.json
             int thc_set_value = 0;

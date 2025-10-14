@@ -115,6 +115,7 @@ void ncControlView::PreInit()
             this->machine_parameters.max_accel[2] = (float)parameters["max_accel"]["z"];
             this->machine_parameters.junction_deviation = (float)parameters["junction_deviation"];
             this->machine_parameters.arc_stabilization_time = (float)parameters["arc_stabilization_time"];
+            this->machine_parameters.arc_voltage_divider = (float)parameters["arc_voltage_divider"];
             this->machine_parameters.floating_head_backlash = (float)parameters["floating_head_backlash"];
             this->machine_parameters.z_probe_feedrate = (float)parameters["z_probe_feedrate"];
             this->machine_parameters.axis_invert[0] = (bool)parameters["axis_invert"]["x"];
@@ -162,8 +163,9 @@ void ncControlView::PreInit()
         this->machine_parameters.max_accel[0] = SCALE(800.0f);
         this->machine_parameters.max_accel[1] = SCALE(800.0f);
         this->machine_parameters.max_accel[2] = SCALE(200.0f);
-        this->machine_parameters.junction_deviation = SCALE(0.008f);
+        this->machine_parameters.junction_deviation = SCALE(0.005f);
         this->machine_parameters.arc_stabilization_time = 2000;
+        this->machine_parameters.arc_voltage_divider = 50.f;
         this->machine_parameters.floating_head_backlash = SCALE(10.f);
         this->machine_parameters.z_probe_feedrate = SCALE(100.f);
         this->machine_parameters.axis_invert[0] = true;

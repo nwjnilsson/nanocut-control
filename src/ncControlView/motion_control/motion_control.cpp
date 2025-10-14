@@ -587,6 +587,7 @@ void motion_controller_save_machine_parameters()
     preferences["max_accel"]["z"] = globals->nc_control_view->machine_parameters.max_accel[2];
     preferences["junction_deviation"] = globals->nc_control_view->machine_parameters.junction_deviation;
     preferences["arc_stabilization_time"] = globals->nc_control_view->machine_parameters.arc_stabilization_time;
+    preferences["arc_voltage_divider"] = globals->nc_control_view->machine_parameters.arc_voltage_divider;
     preferences["floating_head_backlash"] = globals->nc_control_view->machine_parameters.floating_head_backlash;
     preferences["z_probe_feedrate"] = globals->nc_control_view->machine_parameters.z_probe_feedrate;
     preferences["axis_invert"]["x"] = globals->nc_control_view->machine_parameters.axis_invert[0];

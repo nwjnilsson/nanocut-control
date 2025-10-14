@@ -3,6 +3,7 @@
 #include "../motion_control/motion_control.h"
 #include "ncControlView/ncControlView.h"
 #include "../gcode/gcode.h"
+#include <algorithm>
 
 EasyRender::EasyRenderGui *thc_window_handle;
 EasyRender::EasyRenderGui *preferences_window_handle;
@@ -157,6 +158,7 @@ void dialogs_machine_parameters()
     ImGui::Separator();
     ImGui::Text("Each axis maximum allowable acceleration in units per second squared");
     ImGui::InputFloat3("Max Acceleration (X, Y, Z)", globals->nc_control_view->machine_parameters.max_accel);
+    ImGui::InputFloat("Junction Deviation", &globals->nc_control_view->machine_parameters.junction_deviation);
     ImGui::Separator();
     ImGui::Text("The distance the floating head moves off of it's gravity stop to where it closes the probe switch. Ohmic sensing should have 0.0000 value");
     ImGui::InputFloat("Floating Head Backlash", &globals->nc_control_view->machine_parameters.floating_head_backlash);
@@ -165,13 +167,20 @@ void dialogs_machine_parameters()
     ImGui::InputFloat("Z Probe Feed", &globals->nc_control_view->machine_parameters.z_probe_feedrate);
     ImGui::Separator();
     ImGui::Text("The amount of time after motion starts after a probing cycle to consider the arc stabilized. This will affect THC accuracy!");
-    ImGui::InputFloat("Arc Stabalization Time (ms)", &globals->nc_control_view->machine_parameters.arc_stabilization_time);
-
-
+    ImGui::InputFloat("Arc Stabilization Time (ms)", &globals->nc_control_view->machine_parameters.arc_stabilization_time);
+    ImGui::Separator();
+    ImGui::Text("The calibrated arc voltage divider of your system. This affects the DRO value.");
+    ImGui::InputFloat("Arc Voltage Divider", &globals->nc_control_view->machine_parameters.arc_voltage_divider);
 
     ImGui::Spacing();
     if (ImGui::Button("Save and write to controller"))
     {
+        const float divider = globals->nc_control_view->machine_parameters.arc_voltage_divider;
+        if (divider < 0.f or divider > 5000.f) {
+            LOG_F(WARNING, "Arc Voltage Divider is outside sane range! Clamping it...");
+            globals->nc_control_view->machine_parameters.arc_voltage_divider = std::clamp(0.f, divider, 5000.f);
+        }
+
         motion_controller_save_machine_parameters();
         motion_controller_write_parameters_to_controller();
         dialogs_show_machine_parameters(false);

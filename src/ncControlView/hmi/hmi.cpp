@@ -8,6 +8,8 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
+#define BBOX_MIN std::numeric_limits<int>::min()
+#define BBOX_MAX std::numeric_limits<int>::max()
 
 double hmi_backplane_width = 300;
 EasyPrimitive::Box *hmi_backpane;
@@ -30,12 +32,10 @@ template <typename T> std::string to_string_strip_zeros(const T a_value) //Fails
 void hmi_get_bounding_box(double_point_t *bbox_min, double_point_t *bbox_max)
 {
     std::vector<PrimitiveContainer*> *stack = globals->renderer->GetPrimitiveStack();
-    auto min = std::numeric_limits<int>::min();
-    auto max = std::numeric_limits<int>::max();
-    bbox_max->x = min;
-    bbox_max->y = min;
-    bbox_min->x = max;
-    bbox_min->y = max;
+    bbox_max->x = BBOX_MIN;
+    bbox_max->y = BBOX_MIN;
+    bbox_min->x = BBOX_MAX;
+    bbox_min->y = BBOX_MAX;
     for (int x = 0; x < stack->size(); x++)
     {
         if (stack->at(x)->type == "path")
@@ -264,7 +264,6 @@ void hmi_handle_button(std::string id)
         if (id == "Abort")
         {
             LOG_F(INFO, "Clicked Abort");
-            check_path_bounds();
             motion_controller_cmd("abort");
         }
         if (id == "Clean")
@@ -277,7 +276,7 @@ void hmi_handle_button(std::string id)
             LOG_F(INFO, "Clicked Fit");
             double_point_t bbox_min, bbox_max;
             hmi_get_bounding_box(&bbox_min, &bbox_max);
-            if (bbox_max.x == -1000000 && bbox_max.y == -1000000 && bbox_min.x == 1000000 && bbox_min.y == 1000000)
+            if (bbox_max.x == BBOX_MIN && bbox_max.y == BBOX_MIN && bbox_min.x == BBOX_MAX && bbox_min.y == BBOX_MAX)
             {
                 LOG_F(INFO, "No paths, fitting to machine extents!");
                 globals->zoom = 1;
@@ -599,7 +598,7 @@ bool hmi_update_timer()
         dro.y.absolute_readout->textval = to_fixed_string(dro_data["MCS"]["y"], 4);
         dro.z.absolute_readout->textval = to_fixed_string(dro_data["MCS"]["z"], 4);
         dro.feed->textval = "FEED: " + to_fixed_string(dro_data["FEED"], 1);
-        dro.arc_readout->textval = "ARC: " + to_fixed_string(dro_data["ADC"], 0);
+        dro.arc_readout->textval = "ARC: " + to_fixed_string((((float)dro_data["ADC"] + 1) / 1024.f) * globals->nc_control_view->machine_parameters.arc_voltage_divider, 0) + "V";
         dro.arc_set->textval = "SET: " + to_fixed_string(globals->nc_control_view->machine_parameters.thc_set_value, 0);
         nlohmann::json runtime = motion_controller_get_run_time();
         if (runtime != NULL) dro.run_time->textval = "RUN: " + to_string_strip_zeros((int)runtime["hours"]) + ":" + to_string_strip_zeros((int)runtime["minutes"]) + ":" + to_string_strip_zeros((int)runtime["seconds"]);
@@ -1166,7 +1165,7 @@ void hmi_init()
     dro.feed->properties->color[1] = 104;
     dro.feed->properties->color[2] = 15;
 
-    dro.arc_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "ARC: 0.0", 12));
+    dro.arc_readout = globals->renderer->PushPrimitive(new EasyPrimitive::Text({-100000, -100000}, "ARC: 0.0V", 12));
     dro.arc_readout->properties->zindex = 210;
     dro.arc_readout->properties->color[0] = 247;
     dro.arc_readout->properties->color[1] = 104;
