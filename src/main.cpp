@@ -77,6 +77,10 @@ int main(int argc, char **argv)
     //globals->renderer->SetShowFPS(true);
     globals->renderer->SetWindowSize(globals->nc_control_view->preferences.window_size[0], globals->nc_control_view->preferences.window_size[1]);
     globals->renderer->Init(argc, argv);
+    ImFontConfig cfg;
+    cfg.SizePixels = 20.f;
+    ImGui::GetIO().Fonts->AddFontDefault(&cfg);
+    ImGui::GetIO().Fonts->Build();
 
     globals->jet_cam_view->Init();
     globals->nc_control_view->Init();

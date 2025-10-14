@@ -170,14 +170,14 @@ void dialogs_machine_parameters()
     ImGui::Text("The amount of time after motion starts after a probing cycle to consider the arc stabilized. This will affect THC accuracy!");
     ImGui::InputFloat("Arc Stabilization Time (ms)", &temp_parameters.arc_stabilization_time);
     ImGui::Separator();
-    ImGui::Text("The calibrated arc voltage divider of your system. This affects the DRO value.");
+    ImGui::Text("The calibrated arc voltage divider of your system. This affects the DRO and THC settings. 1 means raw arc voltage, 50 means a 1:50 divider is used.");
     ImGui::InputFloat("Arc Voltage Divider", &temp_parameters.arc_voltage_divider);
 
     ImGui::Spacing();
     if (ImGui::Button("Save and write to controller"))
     {
         bool skip_save = false;
-        if (temp_parameters.arc_voltage_divider < 0.f or temp_parameters.arc_voltage_divider > 5000.f)
+        if (temp_parameters.arc_voltage_divider < 1.f or temp_parameters.arc_voltage_divider > 500.f)
         {
             dialogs_set_info_value("The arc voltage divider is insane. Pick something reasonable.");
             dialogs_show_info_window(true);
