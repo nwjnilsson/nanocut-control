@@ -5,6 +5,9 @@
 
 class ncControlView{
     private:
+        static void zoom_event_handle(nlohmann::json e);
+        static void click_and_drag_event_handle(nlohmann::json e);
+    public:
         struct preferences_data_t{
             float background_color[3] = { 0.0f, 0.0f, 0.0f };
             float machine_plane_color[3] = { 0.0f, 0.0f, 0.0f };
@@ -41,9 +44,6 @@ class ncControlView{
             bool smart_thc_on = false;
             float precise_jog_units = 0.0f;
         };
-        static void zoom_event_handle(nlohmann::json e);
-        static void click_and_drag_event_handle(nlohmann::json e);
-    public:
         preferences_data_t preferences;
         EasyPrimitive::Box *machine_plane;
         EasyPrimitive::Box *cuttable_plane;
