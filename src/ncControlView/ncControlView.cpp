@@ -135,9 +135,9 @@ void ncControlView::PreInit()
             this->machine_parameters.invert_step_enable = (bool)parameters["invert_step_enable"];
             this->machine_parameters.precise_jog_units = (float)parameters["precise_jog_units"];
         }
-        catch(...)
+        catch(std::exception& e)
         {
-            LOG_F(WARNING, "Error parsing Machine Parameters file!");
+            LOG_F(FATAL, "Error parsing Machine Parameters file! Reason:\n%s\nAborting to avoid damaging. Fix your machine_parameters.json or delete it to generate a new one.", e.what());
         }
     }
     else
