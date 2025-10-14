@@ -478,7 +478,7 @@ void line_handler(std::string line)
         {
             if (globals->nc_control_view->machine_parameters.homing_enabled == false)
             {
-                LOG_F(WARNING, "Controller lockout for unknown reason. Automatically unlocking!");
+                LOG_F(WARNING, "Controller lockout for unknown reason. Automatically unlocking...");
                 motion_controller_send("$X");
             }
             else {
@@ -531,39 +531,30 @@ void line_handler(std::string line)
     }
     else if (controller_ready == false)
     {
-        /* NOTE: This did not seem to work for my controller
-        if (globals->nc_control_view->machine_parameters.homing_enabled == true)
-        {
-            if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos)
-            {
-                LOG_F(INFO, "Controller ready, but needs homing!");
-                controller_ready = true;
-                needs_homed = true;
-                // motion_controller_push_stack("$X");
-                motion_controller_push_stack("G10 L2 P0 X" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[0]) + " Y" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[1]) + " Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
-                motion_controller_push_stack("M30");
-                motion_controller_run_stack();
-            }
-        }
-        else
-        {
-            if (line.find("Grbl") != std::string::npos)
-            {
-                LOG_F(INFO, "Controller ready!");
-                controller_ready = true;
-                motion_controller_push_stack("G10 L2 P0 X" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[0]) + " Y" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[1]) + " Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
-                motion_controller_push_stack("M30");
-                motion_controller_run_stack();
-            }
-        }
-        */
-       if (line.find("Grbl") != std::string::npos)
+        if (line.find("Grbl") != std::string::npos)
         {
             LOG_F(INFO, "Controller ready!");
             controller_ready = true;
             motion_controller_push_stack("G10 L2 P0 X" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[0]) + " Y" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[1]) + " Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
             motion_controller_push_stack("M30");
             motion_controller_run_stack();
+        }
+        else if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos)
+        {
+            if (globals->nc_control_view->machine_parameters.homing_enabled == true)
+            {
+                LOG_F(INFO, "Controller ready, but needs homing.");
+                controller_ready = true;
+                needs_homed = true;
+                motion_controller_push_stack("G10 L2 P0 X" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[0]) + " Y" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[1]) + " Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
+                motion_controller_push_stack("M30");
+                motion_controller_run_stack();
+            }
+            else
+            {
+                LOG_F(WARNING, "Controller locked out. Unlocking...");
+                motion_controller_send("$X");
+            }
         }
     }
 }
