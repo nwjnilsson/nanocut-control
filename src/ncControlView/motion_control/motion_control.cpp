@@ -674,9 +674,9 @@ void motion_controller_write_parameters_to_controller()
         motion_controller_push_stack("$120=" + std::to_string(globals->nc_control_view->machine_parameters.max_accel[0]));
         motion_controller_push_stack("$121=" + std::to_string(globals->nc_control_view->machine_parameters.max_accel[1]));
         motion_controller_push_stack("$122=" + std::to_string(globals->nc_control_view->machine_parameters.max_accel[2]));
-        motion_controller_push_stack("$130=" + std::to_string(fabs(globals->nc_control_view->machine_parameters.machine_extents[0]))); //x max travel
-        motion_controller_push_stack("$131=" + std::to_string(fabs(globals->nc_control_view->machine_parameters.machine_extents[1]))); //y max travel
-        motion_controller_push_stack("$132=" + std::to_string(fabs(globals->nc_control_view->machine_parameters.machine_extents[2]))); //z max travel
+        motion_controller_push_stack("$130=" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[0])); //x max travel
+        motion_controller_push_stack("$131=" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[1])); //y max travel
+        motion_controller_push_stack("$132=" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2])); //z max travel
         motion_controller_push_stack("M30");
         motion_controller_run_stack();
     }
