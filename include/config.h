@@ -1,9 +1,10 @@
 // IMPORTANT:
 //
-// Uncomment this if you want to use inches. This affects the default pierce and cut height values
+// Uncomment this define if you want to use inches. This affects the default pierce and cut height values
 // that the program will fall back to if the gcode is missing these parameters.
-//
 // #define USE_INCH_DEFAULTS
+
+
 
 #if defined(USE_INCH_DEFAULTS)
 #  define SCALE(x) x / 25.4f
