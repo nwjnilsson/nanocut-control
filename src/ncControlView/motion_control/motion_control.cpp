@@ -524,6 +524,10 @@ void line_handler(std::string line)
             LOG_F(INFO, "Probe finished - Running callback!");
             if (probe_callback != NULL) probe_callback();
         }
+        else if (line.find("Grbl") != std::string::npos)
+        {
+            LOG_F(WARNING, "Received Grbl start message while in ready state. Was the controller reset?");
+        }
         else
         {
             LOG_F(WARNING, "Unidentified line recived - %s", line.c_str());
