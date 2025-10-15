@@ -482,8 +482,9 @@ void line_handler(std::string line)
                 motion_controller_send("$X");
             }
             else {
-                LOG_F(WARNING, "Controller is locked. Homing required.");
-                needs_homed = true;
+                LOG_F(WARNING, "Controller is locked. Homing automatically...");
+                motion_controller_send("$H");
+                //needs_homed = true;
             }
         }
         else if (line.find("[CHECKSUM_FAILURE]") != std::string::npos)
@@ -605,6 +606,7 @@ void motion_controller_save_machine_parameters()
     preferences["homing_debounce"] = globals->nc_control_view->machine_parameters.homing_debounce;
     preferences["homing_pull_off"] = globals->nc_control_view->machine_parameters.homing_pull_off;
     preferences["invert_limit_pins"] = globals->nc_control_view->machine_parameters.invert_limit_pins;
+    preferences["invert_probe_pin"] = globals->nc_control_view->machine_parameters.invert_probe_pin;
     preferences["invert_step_enable"] = globals->nc_control_view->machine_parameters.invert_step_enable;
     preferences["precise_jog_units"] = globals->nc_control_view->machine_parameters.precise_jog_units;
 
@@ -650,7 +652,7 @@ void motion_controller_write_parameters_to_controller()
 
         motion_controller_push_stack("$4=" + std::to_string((int)globals->nc_control_view->machine_parameters.invert_step_enable)); // Step enable invert
         motion_controller_push_stack("$5=" + std::to_string((int)globals->nc_control_view->machine_parameters.invert_limit_pins)); // Limit Pins invert
-        motion_controller_push_stack("$6=" + std::to_string(0)); //Probe Pin invert (not yet supported)
+        motion_controller_push_stack("$6=" + std::to_string((int)globals->nc_control_view->machine_parameters.invert_probe_pin));
         motion_controller_push_stack("$10=" + std::to_string(3)); //Status report mask
 
         motion_controller_push_stack("$11=" + std::to_string(globals->nc_control_view->machine_parameters.junction_deviation));
@@ -675,9 +677,9 @@ void motion_controller_write_parameters_to_controller()
         motion_controller_push_stack("$120=" + std::to_string(globals->nc_control_view->machine_parameters.max_accel[0]));
         motion_controller_push_stack("$121=" + std::to_string(globals->nc_control_view->machine_parameters.max_accel[1]));
         motion_controller_push_stack("$122=" + std::to_string(globals->nc_control_view->machine_parameters.max_accel[2]));
-        motion_controller_push_stack("$130=" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[0])); //x max travel
-        motion_controller_push_stack("$131=" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[1])); //y max travel
-        motion_controller_push_stack("$132=" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2])); //z max travel
+        motion_controller_push_stack("$130=" + std::to_string(fabs(globals->nc_control_view->machine_parameters.machine_extents[0]))); //x max travel
+        motion_controller_push_stack("$131=" + std::to_string(fabs(globals->nc_control_view->machine_parameters.machine_extents[1]))); //y max travel
+        motion_controller_push_stack("$132=" + std::to_string(fabs(globals->nc_control_view->machine_parameters.machine_extents[2]))); //z max travel
         motion_controller_push_stack("M30");
         motion_controller_run_stack();
     }

@@ -33,6 +33,7 @@ class ncControlView{
             bool homing_dir_invert[4] = { false, false, false, false };
             bool invert_step_enable{ false };
             bool invert_limit_pins{ false };
+            bool invert_probe_pin{ false };
 
             // Non-GRBL
             float work_offset[3] = { 0.0f, 0.0f, 0.0f };

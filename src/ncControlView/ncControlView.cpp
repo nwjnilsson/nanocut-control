@@ -133,6 +133,7 @@ void ncControlView::PreInit()
             this->machine_parameters.homing_debounce = (float)parameters["homing_debounce"];
             this->machine_parameters.homing_pull_off = (float)parameters["homing_pull_off"];
             this->machine_parameters.invert_limit_pins = (bool)parameters["invert_limit_pins"];
+            this->machine_parameters.invert_probe_pin = (bool)parameters["invert_probe_pin"];
             this->machine_parameters.invert_step_enable = (bool)parameters["invert_step_enable"];
             this->machine_parameters.precise_jog_units = (float)parameters["precise_jog_units"];
         }
@@ -183,6 +184,7 @@ void ncControlView::PreInit()
         this->machine_parameters.homing_debounce = SCALE(250.f);
         this->machine_parameters.homing_pull_off = SCALE(10.f);
         this->machine_parameters.invert_limit_pins = false;
+        this->machine_parameters.invert_probe_pin = false;
         this->machine_parameters.invert_step_enable = false;
         this->machine_parameters.precise_jog_units = SCALE(5.f);
     }

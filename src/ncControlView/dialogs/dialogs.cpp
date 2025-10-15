@@ -147,6 +147,7 @@ void dialogs_machine_parameters()
     ImGui::SameLine();
     ImGui::Checkbox("Invert homing direction Z", &temp_parameters.homing_dir_invert[3]);
     ImGui::Checkbox("Invert limit pins", &temp_parameters.invert_limit_pins);
+    ImGui::Checkbox("Invert probe pin", &temp_parameters.invert_probe_pin);
     ImGui::InputFloat("Homing Feedrate", &temp_parameters.homing_feed);
     ImGui::InputFloat("Homing Seekrate", &temp_parameters.homing_seek);
     ImGui::InputFloat("Homing Debounce", &temp_parameters.homing_debounce);
@@ -183,12 +184,8 @@ void dialogs_machine_parameters()
             dialogs_show_info_window(true);
             skip_save = true;
         }
-        else if (globals->nc_control_view->machine_parameters.machine_extents[2] > 0.f)
-        {
-            dialogs_set_info_value("The NanoCut THC expects a negative Z extent. Please edit your input and try again.");
-            dialogs_show_info_window(true);
-            skip_save = true;
-        }
+        // Might want to do other sanity checks here
+
 
         if (not skip_save)
         {

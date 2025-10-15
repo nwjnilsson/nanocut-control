@@ -4,6 +4,7 @@
 #include "../dialogs/dialogs.h"
 #include "../gcode/gcode.h"
 #include <limits>
+#include <cmath>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -594,9 +595,12 @@ bool hmi_update_timer()
         dro.x.work_readout->textval = to_fixed_string(dro_data["WCS"]["x"], 4);
         dro.y.work_readout->textval = to_fixed_string(dro_data["WCS"]["y"], 4);
         dro.z.work_readout->textval = to_fixed_string(dro_data["WCS"]["z"], 4);
-        dro.x.absolute_readout->textval = to_fixed_string(dro_data["MCS"]["x"], 4);
-        dro.y.absolute_readout->textval = to_fixed_string(dro_data["MCS"]["y"], 4);
-        dro.z.absolute_readout->textval = to_fixed_string(dro_data["MCS"]["z"], 4);
+        const double  posX = std::copysign(static_cast<double>(dro_data["MCS"]["x"]), globals->nc_control_view->machine_parameters.machine_extents[0]);
+        const double  posY = std::copysign(static_cast<double>(dro_data["MCS"]["y"]), globals->nc_control_view->machine_parameters.machine_extents[1]);
+        const double  posZ = std::copysign(static_cast<double>(dro_data["MCS"]["z"]), globals->nc_control_view->machine_parameters.machine_extents[2]);
+        dro.x.absolute_readout->textval = to_fixed_string(posX, 4);
+        dro.y.absolute_readout->textval = to_fixed_string(posY, 4);
+        dro.z.absolute_readout->textval = to_fixed_string(posZ, 4);
         dro.feed->textval = "FEED: " + to_fixed_string(dro_data["FEED"], 1);
         dro.arc_readout->textval = "ARC: " + to_fixed_string((((float)dro_data["ADC"] + 1) / 1024.f) * globals->nc_control_view->machine_parameters.arc_voltage_divider, 0) + "V";
         dro.arc_set->textval = "SET: " + to_fixed_string(globals->nc_control_view->machine_parameters.thc_set_value, 0);
