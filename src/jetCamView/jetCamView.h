@@ -21,12 +21,14 @@ class jetCamView{
         };
         struct tool_data_t{
             char tool_name[1024];
-            double pierce_height;
-            double pierce_delay;
-            double cut_height;
-            double kerf_width;       
-            double feed_rate;
-            double athc;
+            std::unordered_map<std::string, float> params {
+                {"pierce_height", 1.f},
+                {"pierce_delay", 1.f},
+                {"cut_height", 1.f},
+                {"kerf_width", 1.f},
+                {"feed_rate", 1.f},
+                {"athc", 0.f}
+            };
         };
         enum operation_types{
             jet_cutting,

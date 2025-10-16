@@ -3,6 +3,7 @@
 #include "ncControlView/ncControlView.h"
 #include "../dialogs/dialogs.h"
 #include "../gcode/gcode.h"
+#include "../util.h"
 #include <limits>
 #include <cmath>
 
@@ -21,14 +22,6 @@ EasyPrimitive::Path *arc_okay_highlight_path;
 dro_group_data_t dro;
 std::vector<hmi_button_group_t> button_groups;
 bool left_control_key_is_pressed = false;
-
-template <typename T> std::string to_string_strip_zeros(const T a_value) //Fails to link even though motion_control.h is included here...
-{
-    std::ostringstream oss;
-    oss << std::setprecision(5) << std::noshowpoint << a_value;
-    std::string str = oss.str();
-    return oss.str();
-}
 
 void hmi_get_bounding_box(double_point_t *bbox_min, double_point_t *bbox_max)
 {
@@ -94,7 +87,7 @@ void hmi_handle_button(std::string id)
                 LOG_F(INFO, "Clicked Zero X");
                 try
                 {
-                    globals->nc_control_view->machine_parameters.work_offset[0] = (float)motion_controller_get_dro()["MCS"]["x"];
+                    globals->nc_control_view->machine_parameters.work_offset[0] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["x"]));
                     motion_controller_push_stack("G10 L2 P0 X" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[0]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
@@ -110,7 +103,7 @@ void hmi_handle_button(std::string id)
                 LOG_F(INFO, "Clicked Zero Y");
                 try
                 {
-                    globals->nc_control_view->machine_parameters.work_offset[1] = (float)motion_controller_get_dro()["MCS"]["y"];
+                    globals->nc_control_view->machine_parameters.work_offset[1] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["y"]));
                     motion_controller_push_stack("G10 L2 P0 Y" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[1]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
@@ -126,7 +119,7 @@ void hmi_handle_button(std::string id)
                 LOG_F(INFO, "Clicked Zero Z");
                 try
                 {
-                    globals->nc_control_view->machine_parameters.work_offset[2] = (float)motion_controller_get_dro()["MCS"]["z"];
+                    globals->nc_control_view->machine_parameters.work_offset[2] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["z"]));
                     motion_controller_push_stack("G10 L2 P0 Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
@@ -579,12 +572,6 @@ void hmi_view_matrix(PrimitiveContainer *p)
         }
     }
 }
-std::string to_fixed_string(double n, int d)
-{
-    std::stringstream stream;
-    stream << std::fixed << std::setprecision(d) << n;
-    return stream.str();
-}
 
 bool hmi_update_timer()
 {
@@ -592,21 +579,24 @@ bool hmi_update_timer()
     if (dro_data.contains("STATUS"))
     {
         // { "STATUS": "Idle", "MCS": { "x": 0.000,"y": 0.000,"z": 0.000 }, "WCS": { "x": -4.594,"y": -3.260,"z": 0.000 }, "FEED": 0, "ADC": 0, "IN_MOTION": false, "ARC_OK": true }
-        dro.x.work_readout->textval = to_fixed_string(dro_data["WCS"]["x"], 4);
-        dro.y.work_readout->textval = to_fixed_string(dro_data["WCS"]["y"], 4);
-        dro.z.work_readout->textval = to_fixed_string(dro_data["WCS"]["z"], 4);
-        const double  posX = std::copysign(static_cast<double>(dro_data["MCS"]["x"]), globals->nc_control_view->machine_parameters.machine_extents[0]);
-        const double  posY = std::copysign(static_cast<double>(dro_data["MCS"]["y"]), globals->nc_control_view->machine_parameters.machine_extents[1]);
-        const double  posZ = std::copysign(static_cast<double>(dro_data["MCS"]["z"]), globals->nc_control_view->machine_parameters.machine_extents[2]);
-        dro.x.absolute_readout->textval = to_fixed_string(posX, 4);
-        dro.y.absolute_readout->textval = to_fixed_string(posY, 4);
-        dro.z.absolute_readout->textval = to_fixed_string(posZ, 4);
-        dro.feed->textval = "FEED: " + to_fixed_string(dro_data["FEED"], 1);
-        dro.arc_readout->textval = "ARC: " + to_fixed_string((((float)dro_data["ADC"] + 1) / 1024.f) * globals->nc_control_view->machine_parameters.arc_voltage_divider, 0) + "V";
-        dro.arc_set->textval = "SET: " + to_fixed_string(globals->nc_control_view->machine_parameters.thc_set_value, 0);
+        const float wcx = abs(static_cast<float>(dro_data["WCS"]["x"]));
+        const float wcy = abs(static_cast<float>(dro_data["WCS"]["y"]));
+        const float wcz = abs(static_cast<float>(dro_data["WCS"]["z"]));
+        dro.x.work_readout->textval = to_fixed_string(abs(wcx), 4);
+        dro.y.work_readout->textval = to_fixed_string(abs(wcy), 4);
+        dro.z.work_readout->textval = to_fixed_string(abs(wcz), 4);
+        const double  mcx = abs(static_cast<float>(dro_data["MCS"]["x"]));
+        const double  mcy = abs(static_cast<float>(dro_data["MCS"]["y"]));
+        const double  mcz = abs(static_cast<float>(dro_data["MCS"]["z"]));
+        dro.x.absolute_readout->textval = to_fixed_string(mcx, 4);
+        dro.y.absolute_readout->textval = to_fixed_string(mcy, 4);
+        dro.z.absolute_readout->textval = to_fixed_string(mcz, 4);
+        dro.feed->textval = "FEED: " + to_fixed_string(static_cast<float>(dro_data["FEED"]), 1);
+        dro.arc_readout->textval = "ARC: " + to_fixed_string(adc_sample_to_voltage(static_cast<int>(dro_data["ADC"])), 1) + "V";
+        dro.arc_set->textval = "SET: " + to_fixed_string(globals->nc_control_view->machine_parameters.thc_set_value, 1);
         nlohmann::json runtime = motion_controller_get_run_time();
         if (runtime != NULL) dro.run_time->textval = "RUN: " + to_string_strip_zeros((int)runtime["hours"]) + ":" + to_string_strip_zeros((int)runtime["minutes"]) + ":" + to_string_strip_zeros((int)runtime["seconds"]);
-        globals->nc_control_view->torch_pointer->center = {(double)dro_data["MCS"]["x"], (double)dro_data["MCS"]["y"]};
+        globals->nc_control_view->torch_pointer->center = {abs(mcx), abs(mcy)};
         if (motion_controller_is_torch_on())
         {
             hmi_dro_backpane->properties->color[0] = 100;
@@ -626,7 +616,7 @@ bool hmi_update_timer()
             if (arc_okay_highlight_path == NULL)
             {
                 std::vector<double_point_t> path;
-                path.push_back({(double)dro_data["WCS"]["x"], (double)dro_data["WCS"]["y"]});
+                path.push_back({wcx, wcy});
                 arc_okay_highlight_path = globals->renderer->PushPrimitive(new EasyPrimitive::Path(path));
                 arc_okay_highlight_path->properties->id = "gcode_highlights";
                 arc_okay_highlight_path->is_closed = false;
@@ -636,7 +626,7 @@ bool hmi_update_timer()
             }
             else
             {
-                arc_okay_highlight_path->points.push_back({(double)dro_data["WCS"]["x"], (double)dro_data["WCS"]["y"]});
+                arc_okay_highlight_path->points.push_back({wcx, wcy});
             }
         }
         else
@@ -794,11 +784,7 @@ void hmi_up_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging Y positive Continuous!");
-                    float y_extent = globals->nc_control_view->machine_parameters.machine_extents[1];
-                    if(y_extent < 0)
-                        motion_controller_push_stack("G53 G0 Y0");
-                    else
-                        motion_controller_push_stack("G53 G0 Y" + std::to_string(y_extent));
+                    motion_controller_push_stack("G53 G0 Y" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[1]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -837,11 +823,7 @@ void hmi_down_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging Y negative Continuous!");
-                    float y_extent = globals->nc_control_view->machine_parameters.machine_extents[1];
-                    if(y_extent < 0)
-                        motion_controller_push_stack("G53 G0 Y" + std::to_string(y_extent));
-                    else
-                        motion_controller_push_stack("G53 G0 Y0");
+                    motion_controller_push_stack("G53 G0 Y0");
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -880,12 +862,7 @@ void hmi_right_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging X Positive Continuous!");
-                    float x_extent = globals->nc_control_view->machine_parameters.machine_extents[0];
-                    if(x_extent < 0)
-                        motion_controller_push_stack("G53 G0 X0");
-                    else
-                        motion_controller_push_stack("G53 G0 X" + std::to_string(x_extent));
-                    
+                    motion_controller_push_stack("G53 G0 X" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[0]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -924,11 +901,7 @@ void hmi_left_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging X Negative Continuous!");
-                    float x_extent = globals->nc_control_view->machine_parameters.machine_extents[0];
-                    if(x_extent < 0)
-                        motion_controller_push_stack("G53 G0 X" + std::to_string(x_extent));
-                    else
-                        motion_controller_push_stack("G53 G0 X0");
+                    motion_controller_push_stack("G53 G0 X0");
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }

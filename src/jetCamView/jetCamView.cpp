@@ -432,8 +432,8 @@ void jetCamView::RenderUI(void *self_pointer)
             static int operation_tool = -1;
             if (self->tool_library.size() > operation_tool && operation_tool != -1 && operation.lead_in_length == -1 && operation.lead_out_length == -1)
             {
-                operation.lead_in_length = self->tool_library[operation_tool].kerf_width * 1.5;
-                operation.lead_out_length = self->tool_library[operation_tool].kerf_width * 1.5;
+                operation.lead_in_length = self->tool_library[operation_tool].params["kerf_width"] * 1.5;
+                operation.lead_out_length = self->tool_library[operation_tool].params["kerf_width"] * 1.5;
             }
             std::vector<std::string> combo_options;
             for (size_t x = 0; x < self->tool_library.size(); x++) combo_options.push_back(self->tool_library[x].tool_name);
@@ -533,46 +533,64 @@ void jetCamView::RenderUI(void *self_pointer)
             static tool_data_t tool;
             ImGui::Begin("New Tool", &show_new_tool, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::InputText("Tool Name", tool.tool_name, IM_ARRAYSIZE(tool.tool_name));
-            ImGui::InputDouble("Pierce Height", &tool.pierce_height);
-            ImGui::InputDouble("Pierce Delay", &tool.pierce_delay);
-            ImGui::InputDouble("Cut Height", &tool.cut_height);
-            ImGui::InputDouble("Kerf Width", &tool.kerf_width);
-            ImGui::InputDouble("Feed Rate", &tool.feed_rate);
-            ImGui::InputDouble("ATHC", &tool.athc);
+
+            for (auto& [key, value] : tool.params) {
+                ImGui::InputFloat(key.c_str(), &value);
+            }
             if (ImGui::Button("OK"))
             {
-                self->tool_library.push_back(tool);
-                nlohmann::json tool_library;
-                for (size_t x = 0; x < self->tool_library.size(); x++)
-                {
-                    nlohmann::json tool;
-                    tool["tool_name"] = std::string(self->tool_library[x].tool_name);
-                    tool["pierce_height"] = self->tool_library[x].pierce_height;
-                    tool["pierce_delay"] = self->tool_library[x].pierce_delay;
-                    tool["cut_height"] = self->tool_library[x].cut_height;
-                    tool["kerf_width"] = self->tool_library[x].kerf_width;
-                    tool["feed_rate"] = self->tool_library[x].feed_rate;
-                    tool["athc"] = self->tool_library[x].athc;
-                    tool_library.push_back(tool);
+                // Quick sanity check
+                bool skip_save;
+                for (const auto& [key, value] : tool.params) {
+                    if (value < 0.f || value > 50000.f) {
+                        // TODO: show popup
+                        LOG_F(WARNING, "Invalid tool input parameters.");
+                        skip_save = true;
+                        break;
+                    }
                 }
-                globals->renderer->DumpJsonToFile(globals->renderer->GetConfigDirectory() + "tool_library.json", tool_library);
-                show_new_tool = false;
+                if (!skip_save) {
+                    self->tool_library.push_back(tool);
+                    nlohmann::json tool_library;
+                    for (size_t x = 0; x < self->tool_library.size(); x++)
+                    {
+                        nlohmann::json tool;
+                        tool["tool_name"] = std::string(self->tool_library[x].tool_name);
+                        for (const auto& [key, value] : self->tool_library[x].params) {
+                            tool[key] = value;
+                        }
+                        tool_library.push_back(tool);
+                    }
+
+                    globals->renderer->DumpJsonToFile(globals->renderer->GetConfigDirectory() + "tool_library.json", tool_library);
+                    show_new_tool = false;
+                }
             }
             ImGui::End();
         }
         if (show_tool_edit != -1)
         {
+            static tool_data_t tool;
             ImGui::Begin("Tool Edit", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::InputText("Tool Name", self->tool_library[show_tool_edit].tool_name, IM_ARRAYSIZE(self->tool_library[show_tool_edit].tool_name));
-            ImGui::InputDouble("Pierce Height", &self->tool_library[show_tool_edit].pierce_height);
-            ImGui::InputDouble("Pierce Delay", &self->tool_library[show_tool_edit].pierce_delay);
-            ImGui::InputDouble("Cut Height", &self->tool_library[show_tool_edit].cut_height);
-            ImGui::InputDouble("Kerf Width", &self->tool_library[show_tool_edit].kerf_width);
-            ImGui::InputDouble("Feed Rate", &self->tool_library[show_tool_edit].feed_rate);
-            ImGui::InputDouble("ATHC", &self->tool_library[show_tool_edit].athc);
+            for (const auto& [key, value] : self->tool_library[show_tool_edit].params) {
+                ImGui::InputFloat(key.c_str(), &tool.params[key]);
+            }
             if (ImGui::Button("OK"))
             {
-                show_tool_edit = -1;
+                bool skip_save = false;
+                for (const auto& [key, value] : tool.params) {
+                    if (value < 0.f || value > 50000.f) {
+                        // TODO: show popup
+                        LOG_F(WARNING, "Invalid tool input parameters.");
+                        skip_save = true;
+                        break;
+                    }
+                }
+                if (!skip_save) {
+                    self->tool_library[show_tool_edit].params = tool.params;
+                    show_tool_edit = -1;
+                }
             }
             ImGui::End();
         }
@@ -590,16 +608,15 @@ void jetCamView::RenderUI(void *self_pointer)
                     ImGui::TableSetupColumn("ATHC");
                     ImGui::TableSetupColumn("Action");
                     ImGui::TableHeadersRow();
-                    for (size_t x = 0; x < self->tool_library.size(); x++)
+                    for (size_t x = 0; x < self->tool_library.size(); ++x)
                     {
                         ImGui::TableNextRow();
+                        int i = 1;
                         ImGui::TableSetColumnIndex(0); ImGui::Text("%s", self->tool_library[x].tool_name);
-                        ImGui::TableSetColumnIndex(1); ImGui::Text("%.4f", self->tool_library[x].pierce_height);
-                        ImGui::TableSetColumnIndex(2); ImGui::Text("%.4f", self->tool_library[x].pierce_delay);
-                        ImGui::TableSetColumnIndex(3); ImGui::Text("%.4f", self->tool_library[x].cut_height);
-                        ImGui::TableSetColumnIndex(4); ImGui::Text("%.4f", self->tool_library[x].kerf_width);
-                        ImGui::TableSetColumnIndex(5); ImGui::Text("%.4f", self->tool_library[x].feed_rate);
-                        ImGui::TableSetColumnIndex(6); ImGui::Text("%.4f", self->tool_library[x].athc);
+                        for (const auto& [key, value] : self->tool_library[x].params) {
+                            ImGui::TableSetColumnIndex(i++);
+                            ImGui::Text("%.4f", value);
+                        }
                         ImGui::TableSetColumnIndex(7);
                         if (ImGui::Button(std::string("Edit##Edit-" + std::to_string(x)).c_str()))
                         {
@@ -982,12 +999,9 @@ void jetCamView::PreInit()
             tool_data_t tool;
             std::string tool_name = tool_library[x]["tool_name"];
             sprintf(tool.tool_name, "%s", tool_name.c_str());
-            tool.pierce_height = (double)tool_library[x]["pierce_height"];
-            tool.pierce_delay = (double)tool_library[x]["pierce_delay"];
-            tool.cut_height = (double)tool_library[x]["cut_height"];
-            tool.kerf_width = (double)tool_library[x]["kerf_width"];
-            tool.feed_rate = (double)tool_library[x]["feed_rate"];
-            tool.athc = (double)tool_library[x]["athc"];
+            for (auto& [key, value] : tool.params) {
+                value = static_cast<float>(tool_library[x][key]);
+            }
             this->tool_library.push_back(tool);
         }
     }
@@ -1050,7 +1064,7 @@ void jetCamView::Tick()
                                 {
                                     if (this->tool_library.size() > this->toolpath_operations[x].tool_number)
                                     {
-                                        (*it)->part->paths[y].toolpath_offset = this->tool_library[this->toolpath_operations[x].tool_number].kerf_width;
+                                        (*it)->part->paths[y].toolpath_offset = this->tool_library[this->toolpath_operations[x].tool_number].params["kerf_width"];
                                     }
                                     (*it)->part->paths[y].toolpath_visible = this->toolpath_operations[x].enabled;
                                     (*it)->part->control.lead_in_length = this->toolpath_operations[x].lead_in_length;
@@ -1108,14 +1122,15 @@ void jetCamView::Tick()
                                     for (size_t x = 0; x < tool_paths.size(); x++)
                                     {
                                         gcode_file << "G0 X" << tool_paths[x][0].x << " Y" << tool_paths[x][0].y << "\n";
-                                        if (this->tool_library[this->toolpath_operations[i].tool_number].athc > 0)
+                                        if (this->tool_library[this->toolpath_operations[i].tool_number].params["athc"] > 0)
                                         {
+                                            // TODO: implement
                                             //Motion controller does not support this yet....
                                         }
-                                        gcode_file << "fire_torch " << this->tool_library[this->toolpath_operations[i].tool_number].pierce_height << " " << this->tool_library[this->toolpath_operations[i].tool_number].pierce_delay << " " << this->tool_library[this->toolpath_operations[i].tool_number].cut_height << "\n";
+                                        gcode_file << "fire_torch " << this->tool_library[this->toolpath_operations[i].tool_number].params["pierce_height"] << " " << this->tool_library[this->toolpath_operations[i].tool_number].params["pierce_delay"] << " " << this->tool_library[this->toolpath_operations[i].tool_number].params["cut_height"] << "\n";
                                         for (size_t z = 0; z < tool_paths[x].size(); z++)
                                         {
-                                            gcode_file << "G1 X" << tool_paths[x][z].x << " Y" << tool_paths[x][z].y << " F" << this->tool_library[this->toolpath_operations[i].tool_number].feed_rate << "\n";
+                                            gcode_file << "G1 X" << tool_paths[x][z].x << " Y" << tool_paths[x][z].y << " F" << this->tool_library[this->toolpath_operations[i].tool_number].params["feed_rate"] << "\n";
                                         }
                                         gcode_file << "torch_off\n";
                                     }

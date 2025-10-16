@@ -3,6 +3,7 @@
 #include "../motion_control/motion_control.h"
 #include "ncControlView/ncControlView.h"
 #include "../gcode/gcode.h"
+#include "../util.h"
 #include <algorithm>
 
 EasyRender::EasyRenderGui *thc_window_handle;
@@ -114,7 +115,7 @@ void dialogs_machine_parameters()
     ImGui::Begin("Machine Parameters", &machine_parameters_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Separator();
     ImGui::Text("Machine extents is the max distance each axis can travel freely. X0 is the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
-    ImGui::InputFloat3("Machine Extents (X, Y, Z). Z must be negative for THC to work.", temp_parameters.machine_extents);
+    ImGui::InputFloat3("Machine Extents (X, Y, Z).", temp_parameters.machine_extents);
     
     ImGui::Separator();
     ImGui::Text("Cutting extents are used to prevent accidentally cutting onto machine frames or generally any area outside of where cutting should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is top right hand corner, values are incremented off of machine extents, i.e X2 and Y2 should be negative");
@@ -183,6 +184,14 @@ void dialogs_machine_parameters()
             dialogs_set_info_value("The arc voltage divider is insane. Pick something reasonable.");
             dialogs_show_info_window(true);
             skip_save = true;
+        }
+        for (int i = 0; i < 3; ++i) {
+            if (temp_parameters.machine_extents[i] < 0.f) {
+                dialogs_set_info_value("Machine extents must not be negative.");
+                dialogs_show_info_window(true);
+                skip_save = true;
+                break;
+            }
         }
         // Might want to do other sanity checks here
 
@@ -341,9 +350,15 @@ void dialogs_thc_window()
     //ImGui::Checkbox("Turn on Auto THC Setting Mode", &globals->nc_control_view->machine_parameters.smart_thc_on);
     ImGui::Separator();
     //ImGui::Text("When Smart THC is off (Not Checked) the THC set voltage set below will be used");
-    ImGui::Text("0 = THC OFF, Max value is 1024. Press Tab to manually enter a value");
+
+    const float min_threshold = adc_sample_to_voltage(THC_MIN_THRESHOLD - 1);
+    float& current = globals->nc_control_view->machine_parameters.thc_set_value;
+    const std::string state = current > min_threshold ? "ON" : "OFF";
+    ImGui::Text("Current: %sV (%s). A target of %dV is required to activate THC. Press tab to enter a value directly.", to_string_with_precision(current, 0).c_str(), state.c_str(), static_cast<int>(min_threshold));
     ImGui::Separator();
-    ImGui::SliderInt("Set Voltage", &globals->nc_control_view->machine_parameters.thc_set_value, 0, 1024);
+    int thc_set = voltage_to_adc_sample(current);
+    ImGui::SliderInt("Set Voltage", &thc_set, 0, ADC_RESOLUTION - 1);
+    current = adc_sample_to_voltage(thc_set);
     if (ImGui::Button("Close"))
     {
         dialogs_show_thc_window(false);

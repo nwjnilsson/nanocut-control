@@ -41,7 +41,7 @@ class ncControlView{
             float arc_voltage_divider = 0;
             float floating_head_backlash = 0;
             //Not Included in machine_parameters.json
-            int thc_set_value = 0;
+            float thc_set_value{ 0.f };
             bool smart_thc_on = false;
             float precise_jog_units = 0.0f;
         };

@@ -3,6 +3,7 @@
 #include "motion_control.h"
 #include "ncControlView/ncControlView.h"
 #include "../dialogs/dialogs.h"
+#include "../util.h"
 
 #define DEFAULT_PIERCE_HEIGHT SCALE(2.8f)
 #define DEFAULT_CUT_HEIGHT SCALE(1.75f)
@@ -10,20 +11,6 @@
 
 easy_serial motion_controller("arduino|USB", byte_handler, line_handler);
 
-template <typename T> std::string to_string_with_precision(const T a_value, const int n)
-{
-    std::ostringstream out;
-    out.precision(n);
-    out << std::fixed << a_value;
-    return out.str();
-}
-template <typename T> std::string to_string_strip_zeros(const T a_value)
-{
-    std::ostringstream oss;
-    oss << std::setprecision(5) << std::noshowpoint << a_value;
-    std::string str = oss.str();
-    return oss.str();
-}
 void removeSubstrs(std::string& s, std::string p) { 
   std::string::size_type n = p.length();
   for (std::string::size_type i = s.find(p);
@@ -111,7 +98,7 @@ void raise_to_cut_height_and_run_program()
     //This list that we are inserting is ran from bottom to top or LIFO mode
     if (globals->nc_control_view->machine_parameters.smart_thc_on == false)
     {
-        gcode_stack.insert(gcode_stack.begin(), "$T=" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.thc_set_value));
+        gcode_stack.insert(gcode_stack.begin(), "$T=" + to_string_strip_zeros(voltage_to_adc_sample(globals->nc_control_view->machine_parameters.thc_set_value)));
     }
     gcode_stack.insert(gcode_stack.begin(), "G90");
     gcode_stack.insert(gcode_stack.begin(), "G91G0Z" + to_string_strip_zeros((double)callback_args["cut_height"] - (double)callback_args["pierce_height"]));

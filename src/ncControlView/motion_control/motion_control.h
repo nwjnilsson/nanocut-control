@@ -18,9 +18,6 @@ bool byte_handler(uint8_t);
 void line_handler(std::string);
 /*      End Private Functions       */
 
-template <typename T> std::string to_string_with_precision(const T a_value, const int n = 5);
-template <typename T> std::string to_string_strip_zeros(const T a_value);
-
 nlohmann::json motion_controller_get_dro();
 nlohmann::json motion_controller_get_run_time();
 void motion_controller_set_needs_homed(bool);

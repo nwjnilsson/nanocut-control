@@ -14,3 +14,10 @@
 
 // Default values (in mm), change as you see fit
 #define DEFAULT_MATERIAL_SIZE SCALE(500.f) // The work piece in CAM view (500x500)
+
+
+
+// Other parameters that depend on external factors
+#define ADC_INPUT_VOLTAGE               5.f
+#define ADC_RESOLUTION                  1024
+#define THC_MIN_THRESHOLD               150 // defined in nanocut-firmware thc.h
