@@ -88,7 +88,7 @@ void hmi_handle_button(std::string id)
                 try
                 {
                     globals->nc_control_view->machine_parameters.work_offset[0] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["x"]));
-                    motion_controller_push_stack("G10 L2 P0 X" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[0]));
+                    motion_controller_push_stack("G10 L2 P0 X-" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[0]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                     motion_controller_save_machine_parameters();
@@ -104,7 +104,7 @@ void hmi_handle_button(std::string id)
                 try
                 {
                     globals->nc_control_view->machine_parameters.work_offset[1] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["y"]));
-                    motion_controller_push_stack("G10 L2 P0 Y" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[1]));
+                    motion_controller_push_stack("G10 L2 P0 Y-" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[1]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                     motion_controller_save_machine_parameters();
@@ -120,7 +120,7 @@ void hmi_handle_button(std::string id)
                 try
                 {
                     globals->nc_control_view->machine_parameters.work_offset[2] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["z"]));
-                    motion_controller_push_stack("G10 L2 P0 Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
+                    motion_controller_push_stack("G10 L2 P0 Z-" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                     motion_controller_save_machine_parameters();
@@ -784,7 +784,7 @@ void hmi_up_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging Y positive Continuous!");
-                    motion_controller_push_stack("G53 G0 Y" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[1]));
+                    motion_controller_push_stack("G53 G0 Y-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[1]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -862,7 +862,7 @@ void hmi_right_key_callback(nlohmann::json e)
                 {
                     //key down
                     LOG_F(INFO, "Jogging X Positive Continuous!");
-                    motion_controller_push_stack("G53 G0 X" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[0]));
+                    motion_controller_push_stack("G53 G0 X-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[0]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }

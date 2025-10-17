@@ -200,7 +200,12 @@ void run_pop()
             {
                 okay_callback = NULL;
                 probe_callback = &raise_to_pierce_height_and_fire_torch;
-                motion_controller_send_crc32("G38.3Z" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+                if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
+                    motion_controller_send_crc32("G38.3Z0F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+                }
+                else {
+                    motion_controller_send_crc32("G38.3Z-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+                }
             }
         }
         else if (line.find("touch_torch") != std::string::npos)
@@ -222,7 +227,12 @@ void run_pop()
             }
             okay_callback = NULL;
             probe_callback = &touch_torch_and_pierce;
-            motion_controller_send_crc32("G38.3Z" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+            if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
+                motion_controller_send_crc32("G38.3ZF0" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+            }
+            else {
+                motion_controller_send_crc32("G38.3Z-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+            }
         }
         else if(line.find("WAIT_FOR_ARC_OKAY") != std::string::npos)
         {
@@ -470,8 +480,7 @@ void line_handler(std::string line)
             }
             else {
                 LOG_F(WARNING, "Controller is locked. Homing automatically...");
-                motion_controller_send("$H");
-                //needs_homed = true;
+                needs_homed = true;
             }
         }
         else if (line.find("[CHECKSUM_FAILURE]") != std::string::npos)

@@ -20,7 +20,7 @@ class ncControlView{
             float homing_seek = 0.0f;
             float homing_debounce = 0.0f;
             float homing_pull_off = 0.0f;
-            float machine_extents[3] = { 0.0f, 0.0f, 0.0f };
+            float machine_extents[3] = { 0.0f, 0.0f, 0.0f }; // Stored as positive values
             float cutting_extents[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
             float axis_scale[3] = { 0.0f, 0.0f, 0.0f };
             float max_vel[3] = { 0.0f, 0.0f, 0.0f };
@@ -36,7 +36,7 @@ class ncControlView{
             bool invert_probe_pin{ false };
 
             // Non-GRBL
-            float work_offset[3] = { 0.0f, 0.0f, 0.0f };
+            float work_offset[3] = { 0.0f, 0.0f, 0.0f }; // Stored as positive
             float arc_stabilization_time = 0;
             float arc_voltage_divider = 0;
             float floating_head_backlash = 0;
