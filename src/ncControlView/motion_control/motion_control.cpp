@@ -62,6 +62,28 @@ void program_finished()
     arc_okay_callback = NULL;
     motion_controller_clear_stack();
 }
+
+void motion_controller_retract()
+{
+    if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
+        float pos = globals->nc_control_view->machine_parameters.machine_extents[2] - globals->nc_control_view->machine_parameters.floating_head_backlash;
+        gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z-" + std::to_string(pos));
+    }
+    else {
+        gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z0");
+    }
+}
+void motion_controller_probe()
+{
+    if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
+        motion_controller_send_crc32("G38.3Z0F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+    }
+    else {
+        motion_controller_send_crc32("G38.3Z-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+    }
+}
+
+
 bool arc_okay_expire_timer()
 {
     if (abort_pending == true) return false; //Pending abort must cancel this timer otherwise aborts would be ignored in arc retry loop!
@@ -78,7 +100,7 @@ bool arc_okay_expire_timer()
         //Remember that inserting at the top of list means its the next code to run, meaning
         //This list that we are inserting is ran from bottom to top or LIFO mode
         gcode_stack.insert(gcode_stack.begin(), "fire_torch " + to_string_strip_zeros((double)callback_args["pierce_height"]) + " " + to_string_strip_zeros((double)callback_args["pierce_delay"]) + " " + to_string_strip_zeros((double)callback_args["cut_height"]));
-        gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z0"); //Retract
+        motion_controller_retract();
         gcode_stack.insert(gcode_stack.begin(), "G90"); //Absolute mode
         gcode_stack.insert(gcode_stack.begin(), "M5"); //Torch Off
         
@@ -88,7 +110,7 @@ bool arc_okay_expire_timer()
     }
     return false; //Don't repeat
 }
-void raise_to_cut_height_and_run_program()
+void lower_to_cut_height_and_run_program()
 {
     okay_callback = &run_pop;
     probe_callback = NULL;
@@ -103,9 +125,10 @@ void raise_to_cut_height_and_run_program()
     gcode_stack.insert(gcode_stack.begin(), "G90");
     gcode_stack.insert(gcode_stack.begin(), "G91G0Z" + to_string_strip_zeros((double)callback_args["cut_height"] - (double)callback_args["pierce_height"]));
     gcode_stack.insert(gcode_stack.begin(), "G4P" + to_string_strip_zeros((double)callback_args["pierce_delay"]));
-    LOG_F(INFO, "Running callback => raise_to_cut_height_and_run_program()");
+    LOG_F(INFO, "Running callback => lower_to_cut_height_and_run_program()");
     run_pop();
 }
+
 void raise_to_pierce_height_and_fire_torch()
 {
     okay_callback = &run_pop;
@@ -143,11 +166,12 @@ void torch_off_and_abort()
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
     gcode_stack.insert(gcode_stack.begin(), "M30");
-    gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z0");
+    motion_controller_retract();
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off, retracting, and aborting!");
     run_pop();
 }
+
 void torch_off_and_retract()
 {
     okay_callback = &run_pop;
@@ -161,11 +185,12 @@ void torch_off_and_retract()
     {
         gcode_stack.insert(gcode_stack.begin(), "$T=0");
     }
-    gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z0");
+    motion_controller_retract();
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off and retracting!");
     run_pop();
 }
+
 void run_pop()
 {
     if (gcode_stack.size() > 0)
@@ -200,12 +225,7 @@ void run_pop()
             {
                 okay_callback = NULL;
                 probe_callback = &raise_to_pierce_height_and_fire_torch;
-                if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
-                    motion_controller_send_crc32("G38.3Z0F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
-                }
-                else {
-                    motion_controller_send_crc32("G38.3Z-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
-                }
+                motion_controller_probe();
             }
         }
         else if (line.find("touch_torch") != std::string::npos)
@@ -227,18 +247,13 @@ void run_pop()
             }
             okay_callback = NULL;
             probe_callback = &touch_torch_and_pierce;
-            if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
-                motion_controller_send_crc32("G38.3ZF0" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
-            }
-            else {
-                motion_controller_send_crc32("G38.3Z-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
-            }
+            motion_controller_probe();
         }
         else if(line.find("WAIT_FOR_ARC_OKAY") != std::string::npos)
         {
             LOG_F(INFO, "[run_pop] Setting arc_okay callback and arc_okay expire timer => fires in %.4f ms!", (3 + (double)callback_args["pierce_delay"]) * 1000);
             globals->renderer->PushTimer((3 + (double)callback_args["pierce_delay"]) * 1000, &arc_okay_expire_timer);
-            arc_okay_callback = &raise_to_cut_height_and_run_program;
+            arc_okay_callback = &lower_to_cut_height_and_run_program;
             okay_callback = NULL;
             probe_callback = NULL;
         }

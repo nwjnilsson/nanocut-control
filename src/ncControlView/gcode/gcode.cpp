@@ -99,8 +99,10 @@ nlohmann::json parse_line(std::string line)
             }
         }
     }
-    ret["x"] = atof(x_value.c_str());
-    ret["y"] = atof(y_value.c_str());
+    // Rendering in positive quadrant, so invert gcode values because machine
+    // position is in negative quadrant.
+    ret["x"] = -atof(x_value.c_str());
+    ret["y"] = -atof(y_value.c_str());
     return ret;
 }
 void gcode_push_current_path_to_viewer(int rapid_line)
@@ -167,7 +169,7 @@ bool gcode_parse_timer()
             dialogs_set_progress_value((float)gcode.lines_consumed / (float)gcode.line_count);
             if (line.find("G0") != std::string::npos)
             {
-                double_point_t last_path_endpoint = {-1000000, -1000000};
+                double_point_t last_path_endpoint = {INT_MIN, INT_MIN};
                 if (current_path.points.size() > 0)
                 {
                     last_path_endpoint = current_path.points[current_path.points.size()-1];
@@ -179,7 +181,7 @@ bool gcode_parse_timer()
                 try
                 {
                     current_path.points.push_back({ (double)g["x"], (double)g["y"]});
-                    if (last_path_endpoint.x != -1000000 && last_path_endpoint.y != -1000000)
+                    if (last_path_endpoint.x != INT_MIN && last_path_endpoint.y != INT_MIN)
                     {
                         EasyPrimitive::Line *l = globals->renderer->PushPrimitive(new EasyPrimitive::Line(last_path_endpoint, {(double)g["x"], (double)g["y"]}));
                         l->properties->id = "gcode";

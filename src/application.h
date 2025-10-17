@@ -16,8 +16,12 @@
 #include <ftw.h>
 #include <EasyRender/EasyRender.h>
 #include <../include/config.h>
+#include <limits>
 
 #define DEFAULT_UNIT          SCALE(1.f)
+
+constexpr int INT_MIN { std::numeric_limits<int>::min() };
+constexpr int INT_MAX { std::numeric_limits<int>::max() };
 
 /*
     Primary structure to store global variables in
