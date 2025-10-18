@@ -66,11 +66,12 @@ namespace PolyNest{
             bool CheckIfPointIsInsidePath(std::vector<PolyPoint> path, PolyPoint point);
             bool CheckIfPathIsInsidePath(std::vector<PolyPoint> path1, std::vector<PolyPoint> path2);
             bool CheckIfPolyPartTouchesAnyPlacedPolyPart(PolyPart p);
-            bool CheckIfPolyPartIsInsideExtents(PolyPart p, PolyPoint min_point, PolyPoint max_point, PolyPart part);
+            bool CheckIfPolyPartIsInsideExtents(PolyPart p, PolyPoint min_point, PolyPoint max_point);
             double MeasureDistanceBetweenPoints(PolyPoint a, PolyPoint b);
             double PerpendicularDistance(const PolyPoint &pt, const PolyPoint &lineStart, const PolyPoint &lineEnd);
             void Simplify(const std::vector<PolyPoint> &pointList, std::vector<PolyPoint> &out, double epsilon);
             PolyPart BuildPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible);
+            PolyPoint GetDefaultOffsetXY(const PolyPart&);
         public:
             PolyNest()
             {

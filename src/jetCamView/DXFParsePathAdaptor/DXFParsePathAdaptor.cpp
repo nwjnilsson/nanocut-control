@@ -10,11 +10,11 @@
 /**
  * Default constructor.
  */
-DXFParsePathAdaptor::DXFParsePathAdaptor(void *easy_render_instance, void (*v)(PrimitiveContainer *), void (*m)(PrimitiveContainer*, nlohmann::json)) 
+DXFParsePathAdaptor::DXFParsePathAdaptor(EasyRender* easy_render_instance, void (*v)(PrimitiveContainer *), void (*m)(PrimitiveContainer*, nlohmann::json)) 
 {
     this->current_layer = "default";
     this->filename = "";
-    this->easy_render_instance = reinterpret_cast<EasyRender *>(easy_render_instance);
+    this->easy_render_instance = easy_render_instance;
     this->view_callback = v;
     this->mouse_callback = m;
     this->smoothing = 0.003;
@@ -37,20 +37,20 @@ void DXFParsePathAdaptor::SetChainTolorance(double chain_tolorance)
 {
     this->chain_tolorance = chain_tolorance;
 }
-void DXFParsePathAdaptor::GetBoundingBox(std::vector<std::vector<double_point_t>> path_stack, double_point_t *bbox_min, double_point_t *bbox_max)
+void DXFParsePathAdaptor::GetBoundingBox(const std::vector<std::vector<double_point_t>>& path_stack, double_point_t& bbox_min, double_point_t& bbox_max)
 {
-    bbox_max->x = -1000000;
-    bbox_max->y = -1000000;
-    bbox_min->x = 1000000;
-    bbox_min->y = 1000000;
-    for (std::vector<std::vector<double_point_t>>::iterator it = path_stack.begin(); it != path_stack.end(); ++it)
+    bbox_max.x = INT_MIN;
+    bbox_max.y = INT_MIN;
+    bbox_min.x = INT_MAX;
+    bbox_min.y = INT_MAX;
+    for (const auto& path : path_stack)
     {
-        for (std::vector<double_point_t>::iterator path = it->begin(); path != it->end(); ++path)
+        for (const auto& point : path)
         {
-            if ((double)path->x < bbox_min->x) bbox_min->x = (double)path->x;
-            if ((double)path->x > bbox_max->x) bbox_max->x = (double)path->x;
-            if ((double)path->y < bbox_min->y) bbox_min->y = (double)path->y;
-            if ((double)path->y > bbox_max->y) bbox_max->y = (double)path->y;
+            bbox_min.x = std::min(point.x, bbox_min.x);
+            bbox_max.x = std::max(point.x, bbox_max.x);
+            bbox_min.y = std::min(point.y, bbox_min.y);
+            bbox_max.y = std::max(point.y, bbox_max.y);
         }
     }
 }
@@ -313,12 +313,12 @@ void DXFParsePathAdaptor::Finish()
     std::vector<std::vector<double_point_t>> chains = this->Chainify(this->line_stack, this->chain_tolorance);
     std::vector<EasyPrimitive::Part::path_t> paths;
     double_point_t bb_min, bb_max;
-    this->GetBoundingBox(chains, &bb_min, &bb_max);
-    for (size_t x = 0; x < chains.size(); x++)
+    this->GetBoundingBox(chains, bb_min, bb_max);
+    for (size_t i = 0; i < chains.size(); i++)
     {
         EasyPrimitive::Part::path_t path;
         path.is_inside_contour = false;
-        if (g.distance(chains[x].front(), chains[x].back()) > this->chain_tolorance)
+        if (g.distance(chains[i].front(), chains[i].back()) > this->chain_tolorance)
         {
             path.is_closed = false;
         }
@@ -327,9 +327,11 @@ void DXFParsePathAdaptor::Finish()
             path.is_closed = true;
         }
         this->easy_render_instance->SetColorByName(path.color, globals->jet_cam_view->outside_contour_color);
-        for (size_t i = 0; i < chains[x].size(); i++)
+        for (size_t j = 0; j < chains[i].size(); j++)
         {
-            path.points.push_back({((double)chains[x][i].x - bb_min.x) - ((bb_max.x - bb_min.x) / 2), ((double)chains[x][i].y - bb_min.y) - ((bb_max.y - bb_min.y) / 2)});
+            const double px = chains[i][j].x - bb_min.x;
+            const double py = chains[i][j].y - bb_min.y;
+            path.points.push_back({px, py});
         }
         path.layer = "default";
         path.toolpath_offset = 0.0f;

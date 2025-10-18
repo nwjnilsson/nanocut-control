@@ -1,4 +1,6 @@
 #include "PolyNest.h"
+#include "application.h"
+#include "jetCamView/jetCamView.h"
 
 PolyNest::PolyPoint PolyNest::PolyPart::RotatePoint(PolyPoint p, double a)
 {
@@ -15,10 +17,10 @@ PolyNest::PolyPoint PolyNest::PolyPart::RotatePoint(PolyPoint p, double a)
 }
 void PolyNest::PolyPart::GetBoundingBox(PolyPoint *bbox_min, PolyPoint *bbox_max)
 {
-    bbox_max->x = -1000000;
-    bbox_max->y = -1000000;
-    bbox_min->x = 1000000;
-    bbox_min->y = 1000000;
+    bbox_max->x = INT_MIN;
+    bbox_max->y = INT_MIN;
+    bbox_min->x = INT_MAX;
+    bbox_min->y = INT_MAX;
     for (std::vector<PolyGon>::iterator it = this->built_polygons.begin(); it != this->built_polygons.end(); ++it)
     {
         for (size_t x = 0; x < it->verticies.size(); x++)
@@ -112,9 +114,9 @@ bool PolyNest::PolyNest::CheckIfPolyPartTouchesAnyPlacedPolyPart(PolyPart p)
     }
     return false;
 }
-bool PolyNest::PolyNest::CheckIfPolyPartIsInsideExtents(PolyPart p, PolyPoint min_point, PolyPoint max_point, PolyPart part)
+bool PolyNest::PolyNest::CheckIfPolyPartIsInsideExtents(PolyPart p, PolyPoint min_point, PolyPoint max_point)
 {
-    if (p.bbox_min.x > min_point.x && p.bbox_max.x < max_point.x && p.bbox_min.y > min_point.y && p.bbox_max.y < max_point.y)
+    if (p.bbox_min.x >= min_point.x && p.bbox_max.x <= max_point.x && p.bbox_min.y >= min_point.y && p.bbox_max.y <= max_point.y)
     {
         return true;
     }
@@ -258,6 +260,13 @@ PolyNest::PolyPart PolyNest::PolyNest::BuildPart(std::vector<std::vector<PolyPoi
     part.Build();
     return part;
 }
+
+PolyNest::PolyPoint PolyNest::PolyNest::GetDefaultOffsetXY(const PolyPart& part)
+{
+    double px = min_extents.x - part.bbox_min.x + DEFAULT_LEAD_IN + DEFAULT_KERF_WIDTH;
+    double py = min_extents.y - part.bbox_min.y + DEFAULT_LEAD_IN + DEFAULT_KERF_WIDTH;
+    return {px, py};
+}
 void PolyNest::PolyNest::PushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p, double *offset_x, double *offset_y, double *angle, bool *visible)
 {
     try
@@ -287,13 +296,12 @@ void PolyNest::PolyNest::BeginPlaceUnplacedPolyParts()
     std::sort(this->unplaced_parts.begin(), this->unplaced_parts.end(), [](const PolyPart &lhs, const PolyPart &rhs) {
         return (lhs.bbox_max.x - lhs.bbox_min.x) * (lhs.bbox_max.y - lhs.bbox_min.y) > (rhs.bbox_max.x - rhs.bbox_min.x) * (rhs.bbox_max.y - rhs.bbox_min.y);
     });
-    bool found_valid_placement = false;
     if (this->unplaced_parts.size() > 0 && *this->unplaced_parts.front().offset_x == 0 && *this->unplaced_parts.front().offset_y == 0)
     {
-        *this->unplaced_parts.front().offset_x = this->min_extents.x;
-        *this->unplaced_parts.front().offset_y = this->min_extents.y;
-        *this->unplaced_parts.front().offset_x += (this->unplaced_parts.front().bbox_max.x - this->unplaced_parts.front().bbox_min.x) / 2;
-        *this->unplaced_parts.front().offset_y += (this->unplaced_parts.front().bbox_max.y - this->unplaced_parts.front().bbox_min.y) / 2;
+        auto& part = this->unplaced_parts.front();
+        *part.offset_x = GetDefaultOffsetXY(part).x;
+        *part.offset_y = GetDefaultOffsetXY(part).y;
+        // LOG_F(INFO, "initial offset (%.3f, %.3f) (rotation: %.3f)", *part.offset_x, *part.offset_y, *part.angle);
     }
     this->found_valid_placement = false;
 }
@@ -307,66 +315,61 @@ bool PolyNest::PolyNest::PlaceUnplacedPolyPartsTick(void *p)
     PolyNest *self = reinterpret_cast<PolyNest *>(p);
     if (self != NULL)
     {
-        for (int z = 0; z < 500; z++)
+        while (not self->unplaced_parts.empty())
         {
-            if (self->unplaced_parts.size() > 0)
+            const double bbox_x_half = (self->unplaced_parts.front().bbox_max.x - self->unplaced_parts.front().bbox_min.x) / 2;
+            const double bbox_y_half = (self->unplaced_parts.front().bbox_max.y - self->unplaced_parts.front().bbox_min.y) / 2;
+            auto& part = self->unplaced_parts.front();
+            if (self->found_valid_placement == true)
             {
-                if (self->found_valid_placement == true)
+                LOG_F(INFO, "Found valid placement at offset (%.3f, %.3f) (rotation: %.3f)", *part.offset_x, *part.offset_y, *part.angle);
+                *part.visible = true;
+                self->found_valid_placement = false;
+                self->placed_parts.push_back(self->unplaced_parts.front());
+                self->unplaced_parts.erase(self->unplaced_parts.begin());
+                if (not self->unplaced_parts.empty())
                 {
-                    LOG_F(INFO, "Found valid placement at offset(%.4f, %.4f)", *self->unplaced_parts.front().offset_x, *self->unplaced_parts.front().offset_y);
-                    *self->unplaced_parts.front().visible = true;
-                    self->found_valid_placement = false;
-                    self->placed_parts.push_back(self->unplaced_parts.front());
-                    self->unplaced_parts.erase(self->unplaced_parts.begin());
-                    if (self->unplaced_parts.size() > 0)
-                    {
-                        *self->unplaced_parts.front().offset_x = self->min_extents.x;
-                        *self->unplaced_parts.front().offset_y = self->min_extents.y;
-                        *self->unplaced_parts.front().offset_x += (self->unplaced_parts.front().bbox_max.x - self->unplaced_parts.front().bbox_min.x) / 2;
-                        *self->unplaced_parts.front().offset_y += (self->unplaced_parts.front().bbox_max.y - self->unplaced_parts.front().bbox_min.y) / 2;
-                    }
-                }
-                else
-                {
-                    for (size_t x = 0; x < (360.0 / self->rotation_increments); x++)
-                    {
-                        if (self->CheckIfPolyPartTouchesAnyPlacedPolyPart(self->unplaced_parts.front()) == false && self->CheckIfPolyPartIsInsideExtents(self->unplaced_parts.front(), self->min_extents, self->max_extents, self->unplaced_parts.front()) == true)
-                        {
-                            self->found_valid_placement = true;
-                        }
-                        else
-                        {
-                            *self->unplaced_parts.front().angle += self->rotation_increments;
-                            if (*self->unplaced_parts.front().angle >= 360) *self->unplaced_parts.front().angle -= 360.0;
-                            self->unplaced_parts.front().Build();
-                        }
-                    }
-                    if (self->CheckIfPolyPartTouchesAnyPlacedPolyPart(self->unplaced_parts.front()) == false && self->CheckIfPolyPartIsInsideExtents(self->unplaced_parts.front(), self->min_extents, self->max_extents, self->unplaced_parts.front()) == true)
-                    {
-                        self->found_valid_placement = true;
-                    }
-                    else
-                    {
-                        *self->unplaced_parts.front().offset_x += self->offset_increments.x;
-                        if (*self->unplaced_parts.front().offset_x > (self->max_extents.x - ((self->unplaced_parts.front().bbox_max.x - self->unplaced_parts.front().bbox_min.x) / 2)))
-                        {
-                            *self->unplaced_parts.front().offset_x = self->min_extents.x;
-                            *self->unplaced_parts.front().offset_x += (self->unplaced_parts.front().bbox_max.x - self->unplaced_parts.front().bbox_min.x) / 2;
-                            *self->unplaced_parts.front().offset_y += self->offset_increments.y;
-                        }
-                        if (*self->unplaced_parts.front().offset_y > (self->max_extents.y - ((self->unplaced_parts.front().bbox_max.y - self->unplaced_parts.front().bbox_min.y) / 2)))
-                        {
-                            LOG_F(INFO, "Not enough material to place part!");
-                            *self->unplaced_parts.front().visible = true;
-                            return false;
-                        }
-                        self->unplaced_parts.front().Build();
-                    }
+                    part = self->unplaced_parts.front();
+                    *part.offset_x = self->GetDefaultOffsetXY(part).x;
+                    *part.offset_y = self->GetDefaultOffsetXY(part).y;
                 }
             }
             else
             {
-                return false;
+                for (size_t x = 0; x < (360.0 / self->rotation_increments); x++)
+                {
+                    if (self->CheckIfPolyPartTouchesAnyPlacedPolyPart(part) == false && self->CheckIfPolyPartIsInsideExtents(part, self->min_extents, self->max_extents) == true)
+                    {
+                        self->found_valid_placement = true;
+                        break;
+                    }
+                    else
+                    {
+                        *part.angle += self->rotation_increments;
+                        if (*part.angle >= 360) *part.angle -= 360.0;
+                        part.Build();
+                    }
+                }
+                if (self->CheckIfPolyPartTouchesAnyPlacedPolyPart(part) == false && self->CheckIfPolyPartIsInsideExtents(part, self->min_extents, self->max_extents) == true)
+                {
+                    self->found_valid_placement = true;
+                }
+                else
+                {
+                    *part.offset_x += self->offset_increments.x;
+                    if (*part.offset_x > self->max_extents.x - bbox_x_half)
+                    {
+                        *part.offset_x = self->GetDefaultOffsetXY(part).x;
+                        *part.offset_y += self->offset_increments.y;
+                    }
+                    if (*part.offset_y > self->max_extents.y - bbox_y_half)
+                    {
+                        LOG_F(INFO, "Not enough material to place part!");
+                        *part.visible = true;
+                        return false;
+                    }
+                    part.Build();
+                }
             }
         }
     }

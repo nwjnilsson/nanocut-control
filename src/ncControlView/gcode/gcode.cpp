@@ -99,10 +99,8 @@ nlohmann::json parse_line(std::string line)
             }
         }
     }
-    // Rendering in positive quadrant, so invert gcode values because machine
-    // position is in negative quadrant.
-    ret["x"] = -atof(x_value.c_str());
-    ret["y"] = -atof(y_value.c_str());
+    ret["x"] = atof(x_value.c_str());
+    ret["y"] = atof(y_value.c_str());
     return ret;
 }
 void gcode_push_current_path_to_viewer(int rapid_line)

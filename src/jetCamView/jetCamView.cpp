@@ -67,8 +67,8 @@ void jetCamView::ZoomEventCallback(nlohmann::json e)
 void jetCamView::ViewMatrixCallback(PrimitiveContainer *p)
 {
     p->properties->scale = globals->zoom;
-    p->properties->offset[0] = globals->pan.x;
-    p->properties->offset[1] = globals->pan.y;
+    p->properties->offset[0] = globals->pan.x + globals->jet_cam_view->material_plane->width * globals->zoom;
+    p->properties->offset[1] = globals->pan.y + globals->jet_cam_view->material_plane->height * globals->zoom;
 }
 void jetCamView::MouseCallback(nlohmann::json e)
 {
@@ -86,7 +86,7 @@ void jetCamView::MouseCallback(nlohmann::json e)
         }
         if (e["event"] == "right_click_up")
         {
-            if (globals->jet_cam_view->CurrentTool == JETCAM_TOOL_CONTOUR)
+            if (globals->jet_cam_view->CurrentTool == JetCamTool::Contour)
             {
                 if (globals->jet_cam_view->mouse_over_part != NULL) globals->jet_cam_view->show_viewer_context_menu = {globals->renderer->imgui_io->MousePos.x, globals->renderer->imgui_io->MousePos.y};
             }
@@ -94,7 +94,7 @@ void jetCamView::MouseCallback(nlohmann::json e)
         if (e["event"] == "mouse_move")
         {
             double_point_t mouse_drag = { (double)e["pos"]["x"] - globals->jet_cam_view->last_mouse_click_position.x, (double)e["pos"]["y"] - globals->jet_cam_view->last_mouse_click_position.y };
-            if (globals->jet_cam_view->CurrentTool == JETCAM_TOOL_NESTING)
+            if (globals->jet_cam_view->CurrentTool == JetCamTool::Nesting)
             {
                 if (globals->jet_cam_view->left_click_state == true)
                 {
@@ -127,7 +127,7 @@ void jetCamView::MouseCallback(nlohmann::json e)
 void jetCamView::MouseEventCallback(PrimitiveContainer* c,nlohmann::json e)
 {
     //LOG_F(INFO, "%s", e.dump().c_str());
-    if (globals->jet_cam_view->CurrentTool == JETCAM_TOOL_CONTOUR)
+    if (globals->jet_cam_view->CurrentTool == JetCamTool::Contour)
     {
         if (c->type == "part")
         {
@@ -162,7 +162,7 @@ void jetCamView::MouseEventCallback(PrimitiveContainer* c,nlohmann::json e)
             }
         }
     }
-    if (globals->jet_cam_view->CurrentTool == JETCAM_TOOL_NESTING)
+    if (globals->jet_cam_view->CurrentTool == JetCamTool::Nesting)
     {
         if (c->type == "part" && globals->jet_cam_view->left_click_state == false)
         {
@@ -195,7 +195,7 @@ void jetCamView::MouseEventCallback(PrimitiveContainer* c,nlohmann::json e)
 void jetCamView::KeyCallback(nlohmann::json e)
 {
     //LOG_F(INFO, "%s", e.dump().c_str());
-    if (globals->jet_cam_view->CurrentTool == JETCAM_TOOL_NESTING)
+    if (globals->jet_cam_view->CurrentTool == JetCamTool::Nesting)
     {
         if (e["action"] == 0)
         {
@@ -341,9 +341,9 @@ void jetCamView::RenderUI(void *self_pointer)
                 }
                 ImGui::EndMenu();
             }
-            ImGui::RadioButton("Contour Tool", &self->CurrentTool, 0); ImGui::SameLine();
-            ImGui::RadioButton("Nesting Tool", &self->CurrentTool, 1); ImGui::SameLine();
-            ImGui::RadioButton("Point Tool", &self->CurrentTool, 2);
+            ImGui::RadioButton("Contour Tool", (int*)&self->CurrentTool, 0); ImGui::SameLine();
+            ImGui::RadioButton("Nesting Tool", (int*)&self->CurrentTool, 1); ImGui::SameLine();
+            ImGui::RadioButton("Point Tool", (int*)&self->CurrentTool, 2);
             ImGui::EndMainMenuBar();
         }
         if (show_edit_contour == true)
@@ -430,7 +430,7 @@ void jetCamView::RenderUI(void *self_pointer)
             ImGui::Begin("Create Operation", &show_create_operation, ImGuiWindowFlags_AlwaysAutoResize);
             static toolpath_operation_t operation;
             static int operation_tool = -1;
-            if (self->tool_library.size() > operation_tool && operation_tool != -1 && operation.lead_in_length == -1 && operation.lead_out_length == -1)
+            if (self->tool_library.size() > operation_tool && operation_tool != -1 && operation.lead_in_length == DEFAULT_LEAD_OUT && operation.lead_out_length == DEFAULT_LEAD_OUT)
             {
                 operation.lead_in_length = self->tool_library[operation_tool].params["kerf_width"] * 1.5;
                 operation.lead_out_length = self->tool_library[operation_tool].params["kerf_width"] * 1.5;
@@ -885,6 +885,7 @@ void jetCamView::ShowProgressWindow(bool v)
     this->ProgressWindowProgress = 0.0;
     this->ProgressWindowHandle->visible = true;
 }
+
 bool jetCamView::DxfFileOpen(std::string filename, std::string name)
 {
     this->dxf_fp = fopen(filename.c_str(), "rt");
@@ -892,27 +893,26 @@ bool jetCamView::DxfFileOpen(std::string filename, std::string name)
     {
         this->dxf_nest = PolyNest::PolyNest();
         this->dxf_nest.SetExtents(PolyNest::PolyPoint(this->material_plane->bottom_left.x, this->material_plane->bottom_left.y), PolyNest::PolyPoint(this->material_plane->bottom_left.x + this->material_plane->width, this->material_plane->bottom_left.y + this->material_plane->height));
-        for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
+        for (auto* pPrimitive : *globals->renderer->GetPrimitiveStack())
         {
-            if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part")
+            // Copy existing objects
+            if (pPrimitive->properties->view == globals->renderer->GetCurrentView() && pPrimitive->type == "part")
             {
                 std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-                for (size_t x = 0; x < (*it)->part->paths.size(); x++)
+                for (const auto& path : pPrimitive->part->paths)
                 {
-                    if ((*it)->part->paths[x].is_inside_contour == false)
+                    if (path.is_inside_contour == false)
                     {
                         std::vector<PolyNest::PolyPoint> points;
-                        for (size_t i = 0; i < (*it)->part->paths[x].points.size(); i++)
+                        points.reserve(path.points.size());
+                        for (const double_point_t& p: path.points)
                         {
-                            PolyNest::PolyPoint p;
-                            p.x = (*it)->part->paths[x].points[i].x;
-                            p.y = (*it)->part->paths[x].points[i].y;
-                            points.push_back(p);
+                            points.push_back({p.x, p.y});
                         }
-                        poly_part.push_back(points);
+                        poly_part.push_back(std::move(points));
                     }
                 }
-                this->dxf_nest.PushPlacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visible);
+                this->dxf_nest.PushPlacedPolyPart(poly_part, &pPrimitive->part->control.offset.x, &pPrimitive->part->control.offset.y, &pPrimitive->part->control.angle, &pPrimitive->part->properties->visible);
             }
         }
         this->dl_dxf = new DL_Dxf();
@@ -926,49 +926,43 @@ bool jetCamView::DxfFileOpen(std::string filename, std::string name)
     }
     return false;
 }
+
 bool jetCamView::DxfFileParseTimer(void *p)
 {
     jetCamView *self = reinterpret_cast<jetCamView *>(p);
     if (self != NULL)
     {
-        for (int x = 0; x < 500; x++)
+        while (self->dl_dxf->readDxfGroups(self->dxf_fp, self->DXFcreationInterface)){}
+        LOG_F(INFO, "Successfully parsed DXF groups.");
+        self->DXFcreationInterface->Finish();
+        for (auto* pPrimitive : *globals->renderer->GetPrimitiveStack())
         {
-            if (!self->dl_dxf->readDxfGroups(self->dxf_fp, self->DXFcreationInterface))
+            if (pPrimitive->properties->view == globals->renderer->GetCurrentView() && pPrimitive->type == "part" && pPrimitive->part->part_name == self->DXFcreationInterface->filename)
             {
-                self->DXFcreationInterface->Finish();
-                for (std::vector<PrimitiveContainer*>::iterator it = globals->renderer->GetPrimitiveStack()->begin(); it != globals->renderer->GetPrimitiveStack()->end(); ++it)
+                std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
+                for (const auto& path : pPrimitive->part->paths)
                 {
-                    if ((*it)->properties->view == globals->renderer->GetCurrentView() && (*it)->type == "part" && (*it)->part->part_name == self->DXFcreationInterface->filename)
+                    if (path.is_inside_contour == false)
                     {
-                        std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-                        for (size_t x = 0; x < (*it)->part->paths.size(); x++)
+                        std::vector<PolyNest::PolyPoint> points;
+                        points.reserve(path.points.size());
+                        for (const double_point_t& p: path.points)
                         {
-                            if ((*it)->part->paths[x].is_inside_contour == false)
-                            {
-                                std::vector<PolyNest::PolyPoint> points;
-                                for (size_t i = 0; i < (*it)->part->paths[x].points.size(); i++)
-                                {
-                                    PolyNest::PolyPoint p;
-                                    p.x = (*it)->part->paths[x].points[i].x;
-                                    p.y = (*it)->part->paths[x].points[i].y;
-                                    points.push_back(p);
-                                }
-                                poly_part.push_back(points);
-                            }
+                            points.push_back({p.x, p.y});
                         }
-                        (*it)->part->properties->visible = true;
-                        self->dxf_nest.PushUnplacedPolyPart(poly_part, &(*it)->part->control.offset.x, &(*it)->part->control.offset.y, &(*it)->part->control.angle, &(*it)->part->properties->visible);
+                        poly_part.push_back(std::move(points));
                     }
                 }
-                self->dxf_nest.BeginPlaceUnplacedPolyParts();
-                globals->renderer->PushTimer(0, self->dxf_nest.PlaceUnplacedPolyPartsTick, &self->dxf_nest);
-                fclose(self->dxf_fp);
-                delete self->DXFcreationInterface;
-                delete self->dl_dxf;
-                return false;
+                pPrimitive->part->properties->visible = true;
+                self->dxf_nest.PushUnplacedPolyPart(poly_part, &pPrimitive->part->control.offset.x, &pPrimitive->part->control.offset.y, &pPrimitive->part->control.angle, &pPrimitive->part->properties->visible);
             }
         }
-        return true;
+        self->dxf_nest.BeginPlaceUnplacedPolyParts();
+        globals->renderer->PushTimer(0, self->dxf_nest.PlaceUnplacedPolyPartsTick, &self->dxf_nest);
+        fclose(self->dxf_fp);
+        delete self->DXFcreationInterface;
+        delete self->dl_dxf;
+        return false;
     }
     return false;
 }
@@ -982,11 +976,11 @@ void jetCamView::PreInit()
     this->show_viewer_context_menu.x = -1000000;
     this->show_viewer_context_menu.y = -1000000;
 
-    this->preferences.background_color[0] = 4 / 255.0f;
-    this->preferences.background_color[1] = 17 / 255.0;
-    this->preferences.background_color[2] = 60 / 255.0f;
+    this->preferences.background_color[0] = 58 / 255.0f;
+    this->preferences.background_color[1] = 58 / 255.0;
+    this->preferences.background_color[2] = 58 / 255.0f;
 
-    this->CurrentTool = JETCAM_TOOL_CONTOUR;
+    this->CurrentTool = JetCamTool::Contour;
     this->left_click_state = false;
     this->tab_state = false;
 
@@ -1042,7 +1036,7 @@ void jetCamView::Tick()
         {
             if ((*it)->type == "part")
             {
-                (*it)->part->control.mouse_mode = this->CurrentTool;
+                (*it)->part->control.mouse_mode = static_cast<int>(this->CurrentTool);
             }
         }
     }
