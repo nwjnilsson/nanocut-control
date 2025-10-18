@@ -142,11 +142,9 @@ void dialogs_machine_parameters()
     ImGui::Checkbox("Enable Homing", &temp_parameters.homing_enabled);
     ImGui::Checkbox("Invert homing direction X", &temp_parameters.homing_dir_invert[0]);
     ImGui::SameLine();
-    ImGui::Checkbox("Invert homing direction Y1", &temp_parameters.homing_dir_invert[1]);
+    ImGui::Checkbox("Invert homing direction Y", &temp_parameters.homing_dir_invert[1]);
     ImGui::SameLine();
-    ImGui::Checkbox("Invert homing direction Y2", &temp_parameters.homing_dir_invert[2]);
-    ImGui::SameLine();
-    ImGui::Checkbox("Invert homing direction Z", &temp_parameters.homing_dir_invert[3]);
+    ImGui::Checkbox("Invert homing direction Z", &temp_parameters.homing_dir_invert[2]);
     ImGui::Checkbox("Invert limit pins", &temp_parameters.invert_limit_pins);
     ImGui::Checkbox("Invert probe pin", &temp_parameters.invert_probe_pin);
     ImGui::InputFloat("Homing Feedrate", &temp_parameters.homing_feed);
@@ -304,7 +302,8 @@ void dialogs_controller_homing_window()
     {
         LOG_F(WARNING, "User initiated homing cycle!");
         motion_controller_set_needs_homed(false);
-        motion_controller_send("$H");
+        motion_controller_push_stack("$H");
+        motion_controller_run_stack();
         dialogs_show_controller_homing_window(false);
     }
     ImGui::End();

@@ -30,13 +30,13 @@ class ncControlView{
             bool axis_invert[4] = { false, false, false, false };
             bool soft_limits_enabled = false;
             bool homing_enabled = false;
-            bool homing_dir_invert[4] = { false, false, false, false };
+            bool homing_dir_invert[3] = { false, false, false };
             bool invert_step_enable{ false };
             bool invert_limit_pins{ false };
             bool invert_probe_pin{ false };
 
             // Non-GRBL
-            float work_offset[3] = { 0.0f, 0.0f, 0.0f }; // Stored as positive
+            float work_offset[3] = { 0.0f, 0.0f, 0.0f };
             float arc_stabilization_time = 0;
             float arc_voltage_divider = 0;
             float floating_head_backlash = 0;

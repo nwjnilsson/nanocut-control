@@ -32,8 +32,8 @@ void hmi_get_bounding_box(double_point_t *bbox_min, double_point_t *bbox_max)
         {
             for (int i = 0; i < stack->at(x)->path->points.size(); i++)
             {
-                const float px = stack->at(x)->path->points.at(i).x + globals->nc_control_view->machine_parameters.work_offset[0];
-                const float py = stack->at(x)->path->points.at(i).y + globals->nc_control_view->machine_parameters.work_offset[1];
+                const float px = stack->at(x)->path->points.at(i).x - globals->nc_control_view->machine_parameters.work_offset[0];
+                const float py = stack->at(x)->path->points.at(i).y - globals->nc_control_view->machine_parameters.work_offset[1];
                 if (px < bbox_min->x) bbox_min->x = px;
                 if (px > bbox_max->x) bbox_max->x = px;
                 if (py < bbox_min->y) bbox_min->y = py;
@@ -85,8 +85,8 @@ void hmi_handle_button(std::string id)
                 LOG_F(INFO, "Clicked Zero X");
                 try
                 {
-                    globals->nc_control_view->machine_parameters.work_offset[0] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["x"]));
-                    motion_controller_push_stack("G10 L2 P0 X-" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[0]));
+                    globals->nc_control_view->machine_parameters.work_offset[0] = static_cast<float>(motion_controller_get_dro()["MCS"]["x"]);
+                    motion_controller_push_stack("G10 L2 P0 X" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[0]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                     motion_controller_save_machine_parameters();
@@ -101,8 +101,8 @@ void hmi_handle_button(std::string id)
                 LOG_F(INFO, "Clicked Zero Y");
                 try
                 {
-                    globals->nc_control_view->machine_parameters.work_offset[1] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["y"]));
-                    motion_controller_push_stack("G10 L2 P0 Y-" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[1]));
+                    globals->nc_control_view->machine_parameters.work_offset[1] = static_cast<float>(motion_controller_get_dro()["MCS"]["y"]);
+                    motion_controller_push_stack("G10 L2 P0 Y" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.work_offset[1]));
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                     motion_controller_save_machine_parameters();
@@ -112,22 +112,22 @@ void hmi_handle_button(std::string id)
                     LOG_F(ERROR, "Could not set y work offset!");
                 }
             }
-            else if (id == "Zero Z")
-            {
-                LOG_F(INFO, "Clicked Zero Z");
-                try
-                {
-                    globals->nc_control_view->machine_parameters.work_offset[2] = abs(static_cast<float>(motion_controller_get_dro()["MCS"]["z"]));
-                    motion_controller_push_stack("G10 L2 P0 Z-" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
-                    motion_controller_push_stack("M30");
-                    motion_controller_run_stack();
-                    motion_controller_save_machine_parameters();
-                }
-                catch (...)
-                {
-                    LOG_F(ERROR, "Could not set z work offset!");
-                }
-            }
+    //        else if (id == "Zero Z")
+    //        {
+    //            LOG_F(INFO, "Clicked Zero Z");
+    //            try
+    //            {
+    //                globals->nc_control_view->machine_parameters.work_offset[2] = static_cast<float>(motion_controller_get_dro()["MCS"]["z"]);
+    //                motion_controller_push_stack("G10 L2 P0 Z" + std::to_string(globals->nc_control_view->machine_parameters.work_offset[2]));
+    //                motion_controller_push_stack("M30");
+    //                motion_controller_run_stack();
+    //                motion_controller_save_machine_parameters();
+    //            }
+    //            catch (...)
+    //            {
+    //                LOG_F(ERROR, "Could not set z work offset!");
+    //            }
+    //        }
             else if (id == "Spindle On")
             {
                 // Not used
@@ -147,7 +147,7 @@ void hmi_handle_button(std::string id)
             else if (id == "Retract")
             {
                 LOG_F(INFO, "Clicked Retract");
-                motion_controller_retract();
+                motion_controller_push_stack("G0 Z0");
                 motion_controller_push_stack("M30");
                 motion_controller_run_stack();
             }
@@ -515,11 +515,14 @@ void hmi_mouse_callback(PrimitiveContainer* c, nlohmann::json e)
 
 void hmi_view_matrix(PrimitiveContainer *p)
 {
+    const float wco_zoom_x = globals->pan.x + abs(globals->nc_control_view->machine_parameters.work_offset[0] * globals->zoom);
+    const float wco_zoom_y = globals->pan.y + abs(globals->nc_control_view->machine_parameters.work_offset[1] * globals->zoom);
+
     if (p->type == "line")
     {
         p->properties->scale = globals->zoom;
-        p->properties->offset[0] = globals->pan.x + (globals->nc_control_view->machine_parameters.work_offset[0] * globals->zoom);
-        p->properties->offset[1] = globals->pan.y + (globals->nc_control_view->machine_parameters.work_offset[1] * globals->zoom);
+        p->properties->offset[0] = wco_zoom_x;
+        p->properties->offset[1] = wco_zoom_y;
     }
     if (p->type == "arc" || p->type == "circle")
     {
@@ -548,14 +551,14 @@ void hmi_view_matrix(PrimitiveContainer *p)
         if (p->properties->id == "gcode" || p->properties->id == "gcode_highlights")
         {
             p->properties->scale = globals->zoom;
-            p->properties->offset[0] = globals->pan.x + (globals->nc_control_view->machine_parameters.work_offset[0] * globals->zoom);
-            p->properties->offset[1] = globals->pan.y + (globals->nc_control_view->machine_parameters.work_offset[1] * globals->zoom);
+            p->properties->offset[0] = wco_zoom_x;
+            p->properties->offset[1] = wco_zoom_y;
         }
         if (p->properties->id == "gcode_arrows")
         {
             p->properties->scale = globals->zoom;
-            p->properties->offset[0] = globals->pan.x + (globals->nc_control_view->machine_parameters.work_offset[0] * globals->zoom);
-            p->properties->offset[1] = globals->pan.y + (globals->nc_control_view->machine_parameters.work_offset[1] * globals->zoom);
+            p->properties->offset[0] = wco_zoom_x;
+            p->properties->offset[1] = wco_zoom_y;
         }
     }
 }
@@ -910,7 +913,12 @@ void hmi_page_up_key_callback(nlohmann::json e)
 {
     if ((int)e["action"] == 1)
     {
-        motion_controller_send_rt('>');
+        if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
+            motion_controller_send_rt('<');
+        }
+        else {
+            motion_controller_send_rt('>');
+        }
     }
     else if ((int)e["action"] == 0)
     {
@@ -956,7 +964,12 @@ void hmi_page_down_key_callback(nlohmann::json e)
 {
     if ((int)e["action"] == 1)
     {
-        motion_controller_send_rt('<');
+        if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
+            motion_controller_send_rt('>');
+        }
+        else {
+            motion_controller_send_rt('<');
+        }
     }
     else if ((int)e["action"] == 0)
     {

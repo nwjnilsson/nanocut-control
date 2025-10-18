@@ -8,6 +8,7 @@
 /*
     Callbacks that get called via okay_callback
 */
+
 void torch_off_and_retract();
 void fire_torch_and_pierce();
 void run_pop();
@@ -31,12 +32,11 @@ void motion_controller_run_stack();
 void motion_controller_send(std::string s);
 void motion_controller_send_rt(char s);
 void motion_controller_send_crc32(std::string s);
-void motion_controller_retract();
+void motion_controller_home();
 void motion_controller_trigger_reset();
 void motion_control_init();
 void motion_control_tick();
 bool motion_controller_is_torch_on();
 
 void removeSubstrs(std::string& s, std::string p);
-
 #endif //MOTION_CONTROL_

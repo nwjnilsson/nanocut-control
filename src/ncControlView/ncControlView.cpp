@@ -125,9 +125,8 @@ void ncControlView::PreInit()
             this->machine_parameters.soft_limits_enabled = (bool)parameters["soft_limits_enabled"];
             this->machine_parameters.homing_enabled = (bool)parameters["homing_enabled"];
             this->machine_parameters.homing_dir_invert[0] = (bool)parameters["homing_dir_invert"]["x"];
-            this->machine_parameters.homing_dir_invert[1] = (bool)parameters["homing_dir_invert"]["y1"];
-            this->machine_parameters.homing_dir_invert[2] = (bool)parameters["homing_dir_invert"]["y2"];
-            this->machine_parameters.homing_dir_invert[3] = (bool)parameters["homing_dir_invert"]["z"];
+            this->machine_parameters.homing_dir_invert[1] = (bool)parameters["homing_dir_invert"]["y"];
+            this->machine_parameters.homing_dir_invert[2] = (bool)parameters["homing_dir_invert"]["z"];
             this->machine_parameters.homing_feed = (float)parameters["homing_feed"];
             this->machine_parameters.homing_seek = (float)parameters["homing_seek"];
             this->machine_parameters.homing_debounce = (float)parameters["homing_debounce"];
@@ -178,7 +177,6 @@ void ncControlView::PreInit()
         this->machine_parameters.homing_dir_invert[0] = false;
         this->machine_parameters.homing_dir_invert[1] = false;
         this->machine_parameters.homing_dir_invert[2] = false;
-        this->machine_parameters.homing_dir_invert[3] = false;
         this->machine_parameters.homing_feed = SCALE(400.f);
         this->machine_parameters.homing_seek = SCALE(800.f);
         this->machine_parameters.homing_debounce = SCALE(250.f);

@@ -63,24 +63,18 @@ void program_finished()
     motion_controller_clear_stack();
 }
 
-void motion_controller_retract()
+void homing_done_callback()
 {
-    if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
-        float pos = globals->nc_control_view->machine_parameters.machine_extents[2] - globals->nc_control_view->machine_parameters.floating_head_backlash;
-        gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z-" + std::to_string(pos));
-    }
-    else {
-        gcode_stack.insert(gcode_stack.begin(), "G53 G0 Z0");
-    }
+    LOG_F(INFO, "Homing finished! Saving Z work offset...");
+    motion_controller_push_stack("G10 L20 P0 Z0");
+    motion_controller_push_stack("M30");
+    motion_controller_run_stack();
+    globals->nc_control_view->machine_parameters.work_offset[2] = static_cast<float>(motion_controller_get_dro()["MCS"]["z"]);
 }
+
 void motion_controller_probe()
 {
-    if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
-        motion_controller_send_crc32("G38.3Z0F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
-    }
-    else {
-        motion_controller_send_crc32("G38.3Z-" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
-    }
+    motion_controller_send_crc32("G38.3Z" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
 }
 
 
@@ -100,7 +94,7 @@ bool arc_okay_expire_timer()
         //Remember that inserting at the top of list means its the next code to run, meaning
         //This list that we are inserting is ran from bottom to top or LIFO mode
         gcode_stack.insert(gcode_stack.begin(), "fire_torch " + to_string_strip_zeros((double)callback_args["pierce_height"]) + " " + to_string_strip_zeros((double)callback_args["pierce_delay"]) + " " + to_string_strip_zeros((double)callback_args["cut_height"]));
-        motion_controller_retract();
+        gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
         gcode_stack.insert(gcode_stack.begin(), "G90"); //Absolute mode
         gcode_stack.insert(gcode_stack.begin(), "M5"); //Torch Off
         
@@ -144,7 +138,8 @@ void raise_to_pierce_height_and_fire_torch()
     torch_on_timer = EasyRender::Millis();
     run_pop();
 }
-void touch_torch_and_pierce()
+
+void touch_torch_and_back_off()
 {
     okay_callback = &run_pop;
     probe_callback = NULL;
@@ -156,6 +151,7 @@ void touch_torch_and_pierce()
     LOG_F(INFO, "Touching off torch and dry running!");
     run_pop();
 }
+
 void torch_off_and_abort()
 {
     okay_callback = &run_pop;
@@ -166,7 +162,7 @@ void torch_off_and_abort()
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
     gcode_stack.insert(gcode_stack.begin(), "M30");
-    motion_controller_retract();
+    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off, retracting, and aborting!");
     run_pop();
@@ -185,7 +181,7 @@ void torch_off_and_retract()
     {
         gcode_stack.insert(gcode_stack.begin(), "$T=0");
     }
-    motion_controller_retract();
+    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off and retracting!");
     run_pop();
@@ -246,7 +242,7 @@ void run_pop()
                 callback_args["cut_height"] = DEFAULT_CUT_HEIGHT;
             }
             okay_callback = NULL;
-            probe_callback = &touch_torch_and_pierce;
+            probe_callback = &touch_torch_and_back_off;
             motion_controller_probe();
         }
         else if(line.find("WAIT_FOR_ARC_OKAY") != std::string::npos)
@@ -261,6 +257,10 @@ void run_pop()
         {
             okay_callback = NULL;
             motion_sync_callback = &torch_off_and_retract;
+        }
+        else if (line.find("$H") != std::string::npos) {
+            okay_callback = NULL;
+            motion_sync_callback = &homing_done_callback;
         }
         else if (line.find("M30") != std::string::npos)
         {
@@ -609,9 +609,8 @@ void motion_controller_save_machine_parameters()
     preferences["soft_limits_enabled"] = globals->nc_control_view->machine_parameters.soft_limits_enabled;
     preferences["homing_enabled"] = globals->nc_control_view->machine_parameters.homing_enabled;
     preferences["homing_dir_invert"]["x"] = globals->nc_control_view->machine_parameters.homing_dir_invert[0];
-    preferences["homing_dir_invert"]["y1"] = globals->nc_control_view->machine_parameters.homing_dir_invert[1];
-    preferences["homing_dir_invert"]["y2"] = globals->nc_control_view->machine_parameters.homing_dir_invert[2];
-    preferences["homing_dir_invert"]["z"] = globals->nc_control_view->machine_parameters.homing_dir_invert[3];
+    preferences["homing_dir_invert"]["y"] = globals->nc_control_view->machine_parameters.homing_dir_invert[1];
+    preferences["homing_dir_invert"]["z"] = globals->nc_control_view->machine_parameters.homing_dir_invert[2];
     preferences["homing_feed"] = globals->nc_control_view->machine_parameters.homing_feed;
     preferences["homing_seek"] = globals->nc_control_view->machine_parameters.homing_seek;
     preferences["homing_debounce"] = globals->nc_control_view->machine_parameters.homing_debounce;
@@ -653,8 +652,7 @@ void motion_controller_write_parameters_to_controller()
         uint8_t homing_dir_invert_mask = 0b00000000;
         if (globals->nc_control_view->machine_parameters.homing_dir_invert[0]) homing_dir_invert_mask |= 0b00000001;
         if (globals->nc_control_view->machine_parameters.homing_dir_invert[1]) homing_dir_invert_mask |= 0b00000010;
-        if (globals->nc_control_view->machine_parameters.homing_dir_invert[3]) homing_dir_invert_mask |= 0b00000100;
-        if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) homing_dir_invert_mask |= 0b00001000;
+        if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) homing_dir_invert_mask |= 0b00000100;
         
         motion_controller_push_stack("$X");
         motion_controller_push_stack("$0=" + std::to_string(10)); //Step Pulse, usec
