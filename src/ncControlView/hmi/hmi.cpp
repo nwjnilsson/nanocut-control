@@ -758,7 +758,7 @@ void hmi_up_key_callback(nlohmann::json e)
     try
     {
         nlohmann::json dro_data = motion_controller_get_dro();
-        if (dro_data["STATUS"] == "Idle")
+        if (dro_data["STATUS"] == "IDLE")
         {
             if ((int)e["action"] == 1 || (int)e["action"] == 2)
             {
@@ -797,7 +797,7 @@ void hmi_down_key_callback(nlohmann::json e)
     try
     {
         nlohmann::json dro_data = motion_controller_get_dro();
-        if (dro_data["STATUS"] == "Idle")
+        if (dro_data["STATUS"] == "IDLE")
         {
             if ((int)e["action"] == 1 || (int)e["action"] == 2)
             {
@@ -836,7 +836,7 @@ void hmi_right_key_callback(nlohmann::json e)
     try
     {
         nlohmann::json dro_data = motion_controller_get_dro();
-        if (dro_data["STATUS"] == "Idle")
+        if (dro_data["STATUS"] == "IDLE")
         {
             if ((int)e["action"] == 1 || (int)e["action"] == 2)
             {
@@ -875,7 +875,7 @@ void hmi_left_key_callback(nlohmann::json e)
     try
     {
         nlohmann::json dro_data = motion_controller_get_dro();
-        if (dro_data["STATUS"] == "Idle")
+        if (dro_data["STATUS"] == "IDLE")
         {
             if ((int)e["action"] == 1 || (int)e["action"] == 2)
             {
@@ -927,7 +927,7 @@ void hmi_page_up_key_callback(nlohmann::json e)
     /*try
     {
         nlohmann::json dro_data = motion_controller_get_dro();
-        if (dro_data["STATUS"] == "Idle")
+        if (dro_data["STATUS"] == "IDLE")
         {
             if ((int)e["action"] == 1 || (int)e["action"] == 2)
             {
@@ -978,7 +978,7 @@ void hmi_page_down_key_callback(nlohmann::json e)
     /*try
     {
         nlohmann::json dro_data = motion_controller_get_dro();
-        if (dro_data["STATUS"] == "Idle")
+        if (dro_data["STATUS"] == "IDLE")
         {
             if ((int)e["action"] == 1 || (int)e["action"] == 2)
             {

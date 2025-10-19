@@ -301,9 +301,7 @@ void dialogs_controller_homing_window()
     if (ImGui::Button("Home"))
     {
         LOG_F(WARNING, "User initiated homing cycle!");
-        motion_controller_set_needs_homed(false);
-        motion_controller_push_stack("$H");
-        motion_controller_run_stack();
+        motion_controller_cmd("home");
         dialogs_show_controller_homing_window(false);
     }
     ImGui::End();

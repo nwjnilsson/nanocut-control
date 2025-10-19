@@ -65,16 +65,19 @@ void program_finished()
 
 void homing_done_callback()
 {
+    okay_callback = NULL;
+    needs_homed = false;
     LOG_F(INFO, "Homing finished! Saving Z work offset...");
+    globals->nc_control_view->machine_parameters.work_offset[2] = static_cast<float>(motion_controller_get_dro()["MCS"]["z"]);
     motion_controller_push_stack("G10 L20 P0 Z0");
     motion_controller_push_stack("M30");
     motion_controller_run_stack();
-    globals->nc_control_view->machine_parameters.work_offset[2] = static_cast<float>(motion_controller_get_dro()["MCS"]["z"]);
+    motion_controller_save_machine_parameters();
 }
 
 void motion_controller_probe()
 {
-    motion_controller_send_crc32("G38.3Z" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2]) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
+    motion_controller_send_crc32("G38.3Z" + std::to_string(globals->nc_control_view->machine_parameters.machine_extents[2] - globals->nc_control_view->machine_parameters.homing_pull_off) + "F" + std::to_string(globals->nc_control_view->machine_parameters.z_probe_feedrate));
 }
 
 
@@ -94,8 +97,7 @@ bool arc_okay_expire_timer()
         //Remember that inserting at the top of list means its the next code to run, meaning
         //This list that we are inserting is ran from bottom to top or LIFO mode
         gcode_stack.insert(gcode_stack.begin(), "fire_torch " + to_string_strip_zeros((double)callback_args["pierce_height"]) + " " + to_string_strip_zeros((double)callback_args["pierce_delay"]) + " " + to_string_strip_zeros((double)callback_args["cut_height"]));
-        gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
-        gcode_stack.insert(gcode_stack.begin(), "G90"); //Absolute mode
+        gcode_stack.insert(gcode_stack.begin(), "G91G0 Z0");
         gcode_stack.insert(gcode_stack.begin(), "M5"); //Torch Off
         
         arc_retry_count++;
@@ -117,7 +119,7 @@ void lower_to_cut_height_and_run_program()
         gcode_stack.insert(gcode_stack.begin(), "$T=" + to_string_strip_zeros(voltage_to_adc_sample(globals->nc_control_view->machine_parameters.thc_set_value)));
     }
     gcode_stack.insert(gcode_stack.begin(), "G90");
-    gcode_stack.insert(gcode_stack.begin(), "G91G0Z" + to_string_strip_zeros((double)callback_args["cut_height"] - (double)callback_args["pierce_height"]));
+    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z" + to_string_strip_zeros((double)callback_args["cut_height"] - (double)callback_args["pierce_height"]));
     gcode_stack.insert(gcode_stack.begin(), "G4P" + to_string_strip_zeros((double)callback_args["pierce_delay"]));
     LOG_F(INFO, "Running callback => lower_to_cut_height_and_run_program()");
     run_pop();
@@ -130,9 +132,11 @@ void raise_to_pierce_height_and_fire_torch()
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
     gcode_stack.insert(gcode_stack.begin(), "WAIT_FOR_ARC_OKAY");
+    gcode_stack.insert(gcode_stack.begin(), "G90");
     gcode_stack.insert(gcode_stack.begin(), "M3S1000");
-    gcode_stack.insert(gcode_stack.begin(), "G91G0Z" + to_string_strip_zeros((double)callback_args["pierce_height"]));
-    gcode_stack.insert(gcode_stack.begin(), "G91G0Z" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.floating_head_backlash));
+    gcode_stack.insert(gcode_stack.begin(), "G0Z-" + to_string_strip_zeros((double)callback_args["pierce_height"]));
+    gcode_stack.insert(gcode_stack.begin(), "G0Z-" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.floating_head_backlash));
+    gcode_stack.insert(gcode_stack.begin(), "G91");
     LOG_F(INFO, "Running callback => raise_to_pierce_height_and_fire_torch()");
     torch_on = true;
     torch_on_timer = EasyRender::Millis();
@@ -146,8 +150,9 @@ void touch_torch_and_back_off()
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
     gcode_stack.insert(gcode_stack.begin(), "G90");
-    gcode_stack.insert(gcode_stack.begin(), "G91G0Z0.5");
-    gcode_stack.insert(gcode_stack.begin(), "G91G0Z" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.floating_head_backlash));
+    gcode_stack.insert(gcode_stack.begin(), "G0Z-0.5");
+    gcode_stack.insert(gcode_stack.begin(), "G0Z-" + to_string_strip_zeros(globals->nc_control_view->machine_parameters.floating_head_backlash));
+    gcode_stack.insert(gcode_stack.begin(), "G91");
     LOG_F(INFO, "Touching off torch and dry running!");
     run_pop();
 }
@@ -162,7 +167,8 @@ void torch_off_and_abort()
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
     gcode_stack.insert(gcode_stack.begin(), "M30");
-    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
+    gcode_stack.insert(gcode_stack.begin(), "G90");
+    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z0");
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off, retracting, and aborting!");
     run_pop();
@@ -177,11 +183,12 @@ void torch_off_and_retract()
     torch_on = false;
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
+    gcode_stack.insert(gcode_stack.begin(), "G90");
     if (globals->nc_control_view->machine_parameters.smart_thc_on == false)
     {
         gcode_stack.insert(gcode_stack.begin(), "$T=0");
     }
-    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
+    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z0");
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off and retracting!");
     run_pop();
@@ -257,10 +264,6 @@ void run_pop()
         {
             okay_callback = NULL;
             motion_sync_callback = &torch_off_and_retract;
-        }
-        else if (line.find("$H") != std::string::npos) {
-            okay_callback = NULL;
-            motion_sync_callback = &homing_done_callback;
         }
         else if (line.find("M30") != std::string::npos)
         {
@@ -349,6 +352,10 @@ void motion_controller_cmd(std::string cmd)
         motion_sync_callback = NULL;
         arc_okay_callback = NULL;
         motion_controller_clear_stack();
+    }
+    else if (cmd == "home") {
+        okay_callback = &homing_done_callback;
+        motion_controller_send("$H");
     }
 }
 void motion_controller_clear_stack()
@@ -494,7 +501,7 @@ void line_handler(std::string line)
                 motion_controller_send("$X");
             }
             else {
-                LOG_F(WARNING, "Controller is locked. Homing automatically...");
+                LOG_F(WARNING, "Controller lockout for unknown reason. Machine will need to be re-homed...");
                 needs_homed = true;
             }
         }
@@ -755,7 +762,7 @@ bool motion_control_status_timer()
             {
                 LOG_F(INFO, "Motion is synced, calling pending callback!");
                 motion_sync_callback();
-                motion_sync_callback = NULL;
+                //motion_sync_callback = NULL;
             }
         }
     }
