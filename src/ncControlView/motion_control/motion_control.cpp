@@ -97,7 +97,7 @@ bool arc_okay_expire_timer()
         //Remember that inserting at the top of list means its the next code to run, meaning
         //This list that we are inserting is ran from bottom to top or LIFO mode
         gcode_stack.insert(gcode_stack.begin(), "fire_torch " + to_string_strip_zeros((double)callback_args["pierce_height"]) + " " + to_string_strip_zeros((double)callback_args["pierce_delay"]) + " " + to_string_strip_zeros((double)callback_args["cut_height"]));
-        gcode_stack.insert(gcode_stack.begin(), "G91G0 Z0");
+        gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
         gcode_stack.insert(gcode_stack.begin(), "M5"); //Torch Off
         
         arc_retry_count++;
@@ -167,8 +167,7 @@ void torch_off_and_abort()
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
     gcode_stack.insert(gcode_stack.begin(), "M30");
-    gcode_stack.insert(gcode_stack.begin(), "G90");
-    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z0");
+    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off, retracting, and aborting!");
     run_pop();
@@ -183,12 +182,11 @@ void torch_off_and_retract()
     torch_on = false;
     //Remember that inserting at the top of list means its the next code to run, meaning
     //This list that we are inserting is ran from bottom to top or LIFO mode
-    gcode_stack.insert(gcode_stack.begin(), "G90");
     if (globals->nc_control_view->machine_parameters.smart_thc_on == false)
     {
         gcode_stack.insert(gcode_stack.begin(), "$T=0");
     }
-    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z0");
+    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
     gcode_stack.insert(gcode_stack.begin(), "M5");
     LOG_F(INFO, "Shutting torch off and retracting!");
     run_pop();
