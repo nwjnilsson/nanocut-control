@@ -104,7 +104,7 @@ class EasyRender{
             this->SetShowCursor(true);
             this->SetAutoMaximize(false);
             this->SetGuiIniFileName("EasyRenderGui.ini");
-            this->SetGuiLogFileName("EasyRenderGio.log");
+            this->SetGuiLogFileName("EasyRenderGui.log");
             this->SetMainLogFileName("EasyRender.log");
             this->SetGuiStyle("light");
             this->SetClearColor(21, 22, 34);

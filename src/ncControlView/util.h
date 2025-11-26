@@ -1,6 +1,8 @@
+#pragma once
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <cstdint>
 
 template<typename T, std::enable_if_t<std::is_same_v<T, float> || std::is_same_v<T, double>, int> = 0>
 std::string to_fixed_string(T n, int d)

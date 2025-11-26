@@ -424,12 +424,12 @@ void EasyRender::SetAutoMaximize(bool m)
 }
 void EasyRender::SetGuiIniFileName(std::string i)
 {
-    this->GuiIniFileName = (char*)malloc(sizeof(char) * strlen(i.c_str()));
+    this->GuiIniFileName = (char*)malloc(sizeof(char) * (i.size() + 1));
     strcpy(this->GuiIniFileName , i.c_str());
 }
 void EasyRender::SetGuiLogFileName(std::string l)
 {
-    this->GuiLogFileName = (char*)malloc(sizeof(char) * strlen(l.c_str()));
+    this->GuiLogFileName = (char*)malloc(sizeof(char) * (l.size() + 1));
     strcpy(this->GuiLogFileName , l.c_str());
 }
 void EasyRender::SetMainLogFileName(std::string l)
