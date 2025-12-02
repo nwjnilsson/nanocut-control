@@ -540,7 +540,7 @@ void jetCamView::RenderUI(void *self_pointer)
             if (ImGui::Button("OK"))
             {
                 // Quick sanity check
-                bool skip_save;
+                bool skip_save{false};
                 for (const auto& [key, value] : tool.params) {
                     if (value < 0.f || value > 50000.f) {
                         // TODO: show popup
@@ -568,9 +568,13 @@ void jetCamView::RenderUI(void *self_pointer)
             }
             ImGui::End();
         }
+        static tool_data_t tool;
         if (show_tool_edit != -1)
         {
-            static tool_data_t tool;
+            if (!tool.tool_name[0]) {
+                sprintf(tool.tool_name, "%s", self->tool_library[show_tool_edit].tool_name);
+                tool.params = self->tool_library[show_tool_edit].params;
+            }
             ImGui::Begin("Tool Edit", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::InputText("Tool Name", self->tool_library[show_tool_edit].tool_name, IM_ARRAYSIZE(self->tool_library[show_tool_edit].tool_name));
             for (const auto& [key, value] : self->tool_library[show_tool_edit].params) {
@@ -589,10 +593,24 @@ void jetCamView::RenderUI(void *self_pointer)
                 }
                 if (!skip_save) {
                     self->tool_library[show_tool_edit].params = tool.params;
+                    nlohmann::json tool_library;
+                    for (size_t x = 0; x < self->tool_library.size(); x++)
+                    {
+                        nlohmann::json tool;
+                        tool["tool_name"] = std::string(self->tool_library[x].tool_name);
+                        for (const auto& [key, value] : self->tool_library[x].params) {
+                            tool[key] = value;
+                        }
+                        tool_library.push_back(tool);
+                    }
+                    globals->renderer->DumpJsonToFile(globals->renderer->GetConfigDirectory() + "tool_library.json", tool_library);
                     show_tool_edit = -1;
                 }
             }
             ImGui::End();
+        }
+        else {
+            memset(tool.tool_name, 0, 1024);
         }
         if (show_tool_library == true)
         {
@@ -611,12 +629,13 @@ void jetCamView::RenderUI(void *self_pointer)
                     for (size_t x = 0; x < self->tool_library.size(); ++x)
                     {
                         ImGui::TableNextRow();
-                        int i = 1;
                         ImGui::TableSetColumnIndex(0); ImGui::Text("%s", self->tool_library[x].tool_name);
-                        for (const auto& [key, value] : self->tool_library[x].params) {
-                            ImGui::TableSetColumnIndex(i++);
-                            ImGui::Text("%.4f", value);
-                        }
+                        ImGui::TableSetColumnIndex(1); ImGui::Text("%.4f", self->tool_library[x].params["pierce_height"]);
+                        ImGui::TableSetColumnIndex(2); ImGui::Text("%.4f", self->tool_library[x].params["pierce_delay"]);
+                        ImGui::TableSetColumnIndex(3); ImGui::Text("%.4f", self->tool_library[x].params["cut_height"]);
+                        ImGui::TableSetColumnIndex(4); ImGui::Text("%.4f", self->tool_library[x].params["kerf_width"]);
+                        ImGui::TableSetColumnIndex(5); ImGui::Text("%.4f", self->tool_library[x].params["feed_rate"]);
+                        ImGui::TableSetColumnIndex(6); ImGui::Text("%.4f", self->tool_library[x].params["athc"]);
                         ImGui::TableSetColumnIndex(7);
                         if (ImGui::Button(std::string("Edit##Edit-" + std::to_string(x)).c_str()))
                         {
