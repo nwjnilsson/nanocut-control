@@ -44,7 +44,7 @@ class easy_serial{
         /*
             Send a un-encoded string
         */
-        void send_string(std::string s);
+        void send_string(const std::string& s);
 
         /*
             Equivilent to arduino delay

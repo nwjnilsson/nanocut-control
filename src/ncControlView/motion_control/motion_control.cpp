@@ -119,7 +119,7 @@ void lower_to_cut_height_and_run_program()
         gcode_stack.insert(gcode_stack.begin(), "$T=" + to_string_strip_zeros(voltage_to_adc_sample(globals->nc_control_view->machine_parameters.thc_set_value)));
     }
     gcode_stack.insert(gcode_stack.begin(), "G90");
-    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z" + to_string_strip_zeros((double)callback_args["cut_height"] - (double)callback_args["pierce_height"]));
+    gcode_stack.insert(gcode_stack.begin(), "G91G0 Z" + to_string_strip_zeros((double)callback_args["pierce_height"] - (double)callback_args["cut_height"]));
     gcode_stack.insert(gcode_stack.begin(), "G4P" + to_string_strip_zeros((double)callback_args["pierce_delay"]));
     LOG_F(INFO, "Running callback => lower_to_cut_height_and_run_program()");
     run_pop();

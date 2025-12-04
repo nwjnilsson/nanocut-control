@@ -751,7 +751,7 @@ void hmi_tab_key_up_callback(nlohmann::json e)
 void hmi_escape_key_callback(nlohmann::json e)
 {
     hmi_handle_button("Abort");
-    globals->nc_control_view->way_point_position = {-1000, -1000};
+    globals->nc_control_view->way_point_position = {std::numeric_limits<double>::min(), std::numeric_limits<double>::min()};
 }
 void hmi_up_key_callback(nlohmann::json e)
 {
@@ -766,7 +766,7 @@ void hmi_up_key_callback(nlohmann::json e)
                 {
                     std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
                     LOG_F(INFO, "Jogging Y positive %s", dist.c_str()); 
-                    motion_controller_push_stack("G91 Y" + dist);
+                    motion_controller_push_stack("G91 Y-" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -805,7 +805,7 @@ void hmi_down_key_callback(nlohmann::json e)
                 {
                     std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
                     LOG_F(INFO, "Jogging Y negative %s!", dist.c_str());
-                    motion_controller_push_stack("G91 Y-" + dist);
+                    motion_controller_push_stack("G91 Y" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -844,7 +844,7 @@ void hmi_right_key_callback(nlohmann::json e)
                 {
                     std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
                     LOG_F(INFO, "Jogging X positive %s!", dist.c_str());
-                    motion_controller_push_stack("G91 X" + dist);
+                    motion_controller_push_stack("G91 X-" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }
@@ -883,7 +883,7 @@ void hmi_left_key_callback(nlohmann::json e)
                 {
                     std::string dist = std::to_string(globals->nc_control_view->machine_parameters.precise_jog_units);
                     LOG_F(INFO, "Jogging X negative %s!", dist.c_str());
-                    motion_controller_push_stack("G91 X-" + dist);
+                    motion_controller_push_stack("G91 X" + dist);
                     motion_controller_push_stack("M30");
                     motion_controller_run_stack();
                 }

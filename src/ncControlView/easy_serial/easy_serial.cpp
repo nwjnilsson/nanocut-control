@@ -29,7 +29,7 @@ void easy_serial::send_byte(uint8_t b)
         }
     }
 }
-void easy_serial::send_string(std::string s)
+void easy_serial::send_string(const std::string& s)
 {
     if (this->is_connected == true)
     {
