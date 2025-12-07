@@ -1,5 +1,12 @@
 # NanoCut Control
-Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)). NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine. NanoCut is Native Cross-Platform (Windows, Linux, and MacOS), but I have currently only tested it on Linux (Debian).
+Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)).
+NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine.
+NanoCut is Native Cross-Platform (Windows, Linux, and MacOS),
+but I have currently only tested it on Linux.
+
+This codebase ain't pretty, but at least I didn't have to re-write a similar
+program from scratch. Someone with tokens to spare should let AI re-write the
+whole thing...
 
 # Features
 - 2D Gcode Viewer
@@ -32,10 +39,11 @@ reports positions like this by default.
 - SheetCAM post processor is included with the NanoCut firmware repository at [nanocut-firmware](https://github.com/Applooza/nanocut-firmware)
 - NanoCut's built-in Toolpath Workbench posts gcode that specifically runs with NanoCut control/firmware setups.
 
-# Simple plasma Gcode Program for slicing a sheet
+# Simple plasma g-code program for slicing a sheet
+Pierce at 3 mm, delay 1.6 seconds, lower to 1.5 mm cut height.
 ```
-fire_torch 0.160 1.6 0.075
-G1 X0 Y0 F45
+fire_torch 3.0 1.6 1.5
+G1 X0 Y0 F2200
 torch_off
 M30
 ```
