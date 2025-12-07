@@ -17,15 +17,16 @@ Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware
 - Remove firmware update feature
 - Add customizable precise jog distance
 - Add support for click-and-drag movement of the control view (press and hold right click)
+- Much more robust DXF importer.
+
+![deer](extra/deer.png "High quality DXF importing for gcode generation")
 
 ## Important notes on using this software
 - If you intend to use imperial units for your machine, go into `include/config.h`
 and uncomment the `#define USE_INCH_DEFAULTS`.
 - Negative machine extents is not supported.
 Positioning in the negative quadrant is apparently common traditionally for CNC machines, and GRBL
-reports positions like this by default. I have instead decided to wire the motors and set the axis
-inversion so that the machine operates in the positive quadrant (home is in the bottom left corner)
-so that I don't have to change too much of the code.
+reports positions like this by default.
 
 # Post Processors
 - SheetCAM post processor is included with the NanoCut firmware repository at [nanocut-firmware](https://github.com/Applooza/nanocut-firmware)

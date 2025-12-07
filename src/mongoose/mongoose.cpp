@@ -3886,7 +3886,10 @@ void mg_random(void *buf, size_t len) {
 #if MG_ENABLE_FS
   FILE *fp = mg_fopen("/dev/urandom", "rb");
   if (fp != NULL) {
-    fread(buf, 1, len, fp);
+    if(size_t read = fread(buf, 1, len, fp); read != len)
+    {
+      LOG(LL_VERBOSE_DEBUG, ("Expected %zu bytes, got %zu", len, read));
+    }
     fclose(fp);
     done = true;
   }

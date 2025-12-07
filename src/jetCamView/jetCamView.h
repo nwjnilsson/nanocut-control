@@ -2,9 +2,9 @@
 #define JET_CAM_VIEW_
 
 #include "PolyNest/PolyNest.h"
+#include <EasyRender/EasyRender.h>
 #include <application.h>
 #include <dxf/dxflib/dl_dxf.h>
-
 
 #define DEFAULT_KERF_WIDTH SCALE(2.f)
 #define DEFAULT_LEAD_IN (DEFAULT_KERF_WIDTH * 1.5f)
@@ -22,13 +22,14 @@ private:
   };
   struct job_options_data_t {
     float material_size[2] = { DEFAULT_MATERIAL_SIZE, DEFAULT_MATERIAL_SIZE };
-    int   origin_corner    = 2;
+    int   origin_corner = 2;
   };
   struct tool_data_t {
     char                                   tool_name[1024];
     std::unordered_map<std::string, float> params{
-      { "pierce_height", 1.f }, { "pierce_delay", 1.f }, { "cut_height", 1.f },
-      { "kerf_width", DEFAULT_KERF_WIDTH },    { "feed_rate", 1.f },    { "athc", 0.f }
+      { "pierce_height", 1.f }, { "pierce_delay", 1.f },
+      { "cut_height", 1.f },    { "kerf_width", DEFAULT_KERF_WIDTH },
+      { "feed_rate", 1.f },     { "athc", 0.f }
     };
   };
   enum operation_types {
@@ -39,7 +40,7 @@ private:
     bool        last_enabled = false;
     int         operation_type;
     int         tool_number;
-    double      lead_in_length  = DEFAULT_LEAD_IN;
+    double      lead_in_length = DEFAULT_LEAD_IN;
     double      lead_out_length = DEFAULT_LEAD_OUT;
     std::string layer;
   };
@@ -50,24 +51,30 @@ private:
   };
   std::vector<action_t>      action_stack;
   EasyRender::EasyRenderGui* menu_bar;
-  static void                ZoomEventCallback(nlohmann::json e);
+  static void                ZoomEventCallback(const nlohmann::json& e);
   static void                ViewMatrixCallback(PrimitiveContainer* p);
-  static void                MouseCallback(nlohmann::json e);
-  static void MouseEventCallback(PrimitiveContainer* c, nlohmann::json e);
-  static void KeyCallback(nlohmann::json e);
-  static void RenderUI(void* p);
+  static void                MouseCallback(const nlohmann::json& e);
+  static void                MouseEventCallback(PrimitiveContainer*   c,
+                                                const nlohmann::json& e);
+  static void                TabKeyCallback(const nlohmann::json& e);
+  static void                ModifierKeyCallback(const nlohmann::json& e);
+  static void                RenderUI(void* p);
 
   double_point_t show_viewer_context_menu;
   double_point_t last_mouse_click_position;
-  bool           left_click_state;
-  bool           tab_state;
+  bool           left_click_pressed;
+  bool           ctrl_pressed;
+  bool           shift_pressed;
   enum class JetCamTool : int { Contour, Nesting, Point };
   JetCamTool           CurrentTool;
   FILE*                dxf_fp;
   DL_Dxf*              dl_dxf;
   PolyNest::PolyNest   dxf_nest;
   DXFParsePathAdaptor* DXFcreationInterface;
-  bool                 DxfFileOpen(std::string filename, std::string name);
+  bool                 DxfFileOpen(std::string filename,
+                                   std::string name,
+                                   int         import_quality,
+                                   float       import_scale);
   static bool          DxfFileParseTimer(void* p);
 
   float                      ProgressWindowProgress;

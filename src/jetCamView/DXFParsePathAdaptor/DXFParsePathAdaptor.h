@@ -1,5 +1,5 @@
 /**
- * @file DXFParse_Class.h
+ * @file DXFParsePathAdaptor.h
  */
 
 /*****************************************************************************
@@ -40,20 +40,42 @@ struct polyline_vertex_t {
   double_point_t point;
   double         bulge;
 };
+
 struct polyline_t {
   std::vector<polyline_vertex_t> points;
-  bool                           isClosed;
+  bool                           is_closed;
 };
+
+// Enhanced spline structure supporting both control points and fit points
 struct spline_t {
-  std::vector<double_point_t> points;
-  bool                        isClosed;
+  std::vector<double_point_t> control_points; // NURBS control points
+  std::vector<double_point_t> fit_points;     // Fit points for interpolation
+  std::vector<double>         knots;          // Knot vector for NURBS
+  std::vector<double>         weights;        // Weights for rational NURBS
+  int                         degree;         // Spline degree
+  bool                        is_closed;      // Is the spline closed?
+  bool                        has_fit_points; // Uses fit points?
+  bool                        has_knots;      // Has explicit knot vector?
+
+  spline_t()
+    : degree(3), is_closed(false), has_fit_points(false), has_knots(false)
+  {
+  }
 };
 
 class DXFParsePathAdaptor : public DL_CreationAdapter {
 public:
   DXFParsePathAdaptor(EasyRender* easy_render_pointer,
                       void (*v)(PrimitiveContainer*),
-                      void (*m)(PrimitiveContainer*, nlohmann::json));
+                      void (*m)(PrimitiveContainer*, const nlohmann::json&));
+
+  enum class Units : int {
+    None = 0,
+    Inch = 1,
+    Millimeter = 4,
+    Centimeter = 5,
+    Meter = 6,
+  };
 
   virtual void addLayer(const DL_LayerData& data);
   virtual void addPoint(const DL_PointData& data);
@@ -71,26 +93,28 @@ public:
   virtual void addControlPoint(const DL_ControlPointData& data);
   virtual void addFitPoint(const DL_FitPointData& data);
   virtual void addKnot(const DL_KnotData& data);
+  virtual void setVariableInt(const std::string&, int, int);
 
   EasyRender* easy_render_instance;
   void (*view_callback)(PrimitiveContainer*);
-  void (*mouse_callback)(PrimitiveContainer*, nlohmann::json);
+  void (*mouse_callback)(PrimitiveContainer*, const nlohmann::json&);
 
   void printAttributes();
   void SetFilename(std::string f);
-  void SetScaleFactor(double scale);
-  void SetSmoothing(double smoothing);
-  void SetChainTolorance(double chain_tolorance);
-  void
-  GetBoundingBox(const std::vector<std::vector<double_point_t>>& path_stack,
-                 double_point_t&                                 bbox_min,
-                 double_point_t&                                 bbox_max);
+  void SetImportScale(double scale);
+  void SetImportQuality(int quality);
+  void SetSmoothing(float smoothing);
+  void SetChainTolerance(double chain_tolerance);
+  void GetApproxBoundingBox(double_point_t& bbox_min,
+                            double_point_t& bbox_max,
+                            size_t&         vertex_count);
   bool CheckIfPointIsInsidePath(std::vector<double_point_t> path,
                                 double_point_t              point);
   bool CheckIfPathIsInsidePath(std::vector<double_point_t> path1,
                                std::vector<double_point_t> path2);
   std::vector<std::vector<double_point_t>>
-       Chainify(std::vector<double_line_t> line_stack, double tolorance);
+       Chainify(std::vector<double_line_t> line_stack, double tolerance);
+  void ScaleAllPoints(double scale);
   void Finish();
   void ExplodeArcToLines(double cx,
                          double cy,
@@ -99,12 +123,22 @@ public:
                          double end_angle,
                          double num_segments);
 
-  std::string                current_layer;
-  std::string                filename;
+private:
+  void
+  GetBoundingBox(const std::vector<std::vector<double_point_t>>& path_stack,
+                 double_point_t&                                 bbox_min,
+                 double_point_t&                                 bbox_max);
+
+public:
+  std::string current_layer;
+  std::string filename;
+  float       smoothing;
+  double      import_scale;
+  int         import_quality;
+  double      chain_tolerance;
+  Units       units;
+
   std::vector<double_line_t> line_stack;
-  double                     smoothing;
-  double                     scale;
-  double                     chain_tolorance;
 
   std::vector<polyline_t> polylines;
   polyline_t              current_polyline;

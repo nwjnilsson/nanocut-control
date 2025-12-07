@@ -2,6 +2,7 @@
 #define DIALOGS_
 
 #include <application.h>
+#include <EasyRender/EasyRender.h>
 
 void dialogs_show_machine_parameters(bool s);
 

@@ -7,7 +7,7 @@
 
 
 #if defined(USE_INCH_DEFAULTS)
-#  define SCALE(x) x / 25.4f
+#  define SCALE(x) x / 25.4
 #else
 #  define SCALE(x) x
 #endif

@@ -24,9 +24,6 @@
 #   error "Unknown compiler"
 #endif
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
-
 std::string EasyPrimitive::Box::get_type_name()
 {
     return "box";
@@ -73,7 +70,7 @@ void EasyPrimitive::Box::render_rectangle_with_radius(float x, float y, float wi
     double_point_t bottom_right[ROUNDING_POINT_COUNT];
     if( radius == 0.0 )
     {
-        radius = MIN(width, height);
+        radius = std::min(width, height);
         radius *= 0.00001;
     }
     int i = 0;

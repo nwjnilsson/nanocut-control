@@ -1,6 +1,7 @@
 #define MG_ENABLE_LOG 0
 #include "WebsocketClient.h"
 #include "EasyRender/logging/loguru.h"
+#include "EasyRender/EasyRender.h"
 
 bool WebsocketClient::ReconnectTimer(void *self_pointer)
 {
