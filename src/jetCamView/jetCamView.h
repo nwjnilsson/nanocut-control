@@ -57,14 +57,13 @@ private:
   static void                MouseEventCallback(PrimitiveContainer*   c,
                                                 const nlohmann::json& e);
   static void                TabKeyCallback(const nlohmann::json& e);
-  static void                ModifierKeyCallback(const nlohmann::json& e);
+  static void                ModKeyCallback(const nlohmann::json& e);
   static void                RenderUI(void* p);
 
   double_point_t show_viewer_context_menu;
   double_point_t last_mouse_click_position;
+  int            mods;
   bool           left_click_pressed;
-  bool           ctrl_pressed;
-  bool           shift_pressed;
   enum class JetCamTool : int { Contour, Nesting, Point };
   JetCamTool           CurrentTool;
   FILE*                dxf_fp;

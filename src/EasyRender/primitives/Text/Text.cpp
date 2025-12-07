@@ -6,6 +6,7 @@
 #include "../../geometry/geometry.h"
 #include "../../gui/stb_truetype.h"
 #include "../../logging/loguru.h"
+#include <EasyRender/EasyRender.h>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 // define something for Windows (32-bit and 64-bit, this part is common)
@@ -38,7 +39,7 @@ void        EasyPrimitive::Text::process_mouse(float mpos_x, float mpos_y)
       mpos_y > this->position.y && mpos_y < (this->position.y + this->height)) {
     if (this->properties->mouse_over == false) {
       this->mouse_event = {
-        { "event", "mouse_in" },
+        { "event", EasyRender::EventType::MouseIn },
         { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
       };
       this->properties->mouse_over = true;
@@ -47,7 +48,7 @@ void        EasyPrimitive::Text::process_mouse(float mpos_x, float mpos_y)
   else {
     if (this->properties->mouse_over == true) {
       this->mouse_event = {
-        { "event", "mouse_out" },
+        { "event", EasyRender::EventType::MouseOut },
         { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
       };
       this->properties->mouse_over = false;

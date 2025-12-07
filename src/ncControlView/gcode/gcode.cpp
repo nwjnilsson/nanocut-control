@@ -52,6 +52,7 @@ bool gcode_open_file(std::string file)
     return false;
   }
 }
+
 nlohmann::json parse_line(std::string line)
 {
   nlohmann::json ret;
@@ -84,8 +85,8 @@ nlohmann::json parse_line(std::string line)
       }
     }
   }
-  ret["x"] = -atof(x_value.c_str());
-  ret["y"] = -atof(y_value.c_str());
+  ret["x"] = atof(x_value.c_str());
+  ret["y"] = atof(y_value.c_str());
   return ret;
 }
 void gcode_push_current_path_to_viewer(int rapid_line)
@@ -95,7 +96,7 @@ void gcode_push_current_path_to_viewer(int rapid_line)
     try {
       if (current_path.points.size() > 1) {
         std::vector<double_point_t> simplified =
-          geo.simplify(current_path.points, 0.010);
+          geo.simplify(current_path.points, SCALE(0.25));
         std::vector<double_point_t> path;
         int                         point_count = 0;
         for (int i = 0; i < simplified.size(); i++) {
@@ -108,9 +109,9 @@ void gcode_push_current_path_to_viewer(int rapid_line)
             double angle =
               geo.measure_polar_angle(simplified[i + 1], simplified[i]);
             double_point_t p1 =
-              geo.create_polar_line(midpoint, angle + 30, 0.020).end;
+              geo.create_polar_line(midpoint, angle + 30, SCALE(0.5)).end;
             double_point_t p2 =
-              geo.create_polar_line(midpoint, angle - 30, 0.020).end;
+              geo.create_polar_line(midpoint, angle - 30, SCALE(0.5)).end;
             arrow_path.push_back({ p1.x, p1.y });
             arrow_path.push_back({ p2.x, p2.y });
             EasyPrimitive::Path* direction_indicator =

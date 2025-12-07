@@ -18,18 +18,18 @@ void jetCamView::ZoomEventCallback(const nlohmann::json& e)
       if ((*it)->properties->view == globals->renderer->GetCurrentView()) {
         if ((*it)->type == "part" and (*it)->part->is_part_selected) {
           if ((float) e["scroll"] > 0) {
-            if (globals->jet_cam_view->ctrl_pressed) {
+            if (globals->jet_cam_view->mods & GLFW_MOD_CONTROL) {
               (*it)->part->control.angle += 5;
             }
-            if (globals->jet_cam_view->shift_pressed) {
+            if (globals->jet_cam_view->mods & GLFW_MOD_SHIFT) {
               (*it)->part->control.scale += .1f;
             }
           }
           else {
-            if (globals->jet_cam_view->ctrl_pressed) {
+            if (globals->jet_cam_view->mods & GLFW_MOD_CONTROL) {
               (*it)->part->control.angle -= 5;
             }
-            if (globals->jet_cam_view->shift_pressed) {
+            if (globals->jet_cam_view->mods & GLFW_MOD_SHIFT) {
               (*it)->part->control.scale -= .1f;
             }
           }
@@ -37,8 +37,7 @@ void jetCamView::ZoomEventCallback(const nlohmann::json& e)
       }
     }
   }
-  if (globals->jet_cam_view->ctrl_pressed or
-      globals->jet_cam_view->shift_pressed) {
+  if (globals->jet_cam_view->mods & (GLFW_MOD_SHIFT | GLFW_MOD_CONTROL)) {
     return;
   }
   // Zoom
@@ -81,57 +80,72 @@ void jetCamView::ViewMatrixCallback(PrimitiveContainer* p)
 void jetCamView::MouseCallback(const nlohmann::json& e)
 {
   // LOG_F(INFO, "%s", e.dump().c_str());
+  using EventType = EasyRender::EventType;
   if (!globals->renderer->imgui_io->WantCaptureKeyboard ||
       !globals->renderer->imgui_io->WantCaptureMouse) {
-    if (e["event"] == "left_click_up") {
-      globals->jet_cam_view->left_click_pressed = false;
-    }
-    if (e["event"] == "left_click_down") {
-      globals->jet_cam_view->left_click_pressed = true;
-      globals->jet_cam_view->show_viewer_context_menu = { -1000000, -1000000 };
-    }
-    if (e["event"] == "right_click_up") {
-      if (globals->jet_cam_view->CurrentTool == JetCamTool::Contour) {
-        if (globals->jet_cam_view->mouse_over_part != NULL)
-          globals->jet_cam_view->show_viewer_context_menu = {
-            globals->renderer->imgui_io->MousePos.x,
-            globals->renderer->imgui_io->MousePos.y
-          };
-      }
-    }
-    if (e["event"] == "mouse_move") {
-      double_point_t mouse_drag = {
-        (double) e["pos"]["x"] -
-          globals->jet_cam_view->last_mouse_click_position.x,
-        (double) e["pos"]["y"] -
-          globals->jet_cam_view->last_mouse_click_position.y
-      };
-      if (globals->jet_cam_view->CurrentTool == JetCamTool::Nesting) {
-        if (globals->jet_cam_view->left_click_pressed == true) {
-          // LOG_F(INFO, "Dragging mouse!");
-          for (std::vector<PrimitiveContainer*>::iterator it =
-                 globals->renderer->GetPrimitiveStack()->begin();
-               it != globals->renderer->GetPrimitiveStack()->end();
-               ++it) {
-            if ((*it)->properties->view ==
-                globals->renderer->GetCurrentView()) {
-              if ((*it)->type == "part") {
-                if ((*it)->part->is_part_selected == true) {
-                  // LOG_F(INFO, "Moving (%.4f, %.4f)", mouse_drag.x,
-                  // mouse_drag.y);
-                  (*it)->part->control.offset.x +=
-                    (mouse_drag.x / globals->zoom) / (*it)->part->control.scale;
-                  (*it)->part->control.offset.y +=
-                    (mouse_drag.y / globals->zoom) / (*it)->part->control.scale;
+    if (e.contains("event")) {
+      // Process event
+      EventType event = static_cast<EventType>(e["event"]);
+      if (event == EventType::MouseMove) {
+        double_point_t mouse_drag = {
+          (double) e["pos"]["x"] -
+            globals->jet_cam_view->last_mouse_click_position.x,
+          (double) e["pos"]["y"] -
+            globals->jet_cam_view->last_mouse_click_position.y
+        };
+        if (globals->jet_cam_view->CurrentTool == JetCamTool::Nesting) {
+          if (globals->jet_cam_view->left_click_pressed == true) {
+            // LOG_F(INFO, "Dragging mouse!");
+            for (std::vector<PrimitiveContainer*>::iterator it =
+                   globals->renderer->GetPrimitiveStack()->begin();
+                 it != globals->renderer->GetPrimitiveStack()->end();
+                 ++it) {
+              if ((*it)->properties->view ==
+                  globals->renderer->GetCurrentView()) {
+                if ((*it)->type == "part") {
+                  if ((*it)->part->is_part_selected == true) {
+                    // LOG_F(INFO, "Moving (%.4f, %.4f)", mouse_drag.x,
+                    // mouse_drag.y);
+                    (*it)->part->control.offset.x +=
+                      (mouse_drag.x / globals->zoom) /
+                      (*it)->part->control.scale;
+                    (*it)->part->control.offset.y +=
+                      (mouse_drag.y / globals->zoom) /
+                      (*it)->part->control.scale;
+                  }
                 }
               }
             }
           }
         }
+        globals->jet_cam_view->last_mouse_click_position = {
+          (double) e["pos"]["x"], (double) e["pos"]["y"]
+        };
       }
-      globals->jet_cam_view->last_mouse_click_position = {
-        (double) e["pos"]["x"], (double) e["pos"]["y"]
-      };
+    }
+    else {
+      // Process buttons
+      if ((int) e["button"] == GLFW_MOUSE_BUTTON_1) {
+        if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
+          globals->jet_cam_view->left_click_pressed = false;
+        }
+        if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
+          globals->jet_cam_view->left_click_pressed = true;
+          globals->jet_cam_view->show_viewer_context_menu = { -1000000,
+                                                              -1000000 };
+        }
+      }
+      else if ((int) e["button"] == GLFW_MOUSE_BUTTON_2) {
+        if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
+          if (globals->jet_cam_view->CurrentTool == JetCamTool::Contour) {
+            if (globals->jet_cam_view->mouse_over_part != NULL)
+              globals->jet_cam_view->show_viewer_context_menu = {
+                globals->renderer->imgui_io->MousePos.x,
+                globals->renderer->imgui_io->MousePos.y
+              };
+          }
+        }
+      }
     }
   }
   else {
@@ -143,34 +157,39 @@ void jetCamView::MouseEventCallback(PrimitiveContainer*   c,
                                     const nlohmann::json& e)
 {
   // LOG_F(INFO, "%s", e.dump().c_str());
-  if (globals->jet_cam_view->CurrentTool == JetCamTool::Contour) {
-    if (c->type == "part") {
-      if (e["event"] == "mouse_in") {
-        size_t x = (size_t) e["path_index"];
-        globals->renderer->SetColorByName(
-          c->part->paths[x].color, globals->jet_cam_view->mouse_over_color);
-        globals->jet_cam_view->mouse_over_part = c;
-        globals->jet_cam_view->mouse_over_path = x;
-      }
-      if (e["event"] == "mouse_out") {
-        globals->jet_cam_view->mouse_over_part = NULL;
-        for (size_t x = 0; x < c->part->paths.size(); x++) {
-          if (c->part->paths[x].is_inside_contour == true) {
-            if (c->part->paths[x].is_closed == true) {
-              globals->renderer->SetColorByName(
-                c->part->paths[x].color,
-                globals->jet_cam_view->inside_contour_color);
+  using EventType = EasyRender::EventType;
+  EasyRender::EventType event{};
+  if (e.contains("event")) {
+    event = e.at("event").get<EventType>();
+    if (globals->jet_cam_view->CurrentTool == JetCamTool::Contour) {
+      if (c->type == "part") {
+        if (event == EventType::MouseIn) {
+          size_t x = (size_t) e["path_index"];
+          globals->renderer->SetColorByName(
+            c->part->paths[x].color, globals->jet_cam_view->mouse_over_color);
+          globals->jet_cam_view->mouse_over_part = c;
+          globals->jet_cam_view->mouse_over_path = x;
+        }
+        if (event == EventType::MouseOut) {
+          globals->jet_cam_view->mouse_over_part = NULL;
+          for (size_t x = 0; x < c->part->paths.size(); x++) {
+            if (c->part->paths[x].is_inside_contour == true) {
+              if (c->part->paths[x].is_closed == true) {
+                globals->renderer->SetColorByName(
+                  c->part->paths[x].color,
+                  globals->jet_cam_view->inside_contour_color);
+              }
+              else {
+                globals->renderer->SetColorByName(
+                  c->part->paths[x].color,
+                  globals->jet_cam_view->open_contour_color);
+              }
             }
             else {
               globals->renderer->SetColorByName(
                 c->part->paths[x].color,
-                globals->jet_cam_view->open_contour_color);
+                globals->jet_cam_view->outside_contour_color);
             }
-          }
-          else {
-            globals->renderer->SetColorByName(
-              c->part->paths[x].color,
-              globals->jet_cam_view->outside_contour_color);
           }
         }
       }
@@ -179,14 +198,14 @@ void jetCamView::MouseEventCallback(PrimitiveContainer*   c,
   if (globals->jet_cam_view->CurrentTool == JetCamTool::Nesting) {
     if (c->type == "part" &&
         globals->jet_cam_view->left_click_pressed == false) {
-      if (e["event"] == "mouse_in") {
+      if (event == EventType::MouseIn) {
         c->part->is_part_selected = true;
         for (size_t x = 0; x < c->part->paths.size(); x++) {
           globals->renderer->SetColorByName(
             c->part->paths[x].color, globals->jet_cam_view->mouse_over_color);
         }
       }
-      if (e["event"] == "mouse_out") {
+      else if (event == EventType::MouseOut) {
         for (size_t x = 0; x < c->part->paths.size(); x++) {
           if (c->part->paths[x].is_inside_contour == true) {
             globals->renderer->SetColorByName(
@@ -205,31 +224,32 @@ void jetCamView::MouseEventCallback(PrimitiveContainer*   c,
   }
 }
 
-void jetCamView::ModifierKeyCallback(const nlohmann::json& e)
-{
-  if (e["key"] == "LeftControl") {
-    if (e["type"] == "keydown") {
-      globals->jet_cam_view->ctrl_pressed = true;
-    }
-    else {
-      globals->jet_cam_view->ctrl_pressed = false;
-    }
-  }
-  else if (e["key"] == "LeftShift") {
-    if (e["type"] == "keydown") {
-      globals->jet_cam_view->shift_pressed = true;
-    }
-    else {
-      globals->jet_cam_view->shift_pressed = false;
-    }
-  }
-}
-
 void jetCamView::TabKeyCallback(const nlohmann::json& e)
 {
   // LOG_F(INFO, "%s", e.dump().c_str());
-  if (e["key"] == "Tab" and e["type"] == "keydown") {
-    globals->nc_control_view->MakeActive();
+  globals->nc_control_view->MakeActive();
+}
+
+void jetCamView::ModKeyCallback(const nlohmann::json& e)
+{
+  LOG_F(INFO, "%s", e.dump().c_str());
+  using Action = EasyRender::ActionFlagBits;
+  auto& mods = globals->jet_cam_view->mods;
+  auto  set_mod = [&](int bit) {
+    if (e.at("action").get<int>() & Action::Press) {
+      mods |= bit;
+      LOG_F(INFO, "Oring: %d", mods);
+    }
+    else {
+      mods &= ~bit;
+      LOG_F(INFO, "Zeroing: %d", mods);
+    }
+  };
+  if (e.at("key").get<int>() == GLFW_KEY_LEFT_CONTROL) {
+    set_mod(GLFW_MOD_CONTROL);
+  }
+  if (e.at("key").get<int>() == GLFW_KEY_LEFT_SHIFT) {
+    set_mod(GLFW_MOD_SHIFT);
   }
 }
 
@@ -1113,8 +1133,8 @@ bool jetCamView::DxfFileParseTimer(void* p)
     // self->DXFcreationInterface->GetApproxBoundingBox(
     //   bbox_min, bbox_max, vertex_count);
     // const double area = (bbox_max.x - bbox_min.x) * (bbox_max.y -
-    // bbox_min.y); const double avg_density = vertex_count / area; const double
-    // target_density =
+    // bbox_min.y); const double avg_density = vertex_count / area; const
+    // double target_density =
     //   1 / std::pow(self->DXFcreationInterface->chain_tolorance, 2);
 
     // LOG_F(INFO,
@@ -1173,7 +1193,6 @@ void jetCamView::PreInit()
 
   this->CurrentTool = JetCamTool::Contour;
   this->left_click_pressed = false;
-  this->ctrl_pressed = false;
 
   nlohmann::json tool_library = globals->renderer->ParseJsonFromFile(
     globals->renderer->GetConfigDirectory() + "tool_library.json");
@@ -1204,18 +1223,22 @@ void jetCamView::PreInit()
 void jetCamView::Init()
 {
   globals->renderer->SetCurrentView("jetCamView");
-  globals->renderer->PushEvent("up", "scroll", &this->ZoomEventCallback);
-  globals->renderer->PushEvent("down", "scroll", &this->ZoomEventCallback);
-  globals->renderer->PushEvent("none", "left_click_up", &this->MouseCallback);
-  globals->renderer->PushEvent("none", "left_click_down", &this->MouseCallback);
-  globals->renderer->PushEvent("none", "right_click_up", &this->MouseCallback);
+  using EventType = EasyRender::EventType;
+  using Action = EasyRender::ActionFlagBits;
   globals->renderer->PushEvent(
-    "none", "right_click_down", &this->MouseCallback);
-  globals->renderer->PushEvent("none", "mouse_move", &this->MouseCallback);
-  globals->renderer->PushEvent("Tab", "keydown", &this->TabKeyCallback);
+    GLFW_KEY_UNKNOWN, EventType::Scroll, &this->ZoomEventCallback);
   globals->renderer->PushEvent(
-    "LeftControl", "any", &this->ModifierKeyCallback);
-  globals->renderer->PushEvent("LeftShift", "any", &this->ModifierKeyCallback);
+    GLFW_MOUSE_BUTTON_1, +Action::Any, &this->MouseCallback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_UNKNOWN, EventType::MouseMove, &this->MouseCallback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_TAB, +Action::Press, &this->TabKeyCallback);
+  globals->renderer->PushEvent(GLFW_KEY_LEFT_CONTROL,
+                               Action::Press | Action::Release,
+                               &this->ModKeyCallback);
+  globals->renderer->PushEvent(GLFW_KEY_LEFT_SHIFT,
+                               Action::Press | Action::Release,
+                               &this->ModKeyCallback);
   this->menu_bar = globals->renderer->PushGui(true, &this->RenderUI, this);
   this->ProgressWindowHandle =
     globals->renderer->PushGui(false, &this->RenderProgressWindow, this);

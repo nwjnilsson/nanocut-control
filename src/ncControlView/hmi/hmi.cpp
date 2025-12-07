@@ -14,7 +14,6 @@ EasyPrimitive::Box*             hmi_button_backpane;
 EasyPrimitive::Path*            arc_okay_highlight_path;
 dro_group_data_t                dro;
 std::vector<hmi_button_group_t> button_groups;
-bool                            left_control_key_is_pressed = false;
 
 void hmi_get_bounding_box(double_point_t* bbox_min, double_point_t* bbox_max)
 {
@@ -443,17 +442,24 @@ void hmi_reverse(PrimitiveContainer* p)
 
 void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
 {
-  // LOG_F(INFO, "%s", e.dump().c_str());
-  if (c->type == "path" && c->properties->id == "gcode") {
-    if (e["event"] == "mouse_in" && left_control_key_is_pressed == true) {
-      // LOG_F(INFO, "Start Line => %lu", (unsigned long)o->data["rapid_line"]);
-      globals->renderer->SetColorByName(c->properties->color, "light-green");
+  if (e.contains("event")) {
+    auto event = e.at("event").get<EasyRender::EventType>();
+    if (c->type == "path" && c->properties->id == "gcode") {
+      if (event == EasyRender::EventType::MouseIn and
+          ((int) e["mods"] & GLFW_MOD_CONTROL)) {
+        // LOG_F(INFO, "Start Line => %lu", (unsigned
+        // long)o->data["rapid_line"]);
+        globals->renderer->SetColorByName(c->properties->color, "light-green");
+      }
+      else if (event == EasyRender::EventType::MouseOut) {
+        // LOG_F(INFO, "Mouse Out - %s\n", e.dump().c_str());
+        globals->renderer->SetColorByName(c->properties->color, "white");
+      }
     }
-    if (e["event"] == "mouse_out") {
-      // LOG_F(INFO, "Mouse Out - %s\n", e.dump().c_str());
-      globals->renderer->SetColorByName(c->properties->color, "white");
-    }
-    if (e["event"] == "right_click_up" && left_control_key_is_pressed == true) {
+  }
+  else if ((int) e["button"] == GLFW_MOUSE_BUTTON_2 and
+           ((int) e["mods"] & GLFW_MOD_CONTROL)) {
+    if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
       globals->renderer->SetColorByName(c->properties->color, "light-green");
       dialogs_ask_yes_no(
         "Are you sure you want to reverse this paths direction?",
@@ -461,15 +467,16 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
         NULL,
         c);
     }
-    if (e["event"] == "right_click_down" &&
-        left_control_key_is_pressed == true) {
+    else if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
       globals->renderer->SetColorByName(c->properties->color, "green");
     }
-    if (e["event"] == "left_click_down" &&
-        left_control_key_is_pressed == true) {
+  }
+  else if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
+           ((int) e["mods"] & GLFW_MOD_CONTROL)) {
+    if (e["action"] & EasyRender::ActionFlagBits::Press) {
       globals->renderer->SetColorByName(c->properties->color, "green");
     }
-    if (e["event"] == "left_click_up" && left_control_key_is_pressed == true) {
+    else if (e["action"] & EasyRender::ActionFlagBits::Release) {
       globals->renderer->SetColorByName(c->properties->color, "light-green");
       dialogs_ask_yes_no(
         "Are you sure you want to start the program at this path?",
@@ -478,33 +485,46 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
         c);
     }
   }
-  if (c->type == "box" && c->properties->id != "cuttable_plane" &&
-      c->properties->id != "machine_plane") {
-    if (e["event"] == "mouse_in") {
-      globals->renderer->SetColorByName(c->properties->color, "light-green");
-    }
-    if (e["event"] == "mouse_out") {
-      globals->renderer->SetColorByName(c->properties->color, "black");
-    }
-    if (e["event"] == "left_click_down") {
-      globals->renderer->SetColorByName(c->properties->color, "green");
-    }
-    if (e["event"] == "left_click_up") {
-      globals->renderer->SetColorByName(c->properties->color, "light-green");
-      hmi_handle_button(c->properties->id);
-    }
-  }
-  else if (left_control_key_is_pressed == false) {
-    if (e["event"] == "left_click_up") {
+  else if (not((int) e["mods"] & GLFW_MOD_CONTROL)) {
+    if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
+        (int) e["action"] & EasyRender::ActionFlagBits::Release) {
       nlohmann::json dro_data = motion_controller_get_dro();
       try {
         if (dro_data["IN_MOTION"] == false) {
+          LOG_F(INFO,
+                "Add waypoint position [%f, %f]",
+                globals->mouse_pos_in_matrix_coordinates.x,
+                globals->mouse_pos_in_matrix_coordinates.y);
+          // TODO: display waypoint, show popup. Go here?
           globals->nc_control_view->way_point_position =
             globals->mouse_pos_in_matrix_coordinates;
         }
       }
       catch (...) {
         LOG_F(ERROR, "Error parsing DRO Data!");
+      }
+    }
+  }
+  if (c->type == "box" && c->properties->id != "cuttable_plane" &&
+      c->properties->id != "machine_plane") {
+    if (e.contains("event")) {
+      auto event = e.at("event").get<EasyRender::EventType>();
+      if (event == EasyRender::EventType::MouseIn) {
+        globals->renderer->SetColorByName(c->properties->color, "light-green");
+      }
+      else if (event == EasyRender::EventType::MouseOut) {
+        globals->renderer->SetColorByName(c->properties->color, "black");
+      }
+    }
+    else {
+      if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
+          (int) e["action"] & EasyRender::ActionFlagBits::Press) {
+        globals->renderer->SetColorByName(c->properties->color, "green");
+      }
+      if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
+          (int) e["action"] & EasyRender::ActionFlagBits::Release) {
+        globals->renderer->SetColorByName(c->properties->color, "light-green");
+        hmi_handle_button(c->properties->id);
       }
     }
   }
@@ -566,18 +586,18 @@ bool hmi_update_timer()
     // { "STATUS": "Idle", "MCS": { "x": 0.000,"y": 0.000,"z": 0.000 }, "WCS": {
     // "x": -4.594,"y": -3.260,"z": 0.000 }, "FEED": 0, "ADC": 0, "IN_MOTION":
     // false, "ARC_OK": true }
-    const float wcx = abs(static_cast<float>(dro_data["WCS"]["x"]));
-    const float wcy = abs(static_cast<float>(dro_data["WCS"]["y"]));
-    const float wcz = abs(static_cast<float>(dro_data["WCS"]["z"]));
+    const float wcx = static_cast<float>(dro_data["WCS"]["x"]);
+    const float wcy = static_cast<float>(dro_data["WCS"]["y"]);
+    const float wcz = static_cast<float>(dro_data["WCS"]["z"]);
     dro.x.work_readout->textval = to_fixed_string(abs(wcx), 4);
     dro.y.work_readout->textval = to_fixed_string(abs(wcy), 4);
     dro.z.work_readout->textval = to_fixed_string(abs(wcz), 4);
-    const double mcx = abs(static_cast<float>(dro_data["MCS"]["x"]));
-    const double mcy = abs(static_cast<float>(dro_data["MCS"]["y"]));
-    const double mcz = abs(static_cast<float>(dro_data["MCS"]["z"]));
-    dro.x.absolute_readout->textval = to_fixed_string(mcx, 4);
-    dro.y.absolute_readout->textval = to_fixed_string(mcy, 4);
-    dro.z.absolute_readout->textval = to_fixed_string(mcz, 4);
+    const double mcx = static_cast<float>(dro_data["MCS"]["x"]);
+    const double mcy = static_cast<float>(dro_data["MCS"]["y"]);
+    const double mcz = static_cast<float>(dro_data["MCS"]["z"]);
+    dro.x.absolute_readout->textval = to_fixed_string(abs(mcx), 4);
+    dro.y.absolute_readout->textval = to_fixed_string(abs(mcy), 4);
+    dro.z.absolute_readout->textval = to_fixed_string(abs(mcz), 4);
     dro.feed->textval =
       "FEED: " + to_fixed_string(static_cast<float>(dro_data["FEED"]), 1);
     dro.arc_readout->textval =
@@ -789,8 +809,10 @@ void hmi_push_button_group(std::string b1, std::string b2)
 
 void hmi_tab_key_up_callback(const nlohmann::json& e)
 {
-  if (globals->nc_control_view->way_point_position.x != -1000 &&
-      globals->nc_control_view->way_point_position.y != -1000) {
+  if (globals->nc_control_view->way_point_position.x !=
+        std::numeric_limits<int>::min() &&
+      globals->nc_control_view->way_point_position.y !=
+        std::numeric_limits<int>::min()) {
     LOG_F(INFO,
           "Going to waypoint position: X%.4f Y%.4f",
           globals->nc_control_view->way_point_position.x,
@@ -802,8 +824,10 @@ void hmi_tab_key_up_callback(const nlohmann::json& e)
       to_string_strip_zeros(globals->nc_control_view->way_point_position.y));
     motion_controller_push_stack("M30");
     motion_controller_run_stack();
-    globals->nc_control_view->way_point_position.x = -1000;
-    globals->nc_control_view->way_point_position.y = -1000;
+    globals->nc_control_view->way_point_position.x =
+      std::numeric_limits<int>::min();
+    globals->nc_control_view->way_point_position.y =
+      std::numeric_limits<int>::min();
   }
 }
 void hmi_escape_key_callback(const nlohmann::json& e)
@@ -818,8 +842,9 @@ void hmi_up_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] == 1 || (int) e["action"] == 2) {
-        if (left_control_key_is_pressed == true) {
+      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
+          (int) e["action"] == GLFW_REPEAT) {
+        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y positive %s", dist.c_str());
@@ -839,7 +864,8 @@ void hmi_up_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] == 0 && left_control_key_is_pressed == false) {
+    if ((int) e["action"] & EasyRender::ActionFlagBits::Release and
+        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y positive jog!");
       hmi_handle_button("Abort");
@@ -855,8 +881,9 @@ void hmi_down_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] == 1 || (int) e["action"] == 2) {
-        if (left_control_key_is_pressed == true) {
+      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
+          (int) e["action"] == GLFW_REPEAT) {
+        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y negative %s!", dist.c_str());
@@ -873,7 +900,8 @@ void hmi_down_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] == 0 && left_control_key_is_pressed == false) {
+    if ((int) e["action"] & EasyRender::ActionFlagBits::Release &&
+        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y negative jog!");
       hmi_handle_button("Abort");
@@ -889,8 +917,9 @@ void hmi_right_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] == 1 || (int) e["action"] == 2) {
-        if (left_control_key_is_pressed == true) {
+      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
+          (int) e["action"] == GLFW_REPEAT) {
+        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X positive %s!", dist.c_str());
@@ -910,7 +939,8 @@ void hmi_right_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] == 0 && left_control_key_is_pressed == false) {
+    if ((int) e["action"] & EasyRender::ActionFlagBits::Release &&
+        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Positive jog!");
       hmi_handle_button("Abort");
@@ -925,8 +955,9 @@ void hmi_left_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] == 1 || (int) e["action"] == 2) {
-        if (left_control_key_is_pressed == true) {
+      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
+          (int) e["action"] == GLFW_REPEAT) {
+        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X negative %s!", dist.c_str());
@@ -943,7 +974,8 @@ void hmi_left_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] == 0 && left_control_key_is_pressed == false) {
+    if ((int) e["action"] & EasyRender::ActionFlagBits::Release &&
+        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Negative jog!");
       hmi_handle_button("Abort");
@@ -955,7 +987,7 @@ void hmi_left_key_callback(const nlohmann::json& e)
 }
 void hmi_page_up_key_callback(const nlohmann::json& e)
 {
-  if ((int) e["action"] == 1) {
+  if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
     if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
       motion_controller_send_rt('<');
     }
@@ -963,7 +995,7 @@ void hmi_page_up_key_callback(const nlohmann::json& e)
       motion_controller_send_rt('>');
     }
   }
-  else if ((int) e["action"] == 0) {
+  else if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
     motion_controller_send_rt('^');
   }
   /*try
@@ -1004,7 +1036,7 @@ void hmi_page_up_key_callback(const nlohmann::json& e)
 }
 void hmi_page_down_key_callback(const nlohmann::json& e)
 {
-  if ((int) e["action"] == 1) {
+  if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
     if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
       motion_controller_send_rt('>');
     }
@@ -1012,7 +1044,7 @@ void hmi_page_down_key_callback(const nlohmann::json& e)
       motion_controller_send_rt('<');
     }
   }
-  else if ((int) e["action"] == 0) {
+  else if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
     motion_controller_send_rt('^');
   }
   /*try
@@ -1052,15 +1084,6 @@ void hmi_page_down_key_callback(const nlohmann::json& e)
       //DRO data not available
   }*/
 }
-void hmi_control_key_callback(const nlohmann::json& e)
-{
-  if ((int) e["action"] == 0) {
-    left_control_key_is_pressed = false;
-  }
-  if ((int) e["action"] == 1) {
-    left_control_key_is_pressed = true;
-  }
-}
 void hmi_mouse_motion_callback(const nlohmann::json& e)
 {
   double_point_t point = { (double) e["pos"]["x"], (double) e["pos"]["y"] };
@@ -1076,7 +1099,9 @@ void hmi_mouse_motion_callback(const nlohmann::json& e)
 }
 void hmi_init()
 {
-  globals->nc_control_view->way_point_position = { -1000, -1000 };
+  globals->nc_control_view->way_point_position = {
+    std::numeric_limits<int>::min(), std::numeric_limits<int>::min()
+  };
 
   globals->nc_control_view->machine_plane =
     globals->renderer->PushPrimitive(new EasyPrimitive::Box(
@@ -1247,35 +1272,33 @@ void hmi_init()
   globals->nc_control_view->torch_pointer->properties->matrix_callback =
     globals->nc_control_view->view_matrix;
 
-  globals->renderer->PushEvent("Tab", "keyup", hmi_tab_key_up_callback);
-  globals->renderer->PushEvent("none", "window_resize", hmi_resize_callback);
-  globals->renderer->PushEvent("Escape", "keyup", hmi_escape_key_callback);
-
-  globals->renderer->PushEvent("Up", "keydown", hmi_up_key_callback);
-  globals->renderer->PushEvent("Up", "keyup", hmi_up_key_callback);
-  globals->renderer->PushEvent("Up", "repeat", hmi_up_key_callback);
-
-  globals->renderer->PushEvent("Down", "keydown", hmi_down_key_callback);
-  globals->renderer->PushEvent("Down", "keyup", hmi_down_key_callback);
-
-  globals->renderer->PushEvent("Left", "keydown", hmi_left_key_callback);
-  globals->renderer->PushEvent("Left", "keyup", hmi_left_key_callback);
-
-  globals->renderer->PushEvent("Right", "keydown", hmi_right_key_callback);
-  globals->renderer->PushEvent("Right", "keyup", hmi_right_key_callback);
-
-  globals->renderer->PushEvent("PgUp", "keydown", hmi_page_up_key_callback);
-  globals->renderer->PushEvent("PgUp", "keyup", hmi_page_up_key_callback);
-
-  globals->renderer->PushEvent("PgDown", "keydown", hmi_page_down_key_callback);
-  globals->renderer->PushEvent("PgDown", "keyup", hmi_page_down_key_callback);
+  // globals->renderer->PushEvent(GLFW_KEY_TAB,
+  //                              +EasyRender::ActionFlagBits::Release,
+  //                              hmi_tab_key_up_callback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_UNKNOWN, EasyRender::EventType::WindowResize, hmi_resize_callback);
+  globals->renderer->PushEvent(GLFW_KEY_ESCAPE,
+                               +EasyRender::ActionFlagBits::Press,
+                               hmi_escape_key_callback);
 
   globals->renderer->PushEvent(
-    "LeftControl", "keyup", hmi_control_key_callback);
+    GLFW_KEY_UP, +EasyRender::ActionFlagBits::Any, hmi_up_key_callback);
   globals->renderer->PushEvent(
-    "LeftControl", "keydown", hmi_control_key_callback);
+    GLFW_KEY_DOWN, +EasyRender::ActionFlagBits::Any, hmi_down_key_callback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_LEFT, +EasyRender::ActionFlagBits::Any, hmi_left_key_callback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_RIGHT, +EasyRender::ActionFlagBits::Any, hmi_right_key_callback);
+  globals->renderer->PushEvent(GLFW_KEY_PAGE_UP,
+                               +EasyRender::ActionFlagBits::Any,
+                               hmi_page_up_key_callback);
+  globals->renderer->PushEvent(GLFW_KEY_PAGE_DOWN,
+                               +EasyRender::ActionFlagBits::Any,
+                               hmi_page_down_key_callback);
 
-  globals->renderer->PushEvent("none", "mouse_move", hmi_mouse_motion_callback);
+  globals->renderer->PushEvent(GLFW_KEY_UNKNOWN,
+                               EasyRender::EventType::MouseMove,
+                               hmi_mouse_motion_callback);
 
   globals->renderer->PushTimer(100, hmi_update_timer);
 

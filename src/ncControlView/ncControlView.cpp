@@ -38,16 +38,17 @@ void ncControlView::zoom_event_handle(const nlohmann::json& e)
 
 void ncControlView::key_callback(const nlohmann::json& e)
 {
-  if (e["key"] == "Tab" and e["type"] == "keydown") {
+  if ((int) e["key"] == GLFW_KEY_TAB and
+      (int) e["action"] & EasyRender::ActionFlagBits::Press) {
     globals->jet_cam_view->MakeActive();
   }
 }
 
 void ncControlView::click_and_drag_event_handle(const nlohmann::json& e)
 {
-  if (e["event"] == "right_click_down")
+  if ((int) e["action"] & EasyRender::ActionFlagBits::Press)
     globals->move_view = true;
-  else if (e["event"] == "right_click_up")
+  else if ((int) e["action"] & EasyRender::ActionFlagBits::Release)
     globals->move_view = false;
 }
 
@@ -89,17 +90,17 @@ void ncControlView::PreInit()
   }
   else {
     LOG_F(WARNING, "Preferences file does not exist, creating it!");
-    this->preferences.background_color[0]     = 0.f;
-    this->preferences.background_color[1]     = 0.f;
-    this->preferences.background_color[2]     = 0.f;
-    this->preferences.machine_plane_color[0]  = 100.0f / 255.0f;
-    this->preferences.machine_plane_color[1]  = 100.0f / 255.0f;
-    this->preferences.machine_plane_color[2]  = 100.0f / 255.0f;
+    this->preferences.background_color[0] = 0.f;
+    this->preferences.background_color[1] = 0.f;
+    this->preferences.background_color[2] = 0.f;
+    this->preferences.machine_plane_color[0] = 100.0f / 255.0f;
+    this->preferences.machine_plane_color[1] = 100.0f / 255.0f;
+    this->preferences.machine_plane_color[2] = 100.0f / 255.0f;
     this->preferences.cuttable_plane_color[0] = 151.0f / 255.0f;
     this->preferences.cuttable_plane_color[1] = 5.0f / 255.0f;
     this->preferences.cuttable_plane_color[2] = 5.0f / 255.0f;
-    this->preferences.window_size[0]          = 1280;
-    this->preferences.window_size[1]          = 720;
+    this->preferences.window_size[0] = 1280;
+    this->preferences.window_size[1] = 720;
   }
 
   nlohmann::json parameters = globals->renderer->ParseJsonFromFile(
@@ -203,9 +204,9 @@ void ncControlView::PreInit()
           std::string(globals->renderer->GetConfigDirectory() +
                       "machine_parameters.json")
             .c_str());
-    this->machine_parameters.work_offset[0]     = 0.0f;
-    this->machine_parameters.work_offset[1]     = 0.0f;
-    this->machine_parameters.work_offset[2]     = 0.0f;
+    this->machine_parameters.work_offset[0] = 0.0f;
+    this->machine_parameters.work_offset[1] = 0.0f;
+    this->machine_parameters.work_offset[2] = 0.0f;
     this->machine_parameters.machine_extents[0] = SCALE(1400.f);
     this->machine_parameters.machine_extents[1] = SCALE(1400.f);
     this->machine_parameters.machine_extents[2] = SCALE(-60.f);
@@ -213,50 +214,51 @@ void ncControlView::PreInit()
     this->machine_parameters.cutting_extents[1] = SCALE(50.f);
     this->machine_parameters.cutting_extents[2] = -SCALE(50.f);
     this->machine_parameters.cutting_extents[3] = -SCALE(50.f);
-    this->machine_parameters.axis_scale[0]      = 200 * (0.25f / DEFAULT_UNIT);
-    this->machine_parameters.axis_scale[1]      = 200 * (0.25f / DEFAULT_UNIT);
-    this->machine_parameters.axis_scale[2]      = 200 * (0.25f / DEFAULT_UNIT);
-    this->machine_parameters.max_vel[0]         = SCALE(1000.f);
-    this->machine_parameters.max_vel[1]         = SCALE(1000.f);
-    this->machine_parameters.max_vel[2]         = SCALE(250.f);
-    this->machine_parameters.max_accel[0]       = SCALE(800.0f);
-    this->machine_parameters.max_accel[1]       = SCALE(800.0f);
-    this->machine_parameters.max_accel[2]       = SCALE(200.0f);
+    this->machine_parameters.axis_scale[0] = 200 * (0.25f / DEFAULT_UNIT);
+    this->machine_parameters.axis_scale[1] = 200 * (0.25f / DEFAULT_UNIT);
+    this->machine_parameters.axis_scale[2] = 200 * (0.25f / DEFAULT_UNIT);
+    this->machine_parameters.max_vel[0] = SCALE(1000.f);
+    this->machine_parameters.max_vel[1] = SCALE(1000.f);
+    this->machine_parameters.max_vel[2] = SCALE(250.f);
+    this->machine_parameters.max_accel[0] = SCALE(800.0f);
+    this->machine_parameters.max_accel[1] = SCALE(800.0f);
+    this->machine_parameters.max_accel[2] = SCALE(200.0f);
     this->machine_parameters.junction_deviation = SCALE(0.005f);
     this->machine_parameters.arc_stabilization_time = 2000;
-    this->machine_parameters.arc_voltage_divider    = 50.f;
+    this->machine_parameters.arc_voltage_divider = 50.f;
     this->machine_parameters.floating_head_backlash = SCALE(10.f);
-    this->machine_parameters.z_probe_feedrate       = SCALE(100.f);
-    this->machine_parameters.axis_invert[0]         = true;
-    this->machine_parameters.axis_invert[1]         = true;
-    this->machine_parameters.axis_invert[2]         = true;
-    this->machine_parameters.axis_invert[3]         = true;
-    this->machine_parameters.soft_limits_enabled    = false;
-    this->machine_parameters.homing_enabled         = false;
-    this->machine_parameters.homing_dir_invert[0]   = false;
-    this->machine_parameters.homing_dir_invert[1]   = false;
-    this->machine_parameters.homing_dir_invert[2]   = false;
-    this->machine_parameters.homing_feed            = SCALE(400.f);
-    this->machine_parameters.homing_seek            = SCALE(800.f);
-    this->machine_parameters.homing_debounce        = SCALE(250.f);
-    this->machine_parameters.homing_pull_off        = SCALE(10.f);
-    this->machine_parameters.invert_limit_pins      = false;
-    this->machine_parameters.invert_probe_pin       = false;
-    this->machine_parameters.invert_step_enable     = false;
-    this->machine_parameters.precise_jog_units      = SCALE(5.f);
+    this->machine_parameters.z_probe_feedrate = SCALE(100.f);
+    this->machine_parameters.axis_invert[0] = true;
+    this->machine_parameters.axis_invert[1] = true;
+    this->machine_parameters.axis_invert[2] = true;
+    this->machine_parameters.axis_invert[3] = true;
+    this->machine_parameters.soft_limits_enabled = false;
+    this->machine_parameters.homing_enabled = false;
+    this->machine_parameters.homing_dir_invert[0] = false;
+    this->machine_parameters.homing_dir_invert[1] = false;
+    this->machine_parameters.homing_dir_invert[2] = false;
+    this->machine_parameters.homing_feed = SCALE(400.f);
+    this->machine_parameters.homing_seek = SCALE(800.f);
+    this->machine_parameters.homing_debounce = SCALE(250.f);
+    this->machine_parameters.homing_pull_off = SCALE(10.f);
+    this->machine_parameters.invert_limit_pins = false;
+    this->machine_parameters.invert_probe_pin = false;
+    this->machine_parameters.invert_step_enable = false;
+    this->machine_parameters.precise_jog_units = SCALE(5.f);
   }
   this->view_matrix = &hmi_view_matrix;
 }
 void ncControlView::Init()
 {
   globals->renderer->SetCurrentView("ncControlView");
-  globals->renderer->PushEvent("up", "scroll", &this->zoom_event_handle);
-  globals->renderer->PushEvent("down", "scroll", &this->zoom_event_handle);
   globals->renderer->PushEvent(
-    "down", "right_click_down", &this->click_and_drag_event_handle);
+    GLFW_KEY_UNKNOWN, EasyRender::EventType::Scroll, &this->zoom_event_handle);
+  globals->renderer->PushEvent(GLFW_MOUSE_BUTTON_2,
+                               EasyRender::ActionFlagBits::Release |
+                                 EasyRender::ActionFlagBits::Press,
+                               &this->click_and_drag_event_handle);
   globals->renderer->PushEvent(
-    "up", "right_click_up", &this->click_and_drag_event_handle);
-  globals->renderer->PushEvent("Tab", "keydown", &this->key_callback);
+    GLFW_KEY_TAB, +EasyRender::ActionFlagBits::Press, &this->key_callback);
   menu_bar_init();
   dialogs_init();
   motion_control_init();

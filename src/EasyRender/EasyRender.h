@@ -10,6 +10,7 @@
 #include <ctime>
 #include <string>
 #include <sys/time.h>
+#include <variant>
 #include <vector>
 
 #ifdef __APPLE__
@@ -84,6 +85,24 @@ private:
   static void window_size_callback(GLFWwindow* window, int width, int height);
 
 public:
+  enum class ActionFlagBits {
+    Release = 1 << GLFW_RELEASE,
+    Press = 1 << GLFW_PRESS,
+    Repeat = 1 << GLFW_REPEAT,
+    Any = Release | Press | Repeat
+  };
+  typedef uint32_t ActionFlags;
+
+  // Special events
+  enum class EventType {
+    None,
+    MouseIn,
+    MouseOut,
+    MouseMove,
+    Scroll,
+    WindowResize,
+  };
+
   ImGuiIO* imgui_io;
   struct EasyRenderGui {
     std::string view;
@@ -93,10 +112,10 @@ public:
     void* self_pointer;
   };
   struct EasyRenderEvent {
+    EventType   event; // special events like mouse_in or window_resize
     std::string view;
-    std::string key;
-    std::string type; // keyup, keydown, scroll, mouse_click, mouse_move,
-                      // window_resize
+    int         key;
+    ActionFlags action_flags{ 0 };
     void (*callback)(const nlohmann::json&);
   };
   std::vector<EasyRenderGui*>   gui_stack;
@@ -117,7 +136,7 @@ public:
     this->SetShowFPS(false);
     this->SetCurrentView("main");
     this->FPS_Label = NULL;
-    this->imgui_io  = NULL;
+    this->imgui_io = NULL;
   };
   /* Primitive Creation */
   EasyPrimitive::Line*   PushPrimitive(EasyPrimitive::Line* l);
@@ -138,8 +157,8 @@ public:
   EasyRenderGui* PushGui(bool v, void (*c)(void* p), void* s);
 
   /* Key Event Creation */
-  void PushEvent(std::string key,
-                 std::string type,
+  void PushEvent(int                                  key,
+                 std::variant<ActionFlags, EventType> event,
                  void (*callback)(const nlohmann::json&));
 
   /* Setters */
@@ -186,5 +205,9 @@ public:
   bool Poll(bool should_quit);
   void Close();
 };
+
+uint32_t operator&(EasyRender::ActionFlags a, EasyRender::ActionFlagBits b);
+uint32_t operator|(EasyRender::ActionFlagBits a, EasyRender::ActionFlagBits b);
+uint32_t operator+(EasyRender::ActionFlagBits a);
 
 #endif // EASYREANDER_

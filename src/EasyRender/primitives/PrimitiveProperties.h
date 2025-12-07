@@ -40,23 +40,23 @@ public:
 
   PrimitiveProperties()
   {
-    this->visible            = true;
-    this->zindex             = 1;
-    this->color[0]           = 255;
-    this->color[1]           = 255;
-    this->color[2]           = 255;
-    this->color[3]           = 255;
-    this->scale              = 1;
-    this->offset[0]          = 0;
-    this->offset[1]          = 0;
-    this->offset[2]          = 0;
-    this->angle              = 0;
-    this->id                 = "";
-    this->view               = "main";
-    this->mouse_over         = false;
+    this->visible = true;
+    this->zindex = 1;
+    this->color[0] = 255;
+    this->color[1] = 255;
+    this->color[2] = 255;
+    this->color[3] = 255;
+    this->scale = 1;
+    this->offset[0] = 0;
+    this->offset[1] = 0;
+    this->offset[2] = 0;
+    this->angle = 0;
+    this->id = "";
+    this->view = "main";
+    this->mouse_over = false;
     this->mouse_over_padding = 5;
-    this->mouse_callback     = NULL;
-    this->matrix_callback    = NULL;
+    this->mouse_callback = NULL;
+    this->matrix_callback = NULL;
   }
 };
 

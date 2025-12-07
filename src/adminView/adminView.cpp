@@ -34,7 +34,7 @@ void adminView::ZoomEventCallback(const nlohmann::json& e)
 }
 void adminView::ViewMatrixCallback(PrimitiveContainer* p)
 {
-  p->properties->scale     = globals->zoom;
+  p->properties->scale = globals->zoom;
   p->properties->offset[0] = globals->pan.x;
   p->properties->offset[1] = globals->pan.y;
 }
@@ -117,15 +117,18 @@ void adminView::RenderUI(void* self_pointer)
       }
       ImGui::EndMainMenuBar();
     }
-    //ImGui::End();
+    // ImGui::End();
   }
 }
 void adminView::PreInit() {}
 void adminView::Init()
 {
+  using EventType = EasyRender::EventType;
   globals->renderer->SetCurrentView("adminView");
-  globals->renderer->PushEvent("up", "scroll", &this->ZoomEventCallback);
-  globals->renderer->PushEvent("down", "scroll", &this->ZoomEventCallback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_UNKNOWN, EventType::Scroll, &this->ZoomEventCallback);
+  globals->renderer->PushEvent(
+    GLFW_KEY_UNKNOWN, EventType::Scroll, &this->ZoomEventCallback);
   this->ui = globals->renderer->PushGui(true, &this->RenderUI, this);
   // globals->renderer->SetShowFPS(true);
 }

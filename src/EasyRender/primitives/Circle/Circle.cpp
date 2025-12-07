@@ -1,6 +1,7 @@
 #include "Circle.h"
 #include "../../geometry/geometry.h"
 #include "../../logging/loguru.h"
+#include <EasyRender/EasyRender.h>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 // define something for Windows (32-bit and 64-bit, this part is common)
@@ -41,7 +42,7 @@ void        EasyPrimitive::Circle::process_mouse(float mpos_x, float mpos_y)
            2)))) {
     if (this->properties->mouse_over == false) {
       this->mouse_event = {
-        { "event", "mouse_in" },
+        { "event", EasyRender::EventType::MouseIn },
         { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
       };
       this->properties->mouse_over = true;
@@ -50,7 +51,7 @@ void        EasyPrimitive::Circle::process_mouse(float mpos_x, float mpos_y)
   else {
     if (this->properties->mouse_over == true) {
       this->mouse_event = {
-        { "event", "mouse_out" },
+        { "event", EasyRender::EventType::MouseOut },
         { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
       };
       this->properties->mouse_over = false;
@@ -69,7 +70,8 @@ void EasyPrimitive::Circle::render_arc(
   start.y = cy + (radius * sinf((start_angle) * 3.1415926f / 180.0f));
   end.x = cx + (radius * cosf((end_angle) * 3.1415926f / 180.0f));
   end.y = cy + (radius * sinf((end_angle) * 3.1415926 / 180.0f));
-  double diff = std::max(start_angle, end_angle) - std::min(start_angle, end_angle);
+  double diff =
+    std::max(start_angle, end_angle) - std::min(start_angle, end_angle);
   if (diff > 180)
     diff = 360 - diff;
   double angle_increment = diff / num_segments;

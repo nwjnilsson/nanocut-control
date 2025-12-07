@@ -65,91 +65,18 @@ void EasyRender::key_callback(
   EasyRender* self =
     reinterpret_cast<EasyRender*>(glfwGetWindowUserPointer(window));
   if (self != NULL) {
-    std::string keyname;
-    if (glfwGetKeyName(key, scancode) != NULL) {
-      keyname = std::string(glfwGetKeyName(key, scancode));
-    }
-    else {
-      switch (key) {
-        case 256:
-          keyname = "Escape";
-          break;
-        case 32:
-          keyname = "Space";
-          break;
-        case 258:
-          keyname = "Tab";
-          break;
-        case 265:
-          keyname = "Up";
-          break;
-        case 264:
-          keyname = "Down";
-          break;
-        case 263:
-          keyname = "Left";
-          break;
-        case 262:
-          keyname = "Right";
-          break;
-        case 266:
-          keyname = "PgUp";
-          break;
-        case 267:
-          keyname = "PgDown";
-          break;
-        case 340:
-          keyname = "LeftShift";
-          break;
-        case 347:
-          keyname = "LeftControl";
-          break;
-        case 341:
-          keyname = "LeftControl";
-          break;
-        case 343:
-          keyname = "RightControl";
-          break;
-        case 345:
-          keyname = "RghtControl";
-          break;
-        default:
-          keyname = "None";
-      }
-      if (keyname == "None") {
-        // LOG_F(INFO, "(key_callback) Unknown key: %d", key);
-      }
-    }
     if (self->imgui_io->WantCaptureKeyboard or
         self->imgui_io->WantCaptureMouse) {
       std::string current_view = self->CurrentView;
       for (size_t x = 0; x < self->event_stack.size(); x++) {
         if (self->event_stack.at(x)->view == current_view) {
-          auto type = self->event_stack.at(x)->type;
-          if ((type == "keyup" or type == "any") && action == 0) {
-            if (self->event_stack.at(x)->key == keyname) {
+          if (self->event_stack.at(x)->key == key) {
+            auto flags = self->event_stack.at(x)->action_flags;
+            if (flags & (1 << action)) {
               if (self->event_stack.at(x)->callback != NULL) {
-                self->event_stack.at(x)->callback(
-                  { { "type", "keyup" },
-                    { "key", keyname } });
-              }
-            }
-          }
-          else if ((type == "keydown" or type == "any") && action == 1) {
-            if (self->event_stack.at(x)->key == keyname) {
-              if (self->event_stack.at(x)->callback != NULL) {
-                self->event_stack.at(x)->callback(
-                  { { "type", "keydown" },
-                    { "key", keyname } });
-              }
-            }
-          }
-          else if ((type == "repeat" or type == "any") && action == 2) {
-            if (self->event_stack.at(x)->key == keyname) {
-              if (self->event_stack.at(x)->callback != NULL) {
-                self->event_stack.at(x)->callback(
-                  { { "type", "repeat" },
-                    { "key", keyname } });
+                self->event_stack.at(x)->callback({ { "key", key },
+                                                    { "action", 1 << action },
+                                                    { "mods", mods } });
               }
             }
           }
@@ -166,47 +93,15 @@ void EasyRender::mouse_button_callback(GLFWwindow* window,
   EasyRender* self =
     reinterpret_cast<EasyRender*>(glfwGetWindowUserPointer(window));
   if (self != NULL) {
-    std::string event;
-    if (button == 0) // Left click
-    {
-      if (action == 0) // Up
-      {
-        event = "left_click_up";
-      }
-      else if (action == 1) // Down
-      {
-        event = "left_click_down";
-      }
-    }
-    else if (button == 1) // Right Click
-    {
-      if (action == 0) // Up
-      {
-        event = "right_click_up";
-      }
-      else if (action == 1) // Down
-      {
-        event = "right_click_down";
-      }
-    }
-    else if (button == 2) // Middle Click
-    {
-      if (action == 0) // Up
-      {
-        event = "middle_click_up";
-      }
-      else if (action == 1) // Down
-      {
-        event = "middle_click_down";
-      }
-    }
     if (!self->imgui_io->WantCaptureKeyboard ||
         !self->imgui_io->WantCaptureMouse) {
       for (size_t x = 0; x < self->event_stack.size(); x++) {
         if (self->event_stack.at(x)->view == self->CurrentView) {
-          if (self->event_stack.at(x)->type == event) {
+          if (self->event_stack.at(x)->key == button) {
             if (self->event_stack.at(x)->callback != NULL) {
-              self->event_stack.at(x)->callback({ { "event", event } });
+              self->event_stack.at(x)->callback({ { "button", button },
+                                                  { "action", 1 << action },
+                                                  { "mods", mods } });
             }
           }
         }
@@ -227,10 +122,12 @@ void EasyRender::mouse_button_callback(GLFWwindow* window,
                                (*it)->properties->scale;
               (*it)->properties->mouse_callback(
                 (*it),
-                { { "event", event },
-                  { "mouse_pos", { { "x", m.x }, { "y", m.y } } },
+                { { "mouse_pos", { { "x", m.x }, { "y", m.y } } },
                   { "matrix_mouse_pos",
-                    { { "x", matrix_mouse.x }, { "y", matrix_mouse.y } } } });
+                    { { "x", matrix_mouse.x }, { "y", matrix_mouse.y } } },
+                  { "button", button },
+                  { "action", 1 << action },
+                  { "mods", mods } });
               return;
             }
           }
@@ -250,17 +147,8 @@ void EasyRender::scroll_callback(GLFWwindow* window,
         !self->imgui_io->WantCaptureMouse) {
       for (size_t x = 0; x < self->event_stack.size(); x++) {
         if (self->event_stack.at(x)->view == self->CurrentView) {
-          if (yoffset > 0) {
-            if (self->event_stack.at(x)->type == "scroll" &&
-                self->event_stack.at(x)->key == "up") {
-              self->event_stack.at(x)->callback({ { "scroll", yoffset } });
-            }
-          }
-          else {
-            if (self->event_stack.at(x)->type == "scroll" &&
-                self->event_stack.at(x)->key == "down") {
-              self->event_stack.at(x)->callback({ { "scroll", yoffset } });
-            }
+          if (self->event_stack.at(x)->event == EventType::Scroll) {
+            self->event_stack.at(x)->callback({ { "scroll", yoffset } });
           }
         }
       }
@@ -277,9 +165,9 @@ void EasyRender::cursor_position_callback(GLFWwindow* window,
     double_point_t m = self->GetWindowMousePosition();
     for (size_t x = 0; x < self->event_stack.size(); x++) {
       if (self->event_stack.at(x)->view == self->CurrentView) {
-        if (self->event_stack.at(x)->type == "mouse_move") {
+        if (self->event_stack.at(x)->event == EventType::MouseMove) {
           self->event_stack.at(x)->callback(
-            { { "event", "mouse_move" },
+            { { "event", EventType::MouseMove },
               { "pos", { { "x", m.x }, { "y", m.y } } } });
         }
       }
@@ -293,7 +181,7 @@ void EasyRender::window_size_callback(GLFWwindow* window, int width, int height)
   if (self != NULL) {
     for (size_t x = 0; x < self->event_stack.size(); x++) {
       if (self->event_stack.at(x)->view == self->CurrentView) {
-        if (self->event_stack.at(x)->type == "window_resize") {
+        if (self->event_stack.at(x)->event == EventType::WindowResize) {
           self->event_stack.at(x)->callback(
             { { "size", { { "width", width }, { "height", height } } } });
         }
@@ -407,17 +295,23 @@ EasyRender::PushGui(bool v, void (*c)(void* p), void* s)
   return g;
 }
 
-void EasyRender::PushEvent(std::string key,
-                           std::string type,
+void EasyRender::PushEvent(int                                  key,
+                           std::variant<ActionFlags, EventType> action_event,
                            void (*callback)(const nlohmann::json&))
 {
   EasyRenderEvent* e = new EasyRenderEvent;
   e->key = key;
-  e->type = type;
+  size_t idx = action_event.index();
+  if (std::holds_alternative<EventType>(action_event)) {
+    e->event = std::get<EventType>(action_event);
+  }
+  else {
+    e->action_flags = std::get<ActionFlags>(action_event);
+  }
   e->callback = callback;
   e->view = this->CurrentView;
   event_stack.push_back(e);
-  if (type == "window_resize" && this->Window != NULL) {
+  if (e->event == EventType::WindowResize && this->Window != NULL) {
     double_point_t size = this->GetWindowSize();
     this->WindowSize[0] = (int) size.x;
     this->WindowSize[1] = (int) size.y;
@@ -723,7 +617,11 @@ void EasyRender::DeletePrimitivesById(std::string id)
 bool EasyRender::Init(int argc, char** argv)
 {
   loguru::init(argc, argv);
+#ifdef DEBUG
   loguru::g_stderr_verbosity = 1;
+#else
+  loguru::g_stderr_verbosity = 0;
+#endif
   loguru::add_file(
     this->MainLogFileName.c_str(), loguru::Append, loguru::Verbosity_MAX);
   if (!glfwInit()) {
@@ -927,4 +825,26 @@ void EasyRender::Close()
   glfwTerminate();
   free(this->GuiIniFileName);
   free(this->GuiLogFileName);
+}
+
+uint32_t operator&(EasyRender::ActionFlags a, EasyRender::ActionFlagBits b)
+{
+  return static_cast<uint32_t>(a) & (+b);
+}
+
+EasyRender::ActionFlags operator&(EasyRender::ActionFlagBits a,
+                                  EasyRender::ActionFlagBits b)
+{
+  return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
+}
+
+EasyRender::ActionFlags operator|(EasyRender::ActionFlagBits a,
+                                  EasyRender::ActionFlagBits b)
+{
+  return static_cast<uint32_t>(a) | static_cast<uint32_t>(b);
+}
+
+EasyRender::ActionFlags operator+(EasyRender::ActionFlagBits a)
+{
+  return static_cast<EasyRender::ActionFlags>(a);
 }

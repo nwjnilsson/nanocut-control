@@ -79,7 +79,7 @@ void easy_serial::tick()
                         {
                             if (this->read_line_handler != NULL) 
                             {
-                                LOG_F(INFO, "Handling line %s", this->read_line.c_str());
+                                DLOG_F(INFO, "Handling line %s", this->read_line.c_str());
                                 this->read_line_handler(this->read_line);
                             }
                         }
