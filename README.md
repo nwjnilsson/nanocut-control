@@ -26,7 +26,7 @@ whole thing...
 - Add support for click-and-drag movement of the control view (press and hold right click)
 - Much more robust DXF importer.
 
-![deer](extra/deer.png "High quality DXF importing for gcode generation")
+![deer](assets/deer.png "High quality DXF importing for gcode generation")
 
 ## Important notes on using this software
 - If you intend to use imperial units for your machine, go into `include/config.h`
