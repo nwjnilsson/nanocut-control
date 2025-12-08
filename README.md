@@ -48,25 +48,12 @@ torch_off
 M30
 ```
 
-# Windows Build Instructions
-- Install MSYS2
-- pacman -Syu
-- pacman -Su
-- pacman -S mingw-w64-x86_64-toolchain
-- pacman --noconfirm -S mingw64/mingw-w64-x86_64-glfw mingw64/mingw-w64-x86_64-freeglut
-- PATH=$PATH:/mingw64/bin/
-- cd /path/to/this/repo
-- mingw32-make.exe
-- ./NanoCut
-
-# Linux (Debian) Build Instructions
-- sudo apt-get -y install build-essential libglfw3-dev mesa-common-dev libglu1-mesa-dev freeglut3-dev libzlib1-dev
-- cd /path/to/this/repo
-- make
-- ./NanoCut
-
-# MacOSX Build Instructions
-- brew install glfw
-- cd /path/to/this/repo
-- make
-- ./NanoCut
+# Building
+Building should be roughly the same for all platforms when using CMake. See
+`shell.nix` for a list of what you will (roughly) need to build.
+```
+mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=<..> -DCMAKE_BUILD_TYPE=Release
+make install
+./NanoCut
+```

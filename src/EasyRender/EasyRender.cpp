@@ -473,19 +473,17 @@ std::string EasyRender::GetEvironmentVariable(const std::string& var)
 std::string EasyRender::GetConfigDirectory()
 {
   struct stat info;
-#ifdef __linux__
-  std::string path =
-    this->GetEvironmentVariable("HOME") + "/.config/" + this->WindowTitle + "/";
-  if (stat(path.c_str(), &info) != 0) {
-    LOG_F(INFO,
-          "(EasyRender::GetConfigDirectory) %s does not exist, creating it!",
-          path.c_str());
-    mkdir(path.c_str(), (mode_t) 0733);
-  }
-  return path;
+  std::string path = CONFIG_DIRECTORY;
+  
+  // Expand environment variables in the path
+#ifdef _WIN32
+  path = this->GetEvironmentVariable("APPDATA") + "/NanoCut/";
 #elif __APPLE__
-  std::string path =
-    this->GetEvironmentVariable("HOME") + "/Library/" + this->WindowTitle + "/";
+  path = this->GetEvironmentVariable("HOME") + "/Library/NanoCut/";
+#else // Linux and other Unix-like systems
+  path = this->GetEvironmentVariable("HOME") + "/.config/NanoCut/";
+#endif
+  
   if (stat(path.c_str(), &info) != 0) {
     LOG_F(INFO,
           "(EasyRender::GetConfigDirectory) %s does not exist, creating it!",
@@ -493,20 +491,6 @@ std::string EasyRender::GetConfigDirectory()
     mkdir(path.c_str(), (mode_t) 0733);
   }
   return path;
-#elif _WIN32
-  std::string path =
-    this->GetEvironmentVariable("APPDATA") + "\\" + this->WindowTitle + "\\";
-  if (stat(path.c_str(), &info) != 0) {
-    LOG_F(INFO,
-          "(EasyRender::GetConfigDirectory) %s does not exist, creating it!",
-          path.c_str());
-    mkdir(path.c_str());
-  }
-  return path;
-#else
-#  error Platform not supported! Must be Linux, OSX, or Windows
-  return "";
-#endif
 }
 
 double_point_t EasyRender::GetWindowMousePosition()

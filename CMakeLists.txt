@@ -45,6 +45,23 @@ target_include_directories(NanoCut PRIVATE src)
 
 #
 # ------------------------------------------------------------
+# Platform-specific config directory setup
+# ------------------------------------------------------------
+#
+if(WIN32)
+    set(CONFIG_DIR "$ENV{APPDATA}/NanoCut")
+elseif(APPLE)
+    set(CONFIG_DIR "$ENV{HOME}/Library/NanoCut")
+else() # Linux and other Unix-like systems
+    set(CONFIG_DIR "$ENV{HOME}/.config/NanoCut")
+endif()
+
+target_compile_definitions(NanoCut PRIVATE 
+    CONFIG_DIRECTORY="${CONFIG_DIR_DEFINE}"
+)
+
+#
+# ------------------------------------------------------------
 # Git versioning (mirrors Makefile)
 # ------------------------------------------------------------
 #
@@ -133,6 +150,9 @@ target_link_libraries(NanoCut PRIVATE z m)
 # ------------------------------------------------------------
 #
 install(TARGETS NanoCut DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+
+# Install fonts to system data directory
+install(DIRECTORY assets/fonts/ DESTINATION ${CONFIG_DIR}/fonts)
 
 #
 # ------------------------------------------------------------
