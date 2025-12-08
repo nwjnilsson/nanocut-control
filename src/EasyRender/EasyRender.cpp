@@ -65,8 +65,8 @@ void EasyRender::key_callback(
   EasyRender* self =
     reinterpret_cast<EasyRender*>(glfwGetWindowUserPointer(window));
   if (self != NULL) {
-    if (self->imgui_io->WantCaptureKeyboard or
-        self->imgui_io->WantCaptureMouse) {
+    if (not self->imgui_io->WantCaptureKeyboard and
+        not self->imgui_io->WantCaptureMouse) {
       std::string current_view = self->CurrentView;
       for (size_t x = 0; x < self->event_stack.size(); x++) {
         if (self->event_stack.at(x)->view == current_view) {

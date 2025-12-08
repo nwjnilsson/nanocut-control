@@ -3,6 +3,7 @@
 
 #include <application.h>
 #include <EasyRender/EasyRender.h>
+#include <functional>
 
 void dialogs_show_machine_parameters(bool s);
 
@@ -28,7 +29,9 @@ void dialogs_set_controller_homing_value(std::string i);
 
 void dialogs_show_thc_window(bool s);
 
-void dialogs_ask_yes_no(std::string a, void (*y)(PrimitiveContainer *), void (*n)(PrimitiveContainer *), PrimitiveContainer *args);
+void dialogs_ask_yes_no(std::string a, 
+                        std::function<void()> yes_callback, 
+                        std::function<void()> no_callback = nullptr);
 
 void dialogs_init();
 

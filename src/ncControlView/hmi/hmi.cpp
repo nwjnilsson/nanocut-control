@@ -15,6 +15,8 @@ EasyPrimitive::Path*            arc_okay_highlight_path;
 dro_group_data_t                dro;
 std::vector<hmi_button_group_t> button_groups;
 
+static void hmi_go_to_waypoint(PrimitiveContainer* args);
+
 void hmi_get_bounding_box(double_point_t* bbox_min, double_point_t* bbox_max)
 {
   std::vector<PrimitiveContainer*>* stack =
@@ -463,9 +465,7 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
       globals->renderer->SetColorByName(c->properties->color, "light-green");
       dialogs_ask_yes_no(
         "Are you sure you want to reverse this paths direction?",
-        &hmi_reverse,
-        NULL,
-        c);
+        [c]() { hmi_reverse(c); });
     }
     else if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
       globals->renderer->SetColorByName(c->properties->color, "green");
@@ -480,9 +480,7 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
       globals->renderer->SetColorByName(c->properties->color, "light-green");
       dialogs_ask_yes_no(
         "Are you sure you want to start the program at this path?",
-        &hmi_jumpin,
-        NULL,
-        c);
+        [c]() { hmi_jumpin(c); });
     }
   }
   else if (not((int) e["mods"] & GLFW_MOD_CONTROL)) {
@@ -495,9 +493,25 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
                 "Add waypoint position [%f, %f]",
                 globals->mouse_pos_in_matrix_coordinates.x,
                 globals->mouse_pos_in_matrix_coordinates.y);
-          // TODO: display waypoint, show popup. Go here?
           globals->nc_control_view->way_point_position =
             globals->mouse_pos_in_matrix_coordinates;
+
+          // Show waypoint on machine plane
+          globals->nc_control_view->waypoint_pointer->center = {
+            globals->mouse_pos_in_matrix_coordinates.x,
+            globals->mouse_pos_in_matrix_coordinates.y
+          };
+          globals->nc_control_view->waypoint_pointer->properties->visible =
+            true;
+
+          // Show popup asking user if they want to go to this location
+          dialogs_ask_yes_no(
+            "Go to waypoint position?",
+            []() { hmi_go_to_waypoint(nullptr); },
+            []() {
+              globals->nc_control_view->waypoint_pointer->properties->visible =
+                false;
+            });
         }
       }
       catch (...) {
@@ -552,6 +566,12 @@ void hmi_view_matrix(PrimitiveContainer* p)
       p->properties->offset[1] = globals->pan.y;
       p->properties->scale = globals->zoom;
       p->circle->radius = 5.0f / globals->zoom;
+    }
+    else if (p->properties->id == "waypoint_pointer") {
+      p->properties->offset[0] = globals->pan.x;
+      p->properties->offset[1] = globals->pan.y;
+      p->properties->scale = globals->zoom;
+      p->circle->radius = 8.0f / globals->zoom;
     }
     else {
       p->properties->offset[0] = globals->pan.x;
@@ -824,6 +844,35 @@ void hmi_tab_key_up_callback(const nlohmann::json& e)
       to_string_strip_zeros(globals->nc_control_view->way_point_position.y));
     motion_controller_push_stack("M30");
     motion_controller_run_stack();
+    globals->nc_control_view->way_point_position.x =
+      std::numeric_limits<int>::min();
+    globals->nc_control_view->way_point_position.y =
+      std::numeric_limits<int>::min();
+  }
+}
+
+void hmi_go_to_waypoint(PrimitiveContainer* args)
+{
+  if (globals->nc_control_view->way_point_position.x !=
+        std::numeric_limits<int>::min() &&
+      globals->nc_control_view->way_point_position.y !=
+        std::numeric_limits<int>::min()) {
+    LOG_F(INFO,
+          "Going to waypoint position: X%.4f Y%.4f",
+          globals->nc_control_view->way_point_position.x,
+          globals->nc_control_view->way_point_position.y);
+    motion_controller_push_stack(
+      "G53 G0 X-" +
+      to_string_strip_zeros(globals->nc_control_view->way_point_position.x) +
+      " Y-" +
+      to_string_strip_zeros(globals->nc_control_view->way_point_position.y));
+    motion_controller_push_stack("M30");
+    motion_controller_run_stack();
+
+    // Hide waypoint pointer after going to location
+    globals->nc_control_view->waypoint_pointer->properties->visible = false;
+
+    // Clear waypoint position
     globals->nc_control_view->way_point_position.x =
       std::numeric_limits<int>::min();
     globals->nc_control_view->way_point_position.y =
@@ -1271,6 +1320,17 @@ void hmi_init()
     globals->nc_control_view->torch_pointer->properties->color, "green");
   globals->nc_control_view->torch_pointer->properties->matrix_callback =
     globals->nc_control_view->view_matrix;
+
+  globals->nc_control_view->waypoint_pointer = globals->renderer->PushPrimitive(
+    new EasyPrimitive::Circle({ -100000, -100000 }, 8));
+  globals->nc_control_view->waypoint_pointer->properties->zindex = 501;
+  globals->nc_control_view->waypoint_pointer->properties->id =
+    "waypoint_pointer";
+  globals->renderer->SetColorByName(
+    globals->nc_control_view->waypoint_pointer->properties->color, "orange");
+  globals->nc_control_view->waypoint_pointer->properties->matrix_callback =
+    globals->nc_control_view->view_matrix;
+  globals->nc_control_view->waypoint_pointer->properties->visible = false;
 
   // globals->renderer->PushEvent(GLFW_KEY_TAB,
   //                              +EasyRender::ActionFlagBits::Release,

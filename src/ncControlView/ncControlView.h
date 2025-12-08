@@ -53,6 +53,7 @@ public:
   EasyPrimitive::Box*       machine_plane;
   EasyPrimitive::Box*       cuttable_plane;
   EasyPrimitive::Circle*    torch_pointer;
+  EasyPrimitive::Circle*    waypoint_pointer;
   machine_parameters_data_t machine_parameters;
   double_point_t            way_point_position;
   void (*view_matrix)(PrimitiveContainer* p);
