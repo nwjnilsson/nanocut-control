@@ -72,7 +72,9 @@ void        EasyPrimitive::Part::process_mouse(float mpos_x, float mpos_y)
       if (mouse_is_over_path == true) {
         if (this->properties->mouse_over == false) {
           this->mouse_event = {
-            { "event", EasyRender::EventType::MouseIn },
+            {
+              "event",
+            },
             { "path_index", path_index },
             { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
           };
@@ -82,7 +84,7 @@ void        EasyPrimitive::Part::process_mouse(float mpos_x, float mpos_y)
       else {
         if (this->properties->mouse_over == true) {
           this->mouse_event = {
-            { "event", EasyRender::EventType::MouseOut },
+            { "event", "mouse_out" },
             { "path_index", path_index },
             { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
           };

@@ -97,7 +97,7 @@ void hmi_handle_button(std::string id)
         LOG_F(INFO, "Clicked Zero X");
         try {
           globals->nc_control_view->machine_parameters.work_offset[0] =
-            static_cast<float>(motion_controller_get_dro()["MCS"]["x"]);
+            motion_controller_get_dro()["MCS"]["x"].get<float>();
           motion_controller_push_stack(
             "G10 L2 P0 X" +
             to_string_strip_zeros(
@@ -114,7 +114,7 @@ void hmi_handle_button(std::string id)
         LOG_F(INFO, "Clicked Zero Y");
         try {
           globals->nc_control_view->machine_parameters.work_offset[1] =
-            static_cast<float>(motion_controller_get_dro()["MCS"]["y"]);
+            motion_controller_get_dro()["MCS"]["y"].get<float>();
           motion_controller_push_stack(
             "G10 L2 P0 Y" +
             to_string_strip_zeros(
@@ -444,11 +444,11 @@ void hmi_reverse(PrimitiveContainer* p)
 
 void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
 {
-  if (e.contains("event")) {
-    auto event = e.at("event").get<EasyRender::EventType>();
-    if (c->type == "path" && c->properties->id == "gcode") {
+  if (c->type == "path" && c->properties->id == "gcode") {
+    if (e.contains("event")) {
+      auto event = e.at("event").get<EasyRender::EventType>();
       if (event == EasyRender::EventType::MouseIn and
-          ((int) e["mods"] & GLFW_MOD_CONTROL)) {
+          (globals->nc_control_view->mods & GLFW_MOD_CONTROL)) {
         // LOG_F(INFO, "Start Line => %lu", (unsigned
         // long)o->data["rapid_line"]);
         globals->renderer->SetColorByName(c->properties->color, "light-green");
@@ -458,49 +458,79 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
         globals->renderer->SetColorByName(c->properties->color, "white");
       }
     }
+    else if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_1) {
+      if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
+        if (e["action"] & EasyRender::ActionFlagBits::Press) {
+          globals->renderer->SetColorByName(c->properties->color, "green");
+        }
+        else if (e["action"] & EasyRender::ActionFlagBits::Release) {
+          globals->renderer->SetColorByName(c->properties->color,
+                                            "light-green");
+          dialogs_ask_yes_no(
+            "Are you sure you want to start the program at this path?",
+            [c]() { hmi_jumpin(c); });
+        }
+      }
+    }
+    else if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_2) {
+      if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
+        if (e["action"].get<int>() & EasyRender::ActionFlagBits::Release) {
+          globals->renderer->SetColorByName(c->properties->color,
+                                            "light-green");
+          dialogs_ask_yes_no(
+            "Are you sure you want to reverse this paths direction?",
+            [c]() { hmi_reverse(c); });
+        }
+        else if (e["action"].get<int>() & EasyRender::ActionFlagBits::Press) {
+          globals->renderer->SetColorByName(c->properties->color, "green");
+        }
+      }
+    }
   }
-  else if ((int) e["button"] == GLFW_MOUSE_BUTTON_2 and
-           ((int) e["mods"] & GLFW_MOD_CONTROL)) {
-    if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
-      globals->renderer->SetColorByName(c->properties->color, "light-green");
-      dialogs_ask_yes_no(
-        "Are you sure you want to reverse this paths direction?",
-        [c]() { hmi_reverse(c); });
+  else if (c->type == "box" && c->properties->id != "cuttable_plane" &&
+           c->properties->id != "machine_plane") {
+    if (e.contains("event")) {
+      auto event = e.at("event").get<EasyRender::EventType>();
+      if (event == EasyRender::EventType::MouseIn) {
+        globals->renderer->SetColorByName(c->properties->color, "light-green");
+      }
+      else if (event == EasyRender::EventType::MouseOut) {
+        globals->renderer->SetColorByName(c->properties->color, "black");
+      }
     }
-    else if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
-      globals->renderer->SetColorByName(c->properties->color, "green");
-    }
-  }
-  else if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
-           ((int) e["mods"] & GLFW_MOD_CONTROL)) {
-    if (e["action"] & EasyRender::ActionFlagBits::Press) {
-      globals->renderer->SetColorByName(c->properties->color, "green");
-    }
-    else if (e["action"] & EasyRender::ActionFlagBits::Release) {
-      globals->renderer->SetColorByName(c->properties->color, "light-green");
-      dialogs_ask_yes_no(
-        "Are you sure you want to start the program at this path?",
-        [c]() { hmi_jumpin(c); });
+    else if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_1) {
+      if (e["action"].get<int>() & EasyRender::ActionFlagBits::Press) {
+        globals->renderer->SetColorByName(c->properties->color, "green");
+      }
+      if (e["action"].get<int>() & EasyRender::ActionFlagBits::Release) {
+        globals->renderer->SetColorByName(c->properties->color, "light-green");
+        hmi_handle_button(c->properties->id);
+      }
     }
   }
-  else if (not((int) e["mods"] & GLFW_MOD_CONTROL)) {
-    if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
-        (int) e["action"] & EasyRender::ActionFlagBits::Release) {
+  else if ((c->properties->id == "cuttable_plane" or
+            c->properties->id == "machine_plane") and
+           e.contains("button")) {
+    const auto  p = globals->mouse_pos_in_matrix_coordinates;
+    const auto* cp = globals->nc_control_view->cuttable_plane;
+    const auto  bl = cp->bottom_left;
+    // double check point against cuttable plane in case it was
+    // "machine_plane" that triggered this code path
+    bool is_within = p.x >= bl.x and p.x <= bl.x + cp->width and p.y >= bl.y and
+                     p.y <= bl.y + cp->height;
+    if (not is_within) {
+      return;
+    }
+    if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_1 and
+        e["action"].get<int>() & EasyRender::ActionFlagBits::Release) {
       nlohmann::json dro_data = motion_controller_get_dro();
       try {
         if (dro_data["IN_MOTION"] == false) {
-          LOG_F(INFO,
-                "Add waypoint position [%f, %f]",
-                globals->mouse_pos_in_matrix_coordinates.x,
-                globals->mouse_pos_in_matrix_coordinates.y);
-          globals->nc_control_view->way_point_position =
-            globals->mouse_pos_in_matrix_coordinates;
+          LOG_F(INFO, "Add waypoint position [%f, %f]", p.x, p.y);
+          globals->nc_control_view->way_point_position = p;
 
           // Show waypoint on machine plane
-          globals->nc_control_view->waypoint_pointer->center = {
-            globals->mouse_pos_in_matrix_coordinates.x,
-            globals->mouse_pos_in_matrix_coordinates.y
-          };
+          globals->nc_control_view->waypoint_pointer->center = p;
           globals->nc_control_view->waypoint_pointer->properties->visible =
             true;
 
@@ -516,29 +546,6 @@ void hmi_mouse_callback(PrimitiveContainer* c, const nlohmann::json& e)
       }
       catch (...) {
         LOG_F(ERROR, "Error parsing DRO Data!");
-      }
-    }
-  }
-  if (c->type == "box" && c->properties->id != "cuttable_plane" &&
-      c->properties->id != "machine_plane") {
-    if (e.contains("event")) {
-      auto event = e.at("event").get<EasyRender::EventType>();
-      if (event == EasyRender::EventType::MouseIn) {
-        globals->renderer->SetColorByName(c->properties->color, "light-green");
-      }
-      else if (event == EasyRender::EventType::MouseOut) {
-        globals->renderer->SetColorByName(c->properties->color, "black");
-      }
-    }
-    else {
-      if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
-          (int) e["action"] & EasyRender::ActionFlagBits::Press) {
-        globals->renderer->SetColorByName(c->properties->color, "green");
-      }
-      if ((int) e["button"] == GLFW_MOUSE_BUTTON_1 and
-          (int) e["action"] & EasyRender::ActionFlagBits::Release) {
-        globals->renderer->SetColorByName(c->properties->color, "light-green");
-        hmi_handle_button(c->properties->id);
       }
     }
   }
@@ -602,77 +609,84 @@ void hmi_view_matrix(PrimitiveContainer* p)
 bool hmi_update_timer()
 {
   nlohmann::json dro_data = motion_controller_get_dro();
-  if (dro_data.contains("STATUS")) {
-    // { "STATUS": "Idle", "MCS": { "x": 0.000,"y": 0.000,"z": 0.000 }, "WCS": {
-    // "x": -4.594,"y": -3.260,"z": 0.000 }, "FEED": 0, "ADC": 0, "IN_MOTION":
-    // false, "ARC_OK": true }
-    const float wcx = static_cast<float>(dro_data["WCS"]["x"]);
-    const float wcy = static_cast<float>(dro_data["WCS"]["y"]);
-    const float wcz = static_cast<float>(dro_data["WCS"]["z"]);
-    dro.x.work_readout->textval = to_fixed_string(abs(wcx), 4);
-    dro.y.work_readout->textval = to_fixed_string(abs(wcy), 4);
-    dro.z.work_readout->textval = to_fixed_string(abs(wcz), 4);
-    const double mcx = static_cast<float>(dro_data["MCS"]["x"]);
-    const double mcy = static_cast<float>(dro_data["MCS"]["y"]);
-    const double mcz = static_cast<float>(dro_data["MCS"]["z"]);
-    dro.x.absolute_readout->textval = to_fixed_string(abs(mcx), 4);
-    dro.y.absolute_readout->textval = to_fixed_string(abs(mcy), 4);
-    dro.z.absolute_readout->textval = to_fixed_string(abs(mcz), 4);
-    dro.feed->textval =
-      "FEED: " + to_fixed_string(static_cast<float>(dro_data["FEED"]), 1);
-    dro.arc_readout->textval =
-      "ARC: " +
-      to_fixed_string(adc_sample_to_voltage(static_cast<int>(dro_data["ADC"])),
-                      1) +
-      "V";
-    dro.arc_set->textval =
-      "SET: " +
-      to_fixed_string(
-        globals->nc_control_view->machine_parameters.thc_set_value, 1);
-    nlohmann::json runtime = motion_controller_get_run_time();
-    if (runtime != NULL)
-      dro.run_time->textval =
-        "RUN: " + to_string_strip_zeros((int) runtime["hours"]) + ":" +
-        to_string_strip_zeros((int) runtime["minutes"]) + ":" +
-        to_string_strip_zeros((int) runtime["seconds"]);
-    globals->nc_control_view->torch_pointer->center = { abs(mcx), abs(mcy) };
-    if (motion_controller_is_torch_on()) {
-      hmi_dro_backpane->properties->color[0] = 100;
-      hmi_dro_backpane->properties->color[1] = 32;
-      hmi_dro_backpane->properties->color[2] = 48;
-    }
-    else {
-      hmi_dro_backpane->properties->color[0] = 29;
-      hmi_dro_backpane->properties->color[1] = 32;
-      hmi_dro_backpane->properties->color[2] = 48;
-    }
-    if ((bool) dro_data["ARC_OK"] == false) {
-      globals->renderer->SetColorByName(dro.arc_readout->properties->color,
-                                        "red");
-      // Keep adding points to current highlight path
-      if (arc_okay_highlight_path == NULL) {
-        std::vector<double_point_t> path;
-        path.push_back({ wcx, wcy });
-        arc_okay_highlight_path =
-          globals->renderer->PushPrimitive(new EasyPrimitive::Path(path));
-        arc_okay_highlight_path->properties->id = "gcode_highlights";
-        arc_okay_highlight_path->is_closed = false;
-        arc_okay_highlight_path->width = 3;
-        globals->renderer->SetColorByName(
-          arc_okay_highlight_path->properties->color, "green");
-        arc_okay_highlight_path->properties->matrix_callback =
-          globals->nc_control_view->view_matrix;
+  try {
+    if (dro_data.contains("STATUS")) {
+      // { "STATUS": "Idle", "MCS": { "x": 0.000,"y": 0.000,"z": 0.000 },
+      // "WCS": { "x": -4.594,"y": -3.260,"z": 0.000 }, "FEED": 0, "V": 0,
+      // "IN_MOTION": false, "ARC_OK": true }
+      const float wcx = dro_data["WCS"]["x"].get<float>();
+      const float wcy = dro_data["WCS"]["y"].get<float>();
+      const float wcz = dro_data["WCS"]["z"].get<float>();
+      dro.x.work_readout->textval = to_fixed_string(abs(wcx), 4);
+      dro.y.work_readout->textval = to_fixed_string(abs(wcy), 4);
+      dro.z.work_readout->textval = to_fixed_string(abs(wcz), 4);
+      const float mcx = dro_data["MCS"]["x"].get<float>();
+      const float mcy = dro_data["MCS"]["y"].get<float>();
+      const float mcz = dro_data["MCS"]["z"].get<float>();
+      dro.x.absolute_readout->textval = to_fixed_string(abs(mcx), 4);
+      dro.y.absolute_readout->textval = to_fixed_string(abs(mcy), 4);
+      dro.z.absolute_readout->textval = to_fixed_string(abs(mcz), 4);
+      dro.feed->textval =
+        "FEED: " + to_fixed_string(dro_data["FEED"].get<float>(), 1);
+      dro.arc_readout->textval =
+        "ARC: " +
+        to_fixed_string(
+          dro_data.at("V").get<int>() *
+            globals->nc_control_view->machine_parameters.arc_voltage_divider,
+          1) +
+        "V";
+      dro.arc_set->textval =
+        "SET: " +
+        to_fixed_string(
+          globals->nc_control_view->machine_parameters.thc_set_value, 1);
+      nlohmann::json runtime = motion_controller_get_run_time();
+      if (runtime != NULL)
+        dro.run_time->textval =
+          "RUN: " + to_string_strip_zeros((int) runtime["hours"]) + ":" +
+          to_string_strip_zeros((int) runtime["minutes"]) + ":" +
+          to_string_strip_zeros((int) runtime["seconds"]);
+      globals->nc_control_view->torch_pointer->center = { abs(mcx), abs(mcy) };
+      if (motion_controller_is_torch_on()) {
+        hmi_dro_backpane->properties->color[0] = 100;
+        hmi_dro_backpane->properties->color[1] = 32;
+        hmi_dro_backpane->properties->color[2] = 48;
       }
       else {
-        arc_okay_highlight_path->points.push_back({ wcx, wcy });
+        hmi_dro_backpane->properties->color[0] = 29;
+        hmi_dro_backpane->properties->color[1] = 32;
+        hmi_dro_backpane->properties->color[2] = 48;
+      }
+      if ((bool) dro_data["ARC_OK"] == false) {
+        globals->renderer->SetColorByName(dro.arc_readout->properties->color,
+                                          "red");
+        // Keep adding points to current highlight path
+        if (arc_okay_highlight_path == NULL) {
+          std::vector<double_point_t> path;
+          path.push_back({ wcx, wcy });
+          arc_okay_highlight_path =
+            globals->renderer->PushPrimitive(new EasyPrimitive::Path(path));
+          arc_okay_highlight_path->properties->id = "gcode_highlights";
+          arc_okay_highlight_path->is_closed = false;
+          arc_okay_highlight_path->width = 3;
+          globals->renderer->SetColorByName(
+            arc_okay_highlight_path->properties->color, "green");
+          arc_okay_highlight_path->properties->matrix_callback =
+            globals->nc_control_view->view_matrix;
+        }
+        else {
+          arc_okay_highlight_path->points.push_back({ wcx, wcy });
+        }
+      }
+      else {
+        arc_okay_highlight_path = NULL;
+        dro.arc_readout->properties->color[0] = 247;
+        dro.arc_readout->properties->color[1] = 104;
+        dro.arc_readout->properties->color[2] = 15;
       }
     }
-    else {
-      arc_okay_highlight_path = NULL;
-      dro.arc_readout->properties->color[0] = 247;
-      dro.arc_readout->properties->color[1] = 104;
-      dro.arc_readout->properties->color[2] = 15;
-    }
+  }
+  catch (const nlohmann::json::out_of_range& e) {
+    LOG_F(ERROR, "Failed to parse controller data: %s", e.what());
   }
   return true;
 }
@@ -891,9 +905,9 @@ void hmi_up_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
-          (int) e["action"] == GLFW_REPEAT) {
-        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
+      if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Press) ||
+          e["action"].get<int>() == GLFW_REPEAT) {
+        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y positive %s", dist.c_str());
@@ -913,8 +927,8 @@ void hmi_up_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] & EasyRender::ActionFlagBits::Release and
-        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
+    if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Release) and
+        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y positive jog!");
       hmi_handle_button("Abort");
@@ -930,9 +944,9 @@ void hmi_down_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
-          (int) e["action"] == GLFW_REPEAT) {
-        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
+      if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Press) ||
+          e["action"].get<int>() == GLFW_REPEAT) {
+        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y negative %s!", dist.c_str());
@@ -949,8 +963,8 @@ void hmi_down_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] & EasyRender::ActionFlagBits::Release &&
-        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
+    if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Release) &&
+        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y negative jog!");
       hmi_handle_button("Abort");
@@ -966,9 +980,9 @@ void hmi_right_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
-          (int) e["action"] == GLFW_REPEAT) {
-        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
+      if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Press) ||
+          e["action"].get<int>() == GLFW_REPEAT) {
+        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X positive %s!", dist.c_str());
@@ -988,8 +1002,8 @@ void hmi_right_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] & EasyRender::ActionFlagBits::Release &&
-        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
+    if (e["action"].get<int>() & EasyRender::ActionFlagBits::Release &&
+        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Positive jog!");
       hmi_handle_button("Abort");
@@ -1004,9 +1018,9 @@ void hmi_left_key_callback(const nlohmann::json& e)
   try {
     nlohmann::json dro_data = motion_controller_get_dro();
     if (dro_data["STATUS"] == "IDLE") {
-      if ((int) e["action"] & EasyRender::ActionFlagBits::Press ||
-          (int) e["action"] == GLFW_REPEAT) {
-        if (((int) e["mods"]) & GLFW_MOD_CONTROL) {
+      if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Press) ||
+          e["action"].get<int>() == GLFW_REPEAT) {
+        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
           std::string dist = std::to_string(
             globals->nc_control_view->machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X negative %s!", dist.c_str());
@@ -1023,8 +1037,8 @@ void hmi_left_key_callback(const nlohmann::json& e)
         }
       }
     }
-    if ((int) e["action"] & EasyRender::ActionFlagBits::Release &&
-        not(((int) e["mods"]) & GLFW_MOD_CONTROL)) {
+    if ((e["action"].get<int>() & EasyRender::ActionFlagBits::Release) &&
+        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Negative jog!");
       hmi_handle_button("Abort");
@@ -1036,7 +1050,7 @@ void hmi_left_key_callback(const nlohmann::json& e)
 }
 void hmi_page_up_key_callback(const nlohmann::json& e)
 {
-  if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
+  if (e["action"].get<int>() & EasyRender::ActionFlagBits::Press) {
     if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
       motion_controller_send_rt('<');
     }
@@ -1044,7 +1058,7 @@ void hmi_page_up_key_callback(const nlohmann::json& e)
       motion_controller_send_rt('>');
     }
   }
-  else if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
+  else if (e["action"].get<int>() & EasyRender::ActionFlagBits::Release) {
     motion_controller_send_rt('^');
   }
   /*try
@@ -1085,7 +1099,7 @@ void hmi_page_up_key_callback(const nlohmann::json& e)
 }
 void hmi_page_down_key_callback(const nlohmann::json& e)
 {
-  if ((int) e["action"] & EasyRender::ActionFlagBits::Press) {
+  if (e["action"].get<int>() & EasyRender::ActionFlagBits::Press) {
     if (globals->nc_control_view->machine_parameters.homing_dir_invert[2]) {
       motion_controller_send_rt('>');
     }
@@ -1093,7 +1107,7 @@ void hmi_page_down_key_callback(const nlohmann::json& e)
       motion_controller_send_rt('<');
     }
   }
-  else if ((int) e["action"] & EasyRender::ActionFlagBits::Release) {
+  else if (e["action"].get<int>() & EasyRender::ActionFlagBits::Release) {
     motion_controller_send_rt('^');
   }
   /*try
@@ -1142,8 +1156,10 @@ void hmi_mouse_motion_callback(const nlohmann::json& e)
   }
   globals->mouse_pos_in_screen_coordinates = point;
   globals->mouse_pos_in_matrix_coordinates = {
-    ((double) e["pos"]["x"] / globals->zoom) - (globals->pan.x / globals->zoom),
-    ((double) e["pos"]["y"] / globals->zoom) - (globals->pan.y / globals->zoom)
+    e["pos"]["x"].get<double>() / globals->zoom -
+      (globals->pan.x / globals->zoom),
+    e["pos"]["y"].get<double>() / globals->zoom -
+      (globals->pan.y / globals->zoom)
   };
 }
 void hmi_init()

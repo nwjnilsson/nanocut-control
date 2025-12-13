@@ -474,7 +474,7 @@ std::string EasyRender::GetConfigDirectory()
 {
   struct stat info;
   std::string path = CONFIG_DIRECTORY;
-  
+
   // Expand environment variables in the path
 #ifdef _WIN32
   path = this->GetEvironmentVariable("APPDATA") + "/NanoCut/";
@@ -483,7 +483,7 @@ std::string EasyRender::GetConfigDirectory()
 #else // Linux and other Unix-like systems
   path = this->GetEvironmentVariable("HOME") + "/.config/NanoCut/";
 #endif
-  
+
   if (stat(path.c_str(), &info) != 0) {
     LOG_F(INFO,
           "(EasyRender::GetConfigDirectory) %s does not exist, creating it!",

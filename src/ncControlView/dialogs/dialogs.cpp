@@ -360,7 +360,7 @@ void dialogs_controller_homing_window()
   ImGui::End();
 }
 
-void dialogs_ask_yes_no(std::string a,
+void dialogs_ask_yes_no(std::string           a,
                         std::function<void()> yes_callback,
                         std::function<void()> no_callback)
 {
@@ -395,29 +395,23 @@ void dialogs_thc_window()
   ImGui::Begin("Torch Height Control",
                &thc_window_handle->visible,
                ImGuiWindowFlags_AlwaysAutoResize);
-  // ImGui::Text("Smart THC mode automatically sets the \"set voltage\" that is
-  // measured shortly\nafter the torch pierces and moves negative to cut
-  // height.\n By doing this, the THC should maintain approximately\nthe same
-  // cut height as is set in the cutting parameters."); ImGui::BulletText("Smart
-  // THC Should not be used on thin materials that warp when the torch touches
-  // off!"); ImGui::Separator(); ImGui::Checkbox("Turn on Auto THC Setting
-  // Mode", &globals->nc_control_view->machine_parameters.smart_thc_on);
   ImGui::Separator();
-  // ImGui::Text("When Smart THC is off (Not Checked) the THC set voltage set
-  // below will be used");
 
-  const float min_threshold = adc_sample_to_voltage(THC_MIN_THRESHOLD - 1);
-  float& current = globals->nc_control_view->machine_parameters.thc_set_value;
-  const std::string state = current > min_threshold ? "ON" : "OFF";
-  ImGui::Text("Current: %sV (%s). A target of %dV is required to activate THC. "
-              "Press tab to enter a value directly.",
-              to_string_with_precision(current, 0).c_str(),
-              state.c_str(),
-              static_cast<int>(min_threshold));
+  static float new_value =
+    globals->nc_control_view->machine_parameters.thc_set_value;
+  ImGui::Text("New target is set on next touch-off.");
   ImGui::Separator();
-  int thc_set = voltage_to_adc_sample(current);
-  ImGui::SliderInt("Set Voltage", &thc_set, 0, ADC_RESOLUTION - 1);
-  current = adc_sample_to_voltage(thc_set);
+  ImGui::InputFloat("Set Voltage", &new_value, 0.1f, 0.5f);
+  new_value = std::clamp(new_value, 0.f, 200.f);
+
+  if (ImGui::Button("Set Target")) {
+    dialogs_ask_yes_no(
+      "Set target arc voltage to " + std::to_string(new_value) + "?", [&]() {
+        globals->nc_control_view->machine_parameters.thc_set_value = new_value;
+        dialogs_show_thc_window(false);
+      });
+  }
+  ImGui::SameLine();
   if (ImGui::Button("Close")) {
     dialogs_show_thc_window(false);
   }

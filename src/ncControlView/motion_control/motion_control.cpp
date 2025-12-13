@@ -2,7 +2,7 @@
 #include "../dialogs/dialogs.h"
 #include "../util.h"
 #include "ncControlView/ncControlView.h"
-#include <iomanip>
+#include <deque>
 #include <sstream>
 
 #define DEFAULT_PIERCE_HEIGHT SCALE(2.8f)
@@ -35,16 +35,16 @@ void (*okay_callback)() = NULL;
 void (*probe_callback)() = NULL;
 void (*motion_sync_callback)() = NULL;
 void (*arc_okay_callback)() = NULL;
-int                      arc_retry_count = 0;
-std::vector<std::string> gcode_stack;
-bool                     torch_on;
-unsigned long            torch_on_timer;
-unsigned long            arc_okay_timer;
-unsigned long            program_run_time;
-unsigned long            last_checksum_error = -1;
-bool                     abort_pending;
-bool                     handling_crash;
-bool                     needs_homed;
+int                     arc_retry_count = 0;
+std::deque<std::string> gcode;
+bool                    torch_on;
+unsigned long           torch_on_timer;
+unsigned long           arc_okay_timer;
+unsigned long           program_run_time;
+unsigned long           last_checksum_error = -1;
+bool                    abort_pending;
+bool                    handling_crash;
+bool                    needs_homed;
 
 /*
     Callbacks that get called via okay_callback
@@ -59,7 +59,7 @@ void program_finished()
   probe_callback = NULL;
   motion_sync_callback = NULL;
   arc_okay_callback = NULL;
-  motion_controller_clear_stack();
+  gcode.clear();
 }
 
 void homing_done_callback()
@@ -69,8 +69,8 @@ void homing_done_callback()
   LOG_F(INFO, "Homing finished! Saving Z work offset...");
   globals->nc_control_view->machine_parameters.work_offset[2] =
     static_cast<float>(motion_controller_get_dro()["MCS"]["z"]);
-  motion_controller_push_stack("G10 L20 P0 Z0");
-  motion_controller_push_stack("M30");
+  gcode.push_back("G10 L20 P0 Z0");
+  gcode.push_back("M30");
   motion_controller_run_stack();
   motion_controller_save_machine_parameters();
 }
@@ -106,17 +106,15 @@ bool arc_okay_expire_timer()
     motion_sync_callback = NULL;
     arc_okay_callback = NULL;
     torch_on = false;
-    // Remember that inserting at the top of list means its the next code to
-    // run, meaning This list that we are inserting is ran from bottom to top or
-    // LIFO mode
-    gcode_stack.insert(
-      gcode_stack.begin(),
+    // gcode runs in FIFO, but we now need to prepend commands, so we push_front
+    // in reversed order, i.e M5 runs first here
+    gcode.push_front(
       "fire_torch " +
-        to_string_strip_zeros((double) callback_args["pierce_height"]) + " " +
-        to_string_strip_zeros((double) callback_args["pierce_delay"]) + " " +
-        to_string_strip_zeros((double) callback_args["cut_height"]));
-    gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
-    gcode_stack.insert(gcode_stack.begin(), "M5"); // Torch Off
+      to_string_strip_zeros((double) callback_args["pierce_height"]) + " " +
+      to_string_strip_zeros((double) callback_args["pierce_delay"]) + " " +
+      to_string_strip_zeros((double) callback_args["cut_height"]));
+    gcode.push_front("G0 Z0");
+    gcode.push_front("M5"); // Torch Off
 
     arc_retry_count++;
     LOG_F(WARNING,
@@ -127,28 +125,21 @@ bool arc_okay_expire_timer()
   }
   return false; // Don't repeat
 }
+
 void lower_to_cut_height_and_run_program()
 {
   okay_callback = &run_pop;
   probe_callback = NULL;
   arc_okay_callback = NULL;
   arc_retry_count = 0;
-  // Remember that inserting at the top of list means its the next code to run,
-  // meaning This list that we are inserting is ran from bottom to top or LIFO
-  // mode
-  if (globals->nc_control_view->machine_parameters.smart_thc_on == false) {
-    gcode_stack.insert(
-      gcode_stack.begin(),
-      "$T=" + to_string_strip_zeros(voltage_to_adc_sample(
-                globals->nc_control_view->machine_parameters.thc_set_value)));
-  }
-  gcode_stack.insert(gcode_stack.begin(), "G90");
-  gcode_stack.insert(
-    gcode_stack.begin(),
+  gcode.push_front(
+    "$T=" + to_string_strip_zeros(
+              globals->nc_control_view->machine_parameters.thc_set_value));
+  gcode.push_front("G90");
+  gcode.push_front(
     "G91G0 Z" + to_string_strip_zeros((double) callback_args["pierce_height"] -
                                       (double) callback_args["cut_height"]));
-  gcode_stack.insert(
-    gcode_stack.begin(),
+  gcode.push_front(
     "G4P" + to_string_strip_zeros((double) callback_args["pierce_delay"]));
   LOG_F(INFO, "Running callback => lower_to_cut_height_and_run_program()");
   run_pop();
@@ -161,18 +152,16 @@ void raise_to_pierce_height_and_fire_torch()
   // Remember that inserting at the top of list means its the next code to run,
   // meaning This list that we are inserting is ran from bottom to top or LIFO
   // mode
-  gcode_stack.insert(gcode_stack.begin(), "WAIT_FOR_ARC_OKAY");
-  gcode_stack.insert(gcode_stack.begin(), "G90");
-  gcode_stack.insert(gcode_stack.begin(), "M3S1000");
-  gcode_stack.insert(
-    gcode_stack.begin(),
+  gcode.push_front("WAIT_FOR_ARC_OKAY");
+  gcode.push_front("G90");
+  gcode.push_front("M3S1000");
+  gcode.push_front(
     "G0Z-" + to_string_strip_zeros((double) callback_args["pierce_height"]));
-  gcode_stack.insert(
-    gcode_stack.begin(),
+  gcode.push_front(
     "G0Z-" +
-      to_string_strip_zeros(
-        globals->nc_control_view->machine_parameters.floating_head_backlash));
-  gcode_stack.insert(gcode_stack.begin(), "G91");
+    to_string_strip_zeros(
+      globals->nc_control_view->machine_parameters.floating_head_backlash));
+  gcode.push_front("G91");
   LOG_F(INFO, "Running callback => raise_to_pierce_height_and_fire_torch()");
   torch_on = true;
   torch_on_timer = EasyRender::Millis();
@@ -186,14 +175,13 @@ void touch_torch_and_back_off()
   // Remember that inserting at the top of list means its the next code to run,
   // meaning This list that we are inserting is ran from bottom to top or LIFO
   // mode
-  gcode_stack.insert(gcode_stack.begin(), "G90");
-  gcode_stack.insert(gcode_stack.begin(), "G0Z-0.5");
-  gcode_stack.insert(
-    gcode_stack.begin(),
+  gcode.push_front("G90");
+  gcode.push_front("G0Z-0.5");
+  gcode.push_front(
     "G0Z-" +
-      to_string_strip_zeros(
-        globals->nc_control_view->machine_parameters.floating_head_backlash));
-  gcode_stack.insert(gcode_stack.begin(), "G91");
+    to_string_strip_zeros(
+      globals->nc_control_view->machine_parameters.floating_head_backlash));
+  gcode.push_front("G91");
   LOG_F(INFO, "Touching off torch and dry running!");
   run_pop();
 }
@@ -208,9 +196,9 @@ void torch_off_and_abort()
   // Remember that inserting at the top of list means its the next code to run,
   // meaning This list that we are inserting is ran from bottom to top or LIFO
   // mode
-  gcode_stack.insert(gcode_stack.begin(), "M30");
-  gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
-  gcode_stack.insert(gcode_stack.begin(), "M5");
+  gcode.push_front("M30");
+  gcode.push_front("G0 Z0");
+  gcode.push_front("M5");
   LOG_F(INFO, "Shutting torch off, retracting, and aborting!");
   run_pop();
 }
@@ -225,20 +213,18 @@ void torch_off_and_retract()
   // Remember that inserting at the top of list means its the next code to run,
   // meaning This list that we are inserting is ran from bottom to top or LIFO
   // mode
-  if (globals->nc_control_view->machine_parameters.smart_thc_on == false) {
-    gcode_stack.insert(gcode_stack.begin(), "$T=0");
-  }
-  gcode_stack.insert(gcode_stack.begin(), "G0 Z0");
-  gcode_stack.insert(gcode_stack.begin(), "M5");
+  gcode.push_front("$T=0.0");
+  gcode.push_front("G0 Z0");
+  gcode.push_front("M5");
   LOG_F(INFO, "Shutting torch off and retracting!");
   run_pop();
 }
 
 void run_pop()
 {
-  if (gcode_stack.size() > 0) {
-    std::string line = gcode_stack[0];
-    gcode_stack.erase(gcode_stack.begin());
+  if (gcode.size() > 0) {
+    std::string line = gcode.front();
+    gcode.pop_front();
     if (line.find("fire_torch") != std::string::npos) {
       LOG_F(
         INFO,
@@ -317,7 +303,6 @@ void run_pop()
     }
     else {
       line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
-
       LOG_F(INFO, "(runpop) sending %s", line.c_str());
       motion_controller_send_crc32(line);
     }
@@ -374,8 +359,10 @@ void motion_controller_log_runtime()
       globals->renderer->GetConfigDirectory() + "runtime.json", runtime);
   }
 }
+
 bool motion_controller_is_torch_on() { return torch_on; }
-void motion_controller_cmd(std::string cmd)
+
+void motion_controller_cmd(const std::string& cmd)
 {
   if (cmd == "abort") {
     LOG_F(INFO, "Aborting!");
@@ -385,23 +372,24 @@ void motion_controller_cmd(std::string cmd)
     probe_callback = NULL;
     motion_sync_callback = NULL;
     arc_okay_callback = NULL;
-    motion_controller_clear_stack();
+    gcode.clear();
   }
   else if (cmd == "home") {
     okay_callback = &homing_done_callback;
     motion_controller_send("$H");
   }
 }
-void motion_controller_clear_stack() { gcode_stack.clear(); }
-void motion_controller_push_stack(std::string gcode)
-{
-  gcode_stack.push_back(gcode);
-}
+
 void motion_controller_run_stack()
 {
   program_run_time = EasyRender::Millis();
   run_pop();
   okay_callback = &run_pop;
+}
+
+void motion_controller_push_stack(const std::string& _gcode)
+{
+  gcode.push_back(_gcode);
 }
 
 uint32_t motion_controller_crc32c(uint32_t crc, const char* buf, size_t len)
@@ -415,6 +403,7 @@ uint32_t motion_controller_crc32c(uint32_t crc, const char* buf, size_t len)
   }
   return ~crc;
 }
+
 void motion_controller_log_controller_error(int error)
 {
   std::string ret;
@@ -474,6 +463,10 @@ void motion_controller_log_controller_error(int error)
       break;
     case 17:
       ret = "Laser mode requires PWM output.";
+      break;
+    case 18:
+      ret = "Target voltage is invalid given the set voltage divider, or the "
+            "current state does not allow setting THC target.";
       break;
     case 20:
       ret = "Unsupported or invalid g-code command found in block.";
@@ -562,8 +555,9 @@ void motion_controller_log_controller_error(int error)
   }
   LOG_F(ERROR, "Firmware Error %d => %s", error, ret.c_str());
   dialogs_set_info_value(ret.c_str());
-  motion_controller_clear_stack();
+  gcode.clear();
 }
+
 void motion_controller_handle_alarm(int alarm)
 {
   std::string ret;
@@ -619,11 +613,12 @@ void motion_controller_handle_alarm(int alarm)
   LOG_F(ERROR, "Alarm %d => %s", alarm, ret.c_str());
   dialogs_set_controller_alarm_value(ret);
   dialogs_show_controller_alarm_window(true);
-  motion_controller_clear_stack();
+  gcode.clear();
 }
+
 void line_handler(std::string line)
 {
-  //DLOG_F(INFO, "\nHandling line %s", line.c_str());
+  // DLOG_F(INFO, "\nHandling line %s", line.c_str());
   if (controller_ready == true) {
     if (line.find("{") != std::string::npos) {
       try {
@@ -720,7 +715,7 @@ void line_handler(std::string line)
     if (line.find("Grbl") != std::string::npos) {
       LOG_F(INFO, "Controller ready!");
       controller_ready = true;
-      motion_controller_push_stack(
+      gcode.push_back(
         "G10 L2 P0 X" +
         std::to_string(
           globals->nc_control_view->machine_parameters.work_offset[0]) +
@@ -730,7 +725,7 @@ void line_handler(std::string line)
         " Z" +
         std::to_string(
           globals->nc_control_view->machine_parameters.work_offset[2]));
-      motion_controller_push_stack("M30");
+      gcode.push_back("M30");
       motion_controller_run_stack();
     }
     else if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos) {
@@ -738,7 +733,7 @@ void line_handler(std::string line)
         LOG_F(INFO, "Controller ready, but needs homing.");
         controller_ready = true;
         needs_homed = true;
-        motion_controller_push_stack(
+        gcode.push_back(
           "G10 L2 P0 X" +
           std::to_string(
             globals->nc_control_view->machine_parameters.work_offset[0]) +
@@ -748,7 +743,7 @@ void line_handler(std::string line)
           " Z" +
           std::to_string(
             globals->nc_control_view->machine_parameters.work_offset[2]));
-        motion_controller_push_stack("M30");
+        gcode.push_back("M30");
         motion_controller_run_stack();
       }
       else {
@@ -758,6 +753,7 @@ void line_handler(std::string line)
     }
   }
 }
+
 void motion_controller_save_machine_parameters()
 {
   // Write to file
@@ -873,6 +869,7 @@ void motion_controller_save_machine_parameters()
     LOG_F(ERROR, "Could not write parameters file!");
   }
 }
+
 void motion_controller_write_parameters_to_controller()
 {
   if (motion_controller.is_connected) // Write controller specific parameters to
@@ -896,101 +893,104 @@ void motion_controller_write_parameters_to_controller()
     if (globals->nc_control_view->machine_parameters.homing_dir_invert[2])
       homing_dir_invert_mask |= 0b00000100;
 
-    motion_controller_push_stack("$X");
-    motion_controller_push_stack("$0=" + std::to_string(10)); // Step Pulse,
-                                                              // usec
-    motion_controller_push_stack(
-      "$1=" + std::to_string(255)); // Step Idle Delay, usec (always on)
-    motion_controller_push_stack("$3=" + std::to_string(dir_invert_mask));
+    gcode.push_back("$X");
+    gcode.push_back("$0=" + std::to_string(10));  // Step Pulse,
+                                                  // usec
+    gcode.push_back("$1=" + std::to_string(255)); // Step Idle Delay, usec
+                                                  // (always on)
+    gcode.push_back("$3=" + std::to_string(dir_invert_mask));
 
-    motion_controller_push_stack(
+    gcode.push_back(
       "$4=" + std::to_string((int) globals->nc_control_view->machine_parameters
                                .invert_step_enable)); // Step enable invert
-    motion_controller_push_stack(
+    gcode.push_back(
       "$5=" + std::to_string((int) globals->nc_control_view->machine_parameters
                                .invert_limit_pins)); // Limit Pins invert
-    motion_controller_push_stack(
+    gcode.push_back(
       "$6=" +
       std::to_string(
         (int) globals->nc_control_view->machine_parameters.invert_probe_pin));
-    motion_controller_push_stack("$10=" + std::to_string(3)); // Status report
-                                                              // mask
+    gcode.push_back("$10=" + std::to_string(3)); // Status report
+                                                 // mask
 
-    motion_controller_push_stack(
+    gcode.push_back(
       "$11=" +
       std::to_string(
         globals->nc_control_view->machine_parameters.junction_deviation));
-    motion_controller_push_stack("$12=" + std::to_string(0.002)); // Arc
-                                                                  // Tolerance
+    gcode.push_back("$12=" + std::to_string(0.002)); // Arc
+                                                     // Tolerance
 
-    motion_controller_push_stack(
-      "$13=" + std::to_string(0)); // Report Inches (TODO: not yet supported)
+    gcode.push_back("$13=" + std::to_string(0)); // Report Inches (TODO: not yet
+                                                 // supported)
 
-    motion_controller_push_stack(
+    gcode.push_back(
       "$22=" + std::to_string((int) globals->nc_control_view->machine_parameters
                                 .homing_enabled)); // Homing Cycle Enable
                                                    // (Homing must be enbled
                                                    // before soft-limits...)
-    motion_controller_push_stack(
+    gcode.push_back(
       "$20=" + std::to_string((int) globals->nc_control_view->machine_parameters
                                 .soft_limits_enabled)); // Soft Limits Enable
-    motion_controller_push_stack(
-      "$21=" + std::to_string(0)); // Hard Limits Enable (TODO: not yet
-                                   // supported)
-    motion_controller_push_stack("$23=" +
-                                 std::to_string(homing_dir_invert_mask));
-    motion_controller_push_stack(
+    gcode.push_back("$21=" + std::to_string(0)); // Hard Limits Enable (TODO:
+                                                 // not yet supported)
+    gcode.push_back("$23=" + std::to_string(homing_dir_invert_mask));
+    gcode.push_back(
       "$24=" +
       std::to_string(globals->nc_control_view->machine_parameters.homing_feed));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$25=" +
       std::to_string(globals->nc_control_view->machine_parameters.homing_seek));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$26=" + std::to_string(
                  globals->nc_control_view->machine_parameters.homing_debounce));
-    motion_controller_push_stack(
+    gcode.push_back(
+      "$33=" +
+      std::to_string(
+        globals->nc_control_view->machine_parameters.arc_voltage_divider));
+    gcode.push_back(
       "$27=" + std::to_string(
                  globals->nc_control_view->machine_parameters.homing_pull_off));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$100=" + std::to_string(
                   globals->nc_control_view->machine_parameters.axis_scale[0]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$101=" + std::to_string(
                   globals->nc_control_view->machine_parameters.axis_scale[1]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$102=" + std::to_string(
                   globals->nc_control_view->machine_parameters.axis_scale[2]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$110=" +
       std::to_string(globals->nc_control_view->machine_parameters.max_vel[0]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$111=" +
       std::to_string(globals->nc_control_view->machine_parameters.max_vel[1]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$112=" +
       std::to_string(globals->nc_control_view->machine_parameters.max_vel[2]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$120=" + std::to_string(
                   globals->nc_control_view->machine_parameters.max_accel[0]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$121=" + std::to_string(
                   globals->nc_control_view->machine_parameters.max_accel[1]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$122=" + std::to_string(
                   globals->nc_control_view->machine_parameters.max_accel[2]));
-    motion_controller_push_stack(
+    gcode.push_back(
       "$130=" + std::to_string(fabs(globals->nc_control_view->machine_parameters
                                       .machine_extents[0]))); // x max travel
-    motion_controller_push_stack(
+    gcode.push_back(
       "$131=" + std::to_string(fabs(globals->nc_control_view->machine_parameters
                                       .machine_extents[1]))); // y max travel
-    motion_controller_push_stack(
+    gcode.push_back(
       "$132=" + std::to_string(fabs(globals->nc_control_view->machine_parameters
                                       .machine_extents[2]))); // z max travel
-    motion_controller_push_stack("M30");
+    gcode.push_back("M30");
     motion_controller_run_stack();
   }
 }
+
 void motion_controller_trigger_reset()
 {
   LOG_F(INFO, "Resetting Motion Controller!");
@@ -999,11 +999,12 @@ void motion_controller_trigger_reset()
   motion_controller.serial.setDTR(false);
   controller_ready = false;
 }
+
 bool byte_handler(uint8_t b)
 {
   if (controller_ready == true) {
     if (b == '>') {
-      LOG_F(INFO, "Recieved ok byte!");
+      // LOG_F(INFO, "Recieved ok byte!");
       if (okay_callback != NULL)
         okay_callback();
       return true;
@@ -1011,6 +1012,7 @@ bool byte_handler(uint8_t b)
   }
   return false;
 }
+
 void motion_controller_send_crc32(std::string s)
 {
   if (controller_ready == true) {
@@ -1021,6 +1023,7 @@ void motion_controller_send_crc32(std::string s)
     motion_controller.send_string(s + "*" + std::to_string(checksum) + "\n");
   }
 }
+
 void motion_controller_send(std::string s)
 {
   if (controller_ready == true) {
@@ -1031,6 +1034,7 @@ void motion_controller_send(std::string s)
     motion_controller.send_string(s + "\n");
   }
 }
+
 void motion_controller_send_rt(char s)
 {
   if (controller_ready == true) {
@@ -1076,6 +1080,7 @@ void motion_control_init()
   }
   globals->renderer->PushTimer(100, motion_control_status_timer);
 }
+
 void motion_control_tick()
 {
   motion_controller.tick();

@@ -26,6 +26,3 @@ template <typename T> std::string to_string_strip_zeros(T a_value)
     std::string str = oss.str();
     return oss.str();
 }
-
-float adc_sample_to_voltage(uint16_t val);
-int voltage_to_adc_sample(float val);

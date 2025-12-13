@@ -7,6 +7,7 @@
 #include <EasyRender/gui/imgui.h>
 #include <EasyRender/logging/loguru.h>
 #include <dxf/dxflib/dl_dxf.h>
+#include <ncControlView/util.h>
 
 void jetCamView::ZoomEventCallback(const nlohmann::json& e)
 {
@@ -238,11 +239,9 @@ void jetCamView::ModKeyCallback(const nlohmann::json& e)
   auto  set_mod = [&](int bit) {
     if (e.at("action").get<int>() & Action::Press) {
       mods |= bit;
-      LOG_F(INFO, "Oring: %d", mods);
     }
     else {
       mods &= ~bit;
-      LOG_F(INFO, "Zeroing: %d", mods);
     }
   };
   if (e.at("key").get<int>() == GLFW_KEY_LEFT_CONTROL) {
@@ -1349,16 +1348,20 @@ void jetCamView::Tick()
                   (*it)->part->GetOrderedToolpaths();
                 if (this->tool_library.size() >
                     this->toolpath_operations[i].tool_number) {
+                  // Output tool-specific THC target once at beginning to let us
+                  // update the value internally. The fire_torch and torch_off
+                  // macros will handle the rest
+                  if (float thc_val =
+                        this
+                          ->tool_library[this->toolpath_operations[i]
+                                           .tool_number]
+                          .params["athc"];
+                      thc_val > 0) {
+                    gcode_file << "$T=" << thc_val << "\n";
+                  }
                   for (size_t x = 0; x < tool_paths.size(); x++) {
                     gcode_file << "G0 X" << tool_paths[x][0].x << " Y"
                                << tool_paths[x][0].y << "\n";
-                    if (this
-                          ->tool_library[this->toolpath_operations[i]
-                                           .tool_number]
-                          .params["athc"] > 0) {
-                      // TODO: implement
-                      // Motion controller does not support this yet....
-                    }
                     gcode_file << "fire_torch "
                                << this
                                     ->tool_library[this->toolpath_operations[i]

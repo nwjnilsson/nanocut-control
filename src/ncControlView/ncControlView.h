@@ -9,8 +9,11 @@ private:
   static void zoom_event_handle(const nlohmann::json& e);
   static void click_and_drag_event_handle(const nlohmann::json& e);
   static void key_callback(const nlohmann::json& e);
+  static void mod_key_callback(const nlohmann::json& e);
+
 
 public:
+  int mods; // TODO: get rid of this
   struct preferences_data_t {
     float background_color[3] = { 0.0f, 0.0f, 0.0f };
     float machine_plane_color[3] = { 0.0f, 0.0f, 0.0f };
@@ -46,7 +49,6 @@ public:
     float floating_head_backlash = 0;
     // Not Included in machine_parameters.json
     float thc_set_value{ 0.f };
-    bool  smart_thc_on = false;
     float precise_jog_units = 0.0f;
   };
   preferences_data_t        preferences;

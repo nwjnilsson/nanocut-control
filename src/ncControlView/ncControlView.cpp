@@ -248,15 +248,39 @@ void ncControlView::PreInit()
   }
   this->view_matrix = &hmi_view_matrix;
 }
+
+void ncControlView::mod_key_callback(const nlohmann::json& e)
+{
+  LOG_F(INFO, "%s", e.dump().c_str());
+  using Action = EasyRender::ActionFlagBits;
+  auto& mods = globals->nc_control_view->mods;
+  auto  set_mod = [&](int bit) {
+    if (e.at("action").get<int>() & Action::Press) {
+      mods |= bit;
+    }
+    else {
+      mods &= ~bit;
+    }
+  };
+  if (e.at("key").get<int>() == GLFW_KEY_LEFT_CONTROL) {
+    set_mod(GLFW_MOD_CONTROL);
+  }
+  if (e.at("key").get<int>() == GLFW_KEY_LEFT_SHIFT) {
+    set_mod(GLFW_MOD_SHIFT);
+  }
+}
 void ncControlView::Init()
 {
+  using Action = EasyRender::ActionFlagBits;
   globals->renderer->SetCurrentView("ncControlView");
   globals->renderer->PushEvent(
     GLFW_KEY_UNKNOWN, EasyRender::EventType::Scroll, &this->zoom_event_handle);
   globals->renderer->PushEvent(GLFW_MOUSE_BUTTON_2,
-                               EasyRender::ActionFlagBits::Release |
-                                 EasyRender::ActionFlagBits::Press,
+                               Action::Release | Action::Press,
                                &this->click_and_drag_event_handle);
+  globals->renderer->PushEvent(GLFW_KEY_LEFT_CONTROL,
+                               Action::Press | Action::Release,
+                               &this->mod_key_callback);
   globals->renderer->PushEvent(
     GLFW_KEY_TAB, +EasyRender::ActionFlagBits::Press, &this->key_callback);
   menu_bar_init();
