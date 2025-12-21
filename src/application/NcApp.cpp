@@ -1,14 +1,14 @@
 #include "NcApp.h"
+#include "../NcAdminView/NcAdminView.h"
+#include "../NcCamView/NcCamView.h"
+#include "../NcControlView/NcControlView.h"
 #include "../NcRender/NcRender.h"
 #include "../NcRender/gui/imgui.h"
 #include "../NcRender/json/json.h"
 #include "../NcRender/logging/loguru.h"
 #include "../WebsocketClient/WebsocketClient.h"
-#include "../NcAdminView/NcAdminView.h"
 #include "../input/InputEvents.h"
 #include "../input/InputState.h"
-#include "../NcCamView/NcCamView.h"
-#include "../NcControlView/NcControlView.h"
 #include <stdexcept>
 #include <sys/stat.h>
 
@@ -375,15 +375,12 @@ void NcApp::windowSizeCallback(GLFWwindow* window, int width, int height)
   if (!app)
     return;
 
-  // Delegate to current active view if available
+  if (app->m_renderer) {
+    app->m_renderer->handleWindowSizeEvent(width, height);
+  }
+
   if (app->m_current_active_view) {
     WindowResizeEvent event(width, height);
     app->m_current_active_view->handleWindowResize(event, *app->m_input_state);
-  }
-
-  // Also delegate to NcRender for view-specific processing (it handles GL
-  // viewport)
-  if (app->m_renderer) {
-    app->m_renderer->handleWindowSizeEvent(width, height);
   }
 }

@@ -1376,6 +1376,16 @@ void NcHmi::init()
 
   m_app->getRenderer().pushTimer(100, [this]() { return updateTimer(); });
 
+  // Perform initial layout of HMI elements based on current window size
+  // This is necessary because buttons are created at Point2d::infNeg() and need
+  // to be positioned. With tiling window managers like i3, the resize event may
+  // not fire immediately, so we do an initial layout here.
+  nlohmann::json resize_event = {
+    { "width", m_app->getRenderer().getWindowSize().x },
+    { "height", m_app->getRenderer().getWindowSize().y }
+  };
+  resizeCallback(resize_event);
+
   handleButton("Fit");
 }
 

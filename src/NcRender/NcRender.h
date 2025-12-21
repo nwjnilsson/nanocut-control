@@ -72,7 +72,7 @@ private:
   std::string        m_current_view;
 
   std::vector<std::unique_ptr<Primitive>> m_primitive_stack;
-  std::vector<NcRenderTimer>            m_timer_stack;
+  std::vector<NcRenderTimer>              m_timer_stack;
 
   static void
   keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -114,7 +114,9 @@ public:
     m_window = window;
     // Load Defaults
     setWindowTitle("NcRender");
-    setWindowSize(800, 600);
+    int w, h;
+    glfwGetFramebufferSize(window, &w, &h);
+    setWindowSize(w, h);
     setShowCursor(true);
     setAutoMaximize(false);
     setGuiIniFileName("NcRenderGui.ini");
@@ -199,9 +201,9 @@ public:
 };
 
 NcRender::ActionFlags operator&(NcRender::ActionFlags    a,
-                                  NcRender::ActionFlagBits b);
+                                NcRender::ActionFlagBits b);
 NcRender::ActionFlags operator|(NcRender::ActionFlagBits a,
-                                  NcRender::ActionFlagBits b);
+                                NcRender::ActionFlagBits b);
 NcRender::ActionFlags operator+(NcRender::ActionFlagBits a);
 
 #endif // EASYREANDER_

@@ -108,7 +108,11 @@ void NcRender::handleCursorPositionEvent(double xpos, double ypos)
 
 void NcRender::handleWindowSizeEvent(int width, int height)
 {
-  // Only check if ImGui wants to capture input
+  // Update window size immediately when resize event occurs
+  // This ensures getWindowSize() returns current values for UI layout
+  // calculations
+  setWindowSize(width, height);
+
   // NcApp now handles all window resize events directly through view delegation
 }
 
@@ -130,7 +134,7 @@ void NcRender::pushTimer(unsigned long interval, std::function<bool()> c)
   m_timer_stack.emplace_back(m_current_view, millis(), interval, c);
 }
 NcRender::NcRenderGui* NcRender::pushGui(bool                  visible,
-                                               std::function<void()> callback)
+                                         std::function<void()> callback)
 {
   m_gui_stack.emplace_back(NcRenderGui{ m_current_view, visible, callback });
   return &m_gui_stack.back();
@@ -453,9 +457,8 @@ bool NcRender::init(int argc, char** argv)
 bool NcRender::poll(bool should_quit)
 {
   unsigned long begin_timestamp = millis();
-  glfwGetFramebufferSize(m_window, &m_window_size[0], &m_window_size[1]);
-  float   ratio = m_window_size[0] / (float) m_window_size[1];
-  Point2d window_mouse_pos = getWindowMousePosition();
+  float         ratio = m_window_size[0] / (float) m_window_size[1];
+  Point2d       window_mouse_pos = getWindowMousePosition();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
@@ -509,9 +512,10 @@ bool NcRender::poll(bool should_quit)
         // Dispatch mouse event if one was generated
         if (m_primitive_stack[x]->m_mouse_event != nullptr &&
             m_primitive_stack[x]->mouse_callback) {
-          m_primitive_stack[x]->mouse_callback(m_primitive_stack[x].get(),
-                                               m_primitive_stack[x]->m_mouse_event);
-          m_primitive_stack[x]->m_mouse_event = nullptr; // Clear event after dispatch
+          m_primitive_stack[x]->mouse_callback(
+            m_primitive_stack[x].get(), m_primitive_stack[x]->m_mouse_event);
+          m_primitive_stack[x]->m_mouse_event =
+            nullptr; // Clear event after dispatch
         }
       }
     }
@@ -579,13 +583,13 @@ uint32_t operator&(NcRender::ActionFlags a, NcRender::ActionFlagBits b)
 }
 
 NcRender::ActionFlags operator&(NcRender::ActionFlagBits a,
-                                  NcRender::ActionFlagBits b)
+                                NcRender::ActionFlagBits b)
 {
   return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
 }
 
 NcRender::ActionFlags operator|(NcRender::ActionFlagBits a,
-                                  NcRender::ActionFlagBits b)
+                                NcRender::ActionFlagBits b)
 {
   return static_cast<uint32_t>(a) | static_cast<uint32_t>(b);
 }
