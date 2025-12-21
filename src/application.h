@@ -2,7 +2,6 @@
 #define APPLICATION_
 
 #include <../include/config.h>
-#include <EasyRender/geometry/geometry.h>
 #include <algorithm>
 #include <dirent.h>
 #include <fstream>
@@ -20,31 +19,29 @@
 
 #define DEFAULT_UNIT SCALE(1.f)
 
-/*
-    Primary structure to store global variables in
-*/
-
-class ncControlView;
-class jetCamView;
-class adminView;
-class WebsocketClient;
-class EasyRender;
-
-struct global_variables_t {
-  bool             quit;
-  double           zoom;
-  double_point_t   pan;
-  bool             move_view;
-  double_point_t   mouse_pos_in_screen_coordinates;
-  double_point_t   mouse_pos_in_matrix_coordinates;
-  unsigned long    start_timestamp;
-  EasyRender*      renderer;
-  WebsocketClient* websocket;
-  /*  Define view classes here */
-  ncControlView* nc_control_view;
-  jetCamView*    jet_cam_view;
-  adminView*     admin_view;
+template <typename T> struct Point2 {
+  T                       x;
+  T                       y;
+  static constexpr Point2 infPos()
+  {
+    return { std::numeric_limits<T>::infinity(),
+             std::numeric_limits<T>::infinity() };
+  }
+  static constexpr Point2 infNeg()
+  {
+    return { std::numeric_limits<T>::infinity(),
+             std::numeric_limits<T>::infinity() };
+  }
 };
-extern global_variables_t* globals;
+
+using Point2f = Point2<float>;
+using Point2d = Point2<double>;
+
+template <typename T> static constexpr T inf()
+{
+  return std::numeric_limits<T>::infinity();
+}
+
+// Forward declarations moved to NcApp.h as needed
 
 #endif // APPLICATION_

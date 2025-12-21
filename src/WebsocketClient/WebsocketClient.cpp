@@ -1,158 +1,148 @@
 #define MG_ENABLE_LOG 0
 #include "WebsocketClient.h"
-#include "EasyRender/logging/loguru.h"
-#include "EasyRender/EasyRender.h"
+#include "NcRender/NcRender.h"
+#include "NcRender/logging/loguru.h"
 
-bool WebsocketClient::ReconnectTimer(void *self_pointer)
+bool WebsocketClient::reconnectTimer(void* self_pointer)
 {
-    WebsocketClient *self = reinterpret_cast<WebsocketClient *>(self_pointer);
-    if (self != NULL)
-    {
-        if (self->isConnected == true)
-        {
-            LOG_F(INFO, "Canceled reconnect timer!");
-            return false;
-        }
-        self->Connect();
-        return false;
+  WebsocketClient* self = reinterpret_cast<WebsocketClient*>(self_pointer);
+  if (self != NULL) {
+    if (self->m_is_connected == true) {
+      LOG_F(INFO, "Canceled reconnect timer!");
+      return false;
     }
+    self->connect();
     return false;
+  }
+  return false;
 }
-void WebsocketClient::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
+void WebsocketClient::fn(struct mg_connection* c,
+                         int                   ev,
+                         void*                 ev_data,
+                         void*                 fn_data)
 {
-    WebsocketClient *self = reinterpret_cast<WebsocketClient *>(fn_data);
-    if (self != NULL)
-    {
-        if (ev == MG_EV_ERROR)
-        {
-            //LOG_F(ERROR, "%p %s", c->fd, (char *) ev_data);
-        }
-        else if (ev == MG_EV_WS_OPEN)
-        {
-            LOG_F(INFO, "(WebsocketClient::fn) Connection to server successful, registering ID!");
-            self->isConnected = true;
-            nlohmann::json packet;
-            packet["id"] = self->id;
-            self->Send(packet);
-        }
-        else if (ev == MG_EV_WS_MSG)
-        {
-            struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-            char *buff = (char*)malloc((wm->data.len + 1) * sizeof(char));
-            if (buff != NULL)
-            {
-                for (size_t x = 0; x < wm->data.len; x++)
-                {
-                    buff[x] = wm->data.ptr[x];
-                    buff[x+1] = '\0';
-                }
-                self->HandleWebsocketMessage(buff);
-                free(buff);
-            }
-            else
-            {
-                LOG_F(ERROR, "(WebsocketClient::fn) Could not allocate memory for buffer!");
-            }
-        }
-        if (ev == MG_EV_CLOSE)
-        {
-            self->Close();
-            LOG_F(INFO, "(WebsocketClient::fn) Connection to server closed!");
-            globals->renderer->PushTimer(10 * 1000, self->ReconnectTimer, self);
-        }
+  WebsocketClient* self = reinterpret_cast<WebsocketClient*>(fn_data);
+  if (self != NULL) {
+    if (ev == MG_EV_ERROR) {
+      // LOG_F(ERROR, "%p %s", c->fd, (char *) ev_data);
     }
-}
-void WebsocketClient::Send(nlohmann::json packet)
-{
-    this->Send(packet.dump());
-}
-void WebsocketClient::Send(std::string msg)
-{
-    LOG_F(INFO, "Sending: %s", msg.c_str());
-    mg_ws_send(this->client, msg.c_str(), msg.size(), WEBSOCKET_OP_TEXT);
-}
-nlohmann::json WebsocketClient::SendPacketAndPollResponse(nlohmann::json packet)
-{
-    this->isWaitingForResponse = true;
-    packet["id"] = this->id;
-    this->Send(packet);
-    this->responseTimer = globals->renderer->Millis();
-    while(this->isWaitingForResponse == true)
-    {
-        this->Poll();
-        if ((globals->renderer->Millis() - this->responseTimer) > 5 * 1000)
-        {
-            LOG_F(ERROR, "(WebsocketClient::SendPacketAndPollResponse) Timed out!");
-            this->isWaitingForResponse = false;
-        }
+    else if (ev == MG_EV_WS_OPEN) {
+      LOG_F(INFO,
+            "(WebsocketClient::fn) Connection to server successful, "
+            "registering ID!");
+      self->m_is_connected = true;
+      nlohmann::json packet;
+      packet["id"] = self->m_id;
+      self->send(packet);
     }
-    return this->lastRecievedPacket;
+    else if (ev == MG_EV_WS_MSG) {
+      struct mg_ws_message* wm = (struct mg_ws_message*) ev_data;
+      char* buff = (char*) malloc((wm->data.len + 1) * sizeof(char));
+      if (buff != NULL) {
+        for (size_t x = 0; x < wm->data.len; x++) {
+          buff[x] = wm->data.ptr[x];
+          buff[x + 1] = '\0';
+        }
+        self->handleWebsocketMessage(buff);
+        free(buff);
+      }
+      else {
+        LOG_F(ERROR,
+              "(WebsocketClient::fn) Could not allocate memory for buffer!");
+      }
+    }
+    if (ev == MG_EV_CLOSE) {
+      self->close();
+      LOG_F(INFO, "(WebsocketClient::fn) Connection to server closed!");
+      if (self->m_renderer) {
+        self->m_renderer->pushTimer(
+          10 * 1000, [self]() { return self->reconnectTimer(self); });
+      }
+    }
+  }
 }
-void WebsocketClient::HandleWebsocketMessage(std::string msg)
+void WebsocketClient::send(nlohmann::json packet) { send(packet.dump()); }
+void WebsocketClient::send(std::string msg)
 {
-    char peer_ip[100];
-    mg_ntoa(&this->client->peer, peer_ip, sizeof(peer_ip));
-    LOG_F(INFO, "(WebsocketClient::HandleWebsocketMessage&%s) \"%s\"", peer_ip, msg.c_str());
-    try
-    {
-        nlohmann::json data = nlohmann::json::parse(msg.c_str());
-        this->lastRecievedPacket = data;
-        this->isWaitingForResponse = false;
+  LOG_F(INFO, "Sending: %s", msg.c_str());
+  mg_ws_send(m_client, msg.c_str(), msg.size(), WEBSOCKET_OP_TEXT);
+}
+nlohmann::json WebsocketClient::sendPacketAndPollResponse(nlohmann::json packet)
+{
+  m_is_waiting_for_response = true;
+  packet["id"] = m_id;
+  send(packet);
+  m_response_timer = m_renderer ? m_renderer->millis() : 0;
+  while (m_is_waiting_for_response == true) {
+    poll();
+    if (m_renderer && ((m_renderer->millis() - m_response_timer) > 5 * 1000)) {
+      LOG_F(ERROR, "(WebsocketClient::SendPacketAndPollResponse) Timed out!");
+      m_is_waiting_for_response = false;
+    }
+  }
+  return m_last_received_packet;
+}
+void WebsocketClient::handleWebsocketMessage(std::string msg)
+{
+  char peer_ip[100];
+  mg_ntoa(&m_client->peer, peer_ip, sizeof(peer_ip));
+  LOG_F(INFO,
+        "(WebsocketClient::HandleWebsocketMessage&%s) \"%s\"",
+        peer_ip,
+        msg.c_str());
+  try {
+    nlohmann::json data = nlohmann::json::parse(msg.c_str());
+    m_last_received_packet = data;
+    m_is_waiting_for_response = false;
 
-        if (this->lastRecievedPacket.contains("peer_cmd"))
-        {
-            this->Send({
-                {"id", this->id},
-                {"current_view", globals->renderer->GetCurrentView()},
-            });
-        }
+    if (m_last_received_packet.contains("peer_cmd")) {
+      nlohmann::json response;
+      response["id"] = m_id;
+      if (m_renderer) {
+        response["current_view"] = m_renderer->getCurrentView();
+      }
+      send(response);
     }
-    catch(const std::exception& e)
-    {
-        LOG_F(INFO, "(WebsocketClient::HandleWebsocketMessage) %s", e.what());
-    }
+  }
+  catch (const std::exception& e) {
+    LOG_F(INFO, "(WebsocketClient::HandleWebsocketMessage) %s", e.what());
+  }
 }
-void WebsocketClient::SetId(std::string id_)
+void        WebsocketClient::setId(std::string id_) { m_id = id_; }
+std::string WebsocketClient::getRandomString(size_t length)
 {
-    this->id = id_;
+  auto randchar = []() -> char {
+    const char   charset[] = "0123456789"
+                             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                             "abcdefghijklmnopqrstuvwxyz";
+    const size_t max_index = (sizeof(charset) - 1);
+    return charset[rand() % max_index];
+  };
+  std::string str(length, 0);
+  std::generate_n(str.begin(), length, randchar);
+  return str;
 }
-std::string WebsocketClient::GetRandomString(size_t length)
+void WebsocketClient::setIdAuto()
 {
-    auto randchar = []() -> char
-    {
-        const char charset[] =
-        "0123456789"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz";
-        const size_t max_index = (sizeof(charset) - 1);
-        return charset[ rand() % max_index ];
-    };
-    std::string str(length,0);
-    std::generate_n( str.begin(), length, randchar );
-    return str;
+  std::string user =
+    m_renderer ? m_renderer->getEnvironmentVariable("USER") : "unknown";
+  setId(user + "-" + getRandomString(4));
 }
-void WebsocketClient::SetIdAuto()
+void WebsocketClient::init()
 {
-    this->SetId(globals->renderer->GetEvironmentVariable("USER") + "-" + this->GetRandomString(4));
+  m_is_waiting_for_response = false;
+  m_is_connected = false;
+  connect();
 }
-void WebsocketClient::Init()
+void WebsocketClient::connect()
 {
-    this->isWaitingForResponse = false;
-    this->isConnected = false;
-    this->Connect();
+  mg_mgr_init(&m_mgr);
+  static const char* s_url = "ws://jetcad.io:8000/websocket";
+  m_client = mg_ws_connect(&m_mgr, s_url, fn, this, NULL);
 }
-void WebsocketClient::Connect()
+void WebsocketClient::poll() { mg_mgr_poll(&m_mgr, 1); }
+void WebsocketClient::close()
 {
-    mg_mgr_init(&this->mgr);
-    static const char *s_url = "ws://jetcad.io:8000/websocket";
-    this->client = mg_ws_connect(&this->mgr, s_url, this->fn, this, NULL);
-}
-void WebsocketClient::Poll()
-{
-    mg_mgr_poll(&this->mgr, 1);
-}
-void WebsocketClient::Close()
-{
-    this->isConnected = false;
-    mg_mgr_free(&this->mgr);
+  m_is_connected = false;
+  mg_mgr_free(&m_mgr);
 }

@@ -1,35 +1,48 @@
 #ifndef WEBSOCKET_CLIENT_
 #define WEBSOCKET_CLIENT_
 
-#include <application.h>
 #include "../mongoose/mongoose.h"
+#include <NcRender/json/json.h>
 
-class WebsocketClient
-{
-    public:
-        bool isConnected;
-        bool isWaitingForResponse;
-        unsigned long responseTimer;
-        nlohmann::json lastRecievedPacket;
+// Forward declaration
+class NcApp;
+class NcRender;
 
-        std::string id;
-        static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data);
-        static bool ReconnectTimer(void *self_pointer);
+class WebsocketClient {
+public:
+  bool           m_is_connected;
+  bool           m_is_waiting_for_response;
+  unsigned long  m_response_timer;
+  nlohmann::json m_last_received_packet;
 
-        struct mg_mgr mgr;
-        struct mg_connection *client;
+  std::string m_id;
 
-        std::string GetRandomString(size_t length);
-        void SetIdAuto();
-        void SetId(std::string id_);
-        void Send(nlohmann::json packet);
-        void Send(std::string msg);
-        nlohmann::json SendPacketAndPollResponse(nlohmann::json packet);
-        void HandleWebsocketMessage(std::string msg);
-        void Connect();
-        void Init();
-        void Poll();
-        void Close();
+private:
+  NcRender* m_renderer{ nullptr }; // Reference to renderer for timer
+                                     // functionality
+
+public:
+  static void fn(struct mg_connection* c, int ev, void* ev_data, void* fn_data);
+  static bool reconnectTimer(void* self_pointer);
+
+  struct mg_mgr         m_mgr;
+  struct mg_connection* m_client;
+
+  std::string getRandomString(size_t length);
+  // Constructor with dependency injection
+  WebsocketClient(NcRender* renderer = nullptr) : m_renderer(renderer) {}
+
+  void           setRenderer(NcRender* renderer) { m_renderer = renderer; }
+  void           setIdAuto();
+  void           setId(std::string id_);
+  void           send(nlohmann::json packet);
+  void           send(std::string msg);
+  nlohmann::json sendPacketAndPollResponse(nlohmann::json packet);
+  void           handleWebsocketMessage(std::string msg);
+  void           connect();
+  void           init();
+  void           poll();
+  void           close();
 };
 
-#endif //WEBSOCKET_CLIENT_
+#endif // WEBSOCKET_CLIENT_

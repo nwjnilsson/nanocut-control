@@ -80,7 +80,7 @@ double Vector::lengthSq() const
 Vector Vector::Truncate(double max_value) const
 {
 	Vector v(x, y, z);
-	double len=this->length();
+	double len=length();
 	if(len == 0)
 	{
 		return v;
@@ -98,7 +98,7 @@ Vector Vector::Truncate(double max_value) const
 
 Vector Vector::normalize() const
 {
-	double vl = this->length();
+	double vl = length();
 	if(vl == 0)
 	{
 		return Vector();

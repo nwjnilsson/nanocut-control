@@ -27,10 +27,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/${CMAKE_BUILD_TYPE}
 # Compiler flags
 # ------------------------------------------------------------
 #
-set(BASE_COMPILE_FLAGS "-std=c++17 -fpermissive")
+set(BASE_COMPILE_FLAGS "-std=c++17")
 
-set(CMAKE_CXX_FLAGS_DEBUG   "${BASE_COMPILE_FLAGS} -g -DDEBUG -DLOGURU_DEBUG_LOGGING")
-set(CMAKE_CXX_FLAGS_RELEASE "${BASE_COMPILE_FLAGS} -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG   "${BASE_COMPILE_FLAGS} -O0 -g -DDEBUG -DLOGURU_DEBUG_LOGGING")
+set(CMAKE_CXX_FLAGS_RELEASE "${BASE_COMPILE_FLAGS} -DNDEBUG -O3")
 
 #
 # ------------------------------------------------------------

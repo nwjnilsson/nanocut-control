@@ -29,7 +29,7 @@ public:
 	double length_from_starting_point(int i) const { return _distances[i]; }
 	bool has_next_node(int i) const { return static_cast<int>(_nodes.size()) > i; }
 	int node_count() const {  return static_cast<int>(_nodes.size()); }
-	bool is_empty() { return _nodes.empty(); }
+	bool is_empty() const { return _nodes.empty(); }
 	double total_length() const
 	{
 		assert(!_distances.empty());

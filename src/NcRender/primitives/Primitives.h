@@ -1,0 +1,9 @@
+#pragma once
+#include "Arc/Arc.h"
+#include "Box/Box.h"
+#include "Circle/Circle.h"
+#include "Image/Image.h"
+#include "Line/Line.h"
+#include "Part/Part.h"
+#include "Path/Path.h"
+#include "Text/Text.h"

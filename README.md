@@ -4,15 +4,11 @@ NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/
 NanoCut is Native Cross-Platform (Windows, Linux, and MacOS),
 but I have currently only tested it on Linux.
 
-This codebase ain't pretty, but at least I didn't have to re-write a similar
-program from scratch. Someone with tokens to spare should let AI re-write the
-whole thing...
-
 # Features
 - 2D Gcode Viewer
 - Built-In Machine Parameter Editing (No editing of Config files necessary)
 - Has a primary focus on CNC Plasma cutting and CNC Routing as a secondary focus
-- Click 'n Point Jogging
+- Point-and-Click Jogging
 - Arrow Key Jogging
 - Click and Point Gcode Jump in (No need to manually find a gcode line to jump into). Just hold control and click on the contour you would like to start from
 - User configurable Layout
