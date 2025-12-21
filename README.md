@@ -8,19 +8,22 @@ but I have currently only tested it on Linux.
 - 2D Gcode Viewer
 - Built-In Machine Parameter Editing (No editing of Config files necessary)
 - Has a primary focus on CNC Plasma cutting and CNC Routing as a secondary focus
-- Point-and-Click Jogging
 - Arrow Key Jogging
-- Click and Point Gcode Jump in (No need to manually find a gcode line to jump into). Just hold control and click on the contour you would like to start from
+- Click and Point Gcode Jump in (No need to manually find a gcode line to jump
+into). Just hold control and click on the contour you would like to start from
 - User configurable Layout
 - Built in torch touchoff routine. Instead of a gcode, use fire_torch [pierce_height] [pierce_delay] [cut_height]. torch_off to shut torch off
 - Built-in Toolpath workbench. Setup job options material size. Lay parts out in any configuration and post Gcode ready to run on the machine. Also has an early Auto-Nesting feature.
 ## Changes made by me
+I've re-written large parts of the codebase to make it somewhat more readable.
+The original codebase was a mess but it did kind of solve my problem so that's
+why I decided to build on top of it.
 - Add support limit pin inversion
-- Add support non-standard homing position for X-axis
-- Remove firmware update feature
 - Add customizable precise jog distance
-- Add support for click-and-drag movement of the control view (press and hold right click)
-- Much more robust DXF importer.
+- Add support for machine jogging by clicking anywhere on machine plane
+- Add support for click-and-drag movement of the control view (press and hold
+right click)
+- Much more robust DXF importer
 
 ![deer](assets/deer.png "High quality DXF importing for gcode generation")
 
