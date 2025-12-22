@@ -334,7 +334,7 @@ uint8_t NcRender::getFramesPerSecond()
 
 std::string NcRender::getCurrentView() const { return m_current_view; }
 
-std::vector<std::unique_ptr<Primitive>>& NcRender::getPrimitiveStack()
+std::deque<std::unique_ptr<Primitive>>& NcRender::getPrimitiveStack()
 {
   return m_primitive_stack;
 }

@@ -488,6 +488,252 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     ImGui::End();
   }
 
+  // Create Operation Dialog
+  if (show_create_operation == true) {
+    ImGui::Begin("Create Operation",
+                 &show_create_operation,
+                 ImGuiWindowFlags_AlwaysAutoResize);
+    static ToolOperation operation;
+    static int           operation_tool = -1;
+
+    // Auto-set lead in/out based on tool kerf width
+    if (m_tool_library.size() > static_cast<size_t>(operation_tool) &&
+        operation_tool != -1 &&
+        operation.lead_in_length == DEFAULT_LEAD_IN &&
+        operation.lead_out_length == DEFAULT_LEAD_OUT) {
+      operation.lead_in_length =
+        m_tool_library[operation_tool].params.at("kerf_width") * 1.5;
+      operation.lead_out_length =
+        m_tool_library[operation_tool].params.at("kerf_width") * 1.5;
+    }
+
+    // Tool selection combo
+    if (ImGui::BeginCombo("Choose Tool",
+                          operation_tool >= 0 && operation_tool < static_cast<int>(m_tool_library.size())
+                          ? m_tool_library[operation_tool].tool_name
+                          : "Select...")) {
+      for (size_t i = 0; i < m_tool_library.size(); i++) {
+        bool is_selected = (operation_tool == static_cast<int>(i));
+        if (ImGui::Selectable(m_tool_library[i].tool_name, is_selected)) {
+          operation_tool = i;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    // Layer selection combo
+    static int                   layer_selection = -1;
+    std::vector<std::string>     layers = getAllLayers();
+    if (ImGui::BeginCombo("Choose Layer",
+                          layer_selection >= 0 && layer_selection < static_cast<int>(layers.size())
+                          ? layers[layer_selection].c_str()
+                          : "Select...")) {
+      for (size_t i = 0; i < layers.size(); i++) {
+        bool is_selected = (layer_selection == static_cast<int>(i));
+        if (ImGui::Selectable(layers[i].c_str(), is_selected)) {
+          layer_selection = i;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    // Lead in/out settings
+    if (operation_tool != -1) {
+      ImGui::InputDouble("Lead In Length", &operation.lead_in_length);
+      ImGui::InputDouble("Lead Out Length", &operation.lead_out_length);
+    }
+
+    if (ImGui::Button("OK")) {
+      if (operation_tool != -1 && layer_selection != -1) {
+        if (operation.lead_in_length < 0)
+          operation.lead_in_length = 0;
+        if (operation.lead_out_length < 0)
+          operation.lead_out_length = 0;
+        operation.enabled = true;
+        operation.layer = layers[layer_selection];
+        operation.tool_number = operation_tool;
+        operation.type = OpType::Cut;
+        m_toolpath_operations.push_back(operation);
+        operation.lead_in_length = DEFAULT_LEAD_IN;
+        operation.lead_out_length = DEFAULT_LEAD_OUT;
+        operation_tool = -1;
+        layer_selection = -1;
+        show_create_operation = false;
+      }
+    }
+    ImGui::End();
+  }
+
+  // New Tool Dialog
+  if (show_new_tool == true) {
+    static ToolData tool;
+    ImGui::Begin("New Tool", &show_new_tool, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::InputText("Tool Name", tool.tool_name, IM_ARRAYSIZE(tool.tool_name));
+
+    for (auto& [key, value] : tool.params) {
+      ImGui::InputFloat(key.c_str(), &value);
+    }
+
+    if (ImGui::Button("OK")) {
+      bool skip_save = false;
+      for (const auto& [key, value] : tool.params) {
+        if (value < 0.f || value > 50000.f) {
+          LOG_F(WARNING, "Invalid tool input parameters.");
+          skip_save = true;
+          break;
+        }
+      }
+      if (!skip_save) {
+        m_tool_library.push_back(tool);
+
+        // Save to file
+        nlohmann::json tool_library;
+        for (size_t x = 0; x < m_tool_library.size(); x++) {
+          nlohmann::json tool_json;
+          tool_json["tool_name"] = std::string(m_tool_library[x].tool_name);
+          for (const auto& [key, value] : m_tool_library[x].params) {
+            tool_json[key] = value;
+          }
+          tool_library.push_back(tool_json);
+        }
+
+        renderer.dumpJsonToFile(renderer.getConfigDirectory() + "tool_library.json",
+                                tool_library);
+        show_new_tool = false;
+
+        // Reset tool data for next use
+        memset(tool.tool_name, 0, sizeof(tool.tool_name));
+        tool.params = {
+          { "pierce_height", 1.f }, { "pierce_delay", 1.f },
+          { "cut_height", 1.f },    { "kerf_width", DEFAULT_KERF_WIDTH },
+          { "feed_rate", 1.f },     { "thc", 0.f }
+        };
+      }
+    }
+    ImGui::End();
+  }
+
+  // Edit Tool Dialog
+  static ToolData edit_tool;
+  if (show_tool_edit != -1) {
+    if (!edit_tool.tool_name[0]) {
+      sprintf(edit_tool.tool_name, "%s", m_tool_library[show_tool_edit].tool_name);
+      edit_tool.params = m_tool_library[show_tool_edit].params;
+    }
+
+    ImGui::Begin("Tool Edit", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::InputText("Tool Name",
+                     m_tool_library[show_tool_edit].tool_name,
+                     IM_ARRAYSIZE(m_tool_library[show_tool_edit].tool_name));
+
+    for (const auto& [key, value] : m_tool_library[show_tool_edit].params) {
+      ImGui::InputFloat(key.c_str(), &edit_tool.params[key]);
+    }
+
+    if (ImGui::Button("OK")) {
+      bool skip_save = false;
+      for (const auto& [key, value] : edit_tool.params) {
+        if (value < 0.f || value > 50000.f) {
+          LOG_F(WARNING, "Invalid tool input parameters.");
+          skip_save = true;
+          break;
+        }
+      }
+      if (!skip_save) {
+        m_tool_library[show_tool_edit].params = edit_tool.params;
+
+        // Save to file
+        nlohmann::json tool_library;
+        for (size_t x = 0; x < m_tool_library.size(); x++) {
+          nlohmann::json tool_json;
+          tool_json["tool_name"] = std::string(m_tool_library[x].tool_name);
+          for (const auto& [key, value] : m_tool_library[x].params) {
+            tool_json[key] = value;
+          }
+          tool_library.push_back(tool_json);
+        }
+
+        renderer.dumpJsonToFile(renderer.getConfigDirectory() + "tool_library.json",
+                                tool_library);
+        show_tool_edit = -1;
+      }
+    }
+    ImGui::End();
+  }
+  else {
+    memset(edit_tool.tool_name, 0, sizeof(edit_tool.tool_name));
+  }
+
+  // Tool Library Dialog
+  if (show_tool_library == true) {
+    ImGui::Begin("Tool Library", &show_tool_library, ImGuiWindowFlags_AlwaysAutoResize);
+    if (ImGui::BeginTable("Tools", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+      ImGui::TableSetupColumn("Tool Name");
+      ImGui::TableSetupColumn("Pierce Height");
+      ImGui::TableSetupColumn("Pierce Delay");
+      ImGui::TableSetupColumn("Cut Height");
+      ImGui::TableSetupColumn("Kerf Width");
+      ImGui::TableSetupColumn("Feed Rate");
+      ImGui::TableSetupColumn("THC");
+      ImGui::TableSetupColumn("Action");
+      ImGui::TableHeadersRow();
+
+      for (size_t x = 0; x < m_tool_library.size(); ++x) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("%s", m_tool_library[x].tool_name);
+        ImGui::TableSetColumnIndex(1);
+        ImGui::Text("%.4f", m_tool_library[x].params.at("pierce_height"));
+        ImGui::TableSetColumnIndex(2);
+        ImGui::Text("%.4f", m_tool_library[x].params.at("pierce_delay"));
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%.4f", m_tool_library[x].params.at("cut_height"));
+        ImGui::TableSetColumnIndex(4);
+        ImGui::Text("%.4f", m_tool_library[x].params.at("kerf_width"));
+        ImGui::TableSetColumnIndex(5);
+        ImGui::Text("%.4f", m_tool_library[x].params.at("feed_rate"));
+        ImGui::TableSetColumnIndex(6);
+        ImGui::Text("%.4f", m_tool_library[x].params.at("thc"));
+        ImGui::TableSetColumnIndex(7);
+        if (ImGui::Button(std::string("Edit##Edit-" + std::to_string(x)).c_str())) {
+          show_tool_edit = x;
+          LOG_F(INFO, "show_tool_edit: %d", show_tool_edit);
+        }
+      }
+      ImGui::EndTable();
+    }
+    if (ImGui::Button("New Tool")) {
+      show_new_tool = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Close")) {
+      show_tool_library = false;
+    }
+    ImGui::End();
+  }
+
+  // Edit Tool Operation Dialog
+  if (show_edit_tool_operation != -1) {
+    ImGui::Begin("Edit Operation", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::InputDouble(
+      "Lead In Length",
+      &m_toolpath_operations[show_edit_tool_operation].lead_in_length);
+    ImGui::InputDouble(
+      "Lead Out Length",
+      &m_toolpath_operations[show_edit_tool_operation].lead_out_length);
+    if (ImGui::Button("OK")) {
+      m_toolpath_operations[show_edit_tool_operation].last_enabled = false;
+      show_edit_tool_operation = -1;
+    }
+    ImGui::End();
+  }
+
   // Main left pane
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(ImVec2(300, renderer.getWindowSize().y));
@@ -502,14 +748,11 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
   renderPartsViewer(selected_part);
   ImGui::Separator();
-  renderOperationsViewer(show_edit_tool_operation);
+  renderOperationsViewer(show_create_operation, show_edit_tool_operation);
   ImGui::Separator();
   renderLayersViewer();
 
   ImGui::End();
-
-  // TODO: Extract the huge dialogs (create operation, tool library, etc.)
-  // For now, keeping them inline to get this compiling
 }
 
 void NcCamView::renderPartsViewer(Part*& selected_part)
@@ -579,7 +822,7 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
   ImGui::EndTable();
 }
 
-void NcCamView::renderOperationsViewer(int& show_edit_tool_operation)
+void NcCamView::renderOperationsViewer(bool& show_create_operation, int& show_edit_tool_operation)
 {
   if (!ImGui::BeginTable("operations_view_table",
                          1,
@@ -590,8 +833,13 @@ void NcCamView::renderOperationsViewer(int& show_edit_tool_operation)
 
   ImGui::TableSetupColumn("Operations Viewer");
   ImGui::TableHeadersRow();
+
+  // Add "New Operation" button
   ImGui::TableNextRow();
   ImGui::TableSetColumnIndex(0);
+  if (ImGui::Button("New Operation")) {
+    show_create_operation = true;
+  }
 
   for (size_t x = 0; x < m_toolpath_operations.size(); x++) {
     auto& operation = m_toolpath_operations[x];
@@ -604,11 +852,11 @@ void NcCamView::renderOperationsViewer(int& show_edit_tool_operation)
       ImGui::Text("Jet: %s", operation.layer.c_str());
     }
     ImGui::SameLine();
-    if (ImGui::Button("Edit")) {
+    if (ImGui::Button(std::string("Edit##edit-op-" + std::to_string(x)).c_str())) {
       show_edit_tool_operation = x;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Delete")) {
+    if (ImGui::Button(std::string("Delete##del-op-" + std::to_string(x)).c_str())) {
       action_t action;
       action.action_id = "delete_operation";
       action.data["index"] = x;
@@ -1020,7 +1268,7 @@ bool NcCamView::dxfFileOpen(std::string filename,
     auto& renderer = m_app->getRenderer();
     m_dxf_creation_interface = std::make_unique<DXFParsePathAdaptor>(
       &renderer,
-      getViewMatrixCallback(),
+      getTransformCallback(),
       [this](Primitive* c, const nlohmann::json& e) {
         mouseEventCallback(c, e);
       },
@@ -1165,7 +1413,7 @@ void NcCamView::init()
   m_material_plane->color[0] = 100;
   m_material_plane->color[1] = 0;
   m_material_plane->color[2] = 0;
-  m_material_plane->matrix_callback = getViewMatrixCallback();
+  m_material_plane->matrix_callback = getTransformCallback();
   m_material_plane->mouse_callback =
     [this](Primitive* c, const nlohmann::json& e) { mouseEventCallback(c, e); };
   // TODO: Implement SetShowFPS in NcApp if needed
@@ -1197,7 +1445,6 @@ void NcCamView::tick()
               m_toolpath_operations[x].lead_in_length;
             part->m_control.lead_out_length =
               m_toolpath_operations[x].lead_out_length;
-            part->m_last_control.angle = 1; // Triggers rebuild
           }
         }
       });

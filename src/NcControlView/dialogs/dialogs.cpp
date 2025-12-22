@@ -28,6 +28,7 @@ void NcDialogs::renderFileOpen()
       out << filePath;
       out << "/";
       out.close();
+      m_view->getHmi().clearHighlights();
       auto& gcode = m_app->getControlView().getGCode();
       if (gcode.openFile(filePathName)) {
         m_app->getRenderer().pushTimer(

@@ -31,7 +31,10 @@ public:
     bool operator==(const part_control_data_t& a) const
     {
       return (offset.x == a.offset.x && offset.y == a.offset.y &&
-              scale == a.scale && smoothing == a.smoothing && angle == a.angle);
+              lead_in_length == a.lead_in_length &&
+              lead_out_length == a.lead_out_length &&
+              scale == a.scale && smoothing == a.smoothing && angle == a.angle &&
+              mouse_mode == a.mouse_mode);
     }
   };
 

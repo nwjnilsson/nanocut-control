@@ -49,7 +49,7 @@ void View::handleMouseMove(const Point2d& current_mouse_pos)
   if (m_move_view) {
     // Calculate delta and update pan
     Point2d delta = { current_mouse_pos.x - m_last_mouse_pos.x,
-                             current_mouse_pos.y - m_last_mouse_pos.y };
+                      current_mouse_pos.y - m_last_mouse_pos.y };
     adjustPan(delta);
     m_last_mouse_pos = current_mouse_pos;
   }
@@ -66,26 +66,32 @@ Point2d View::matrixToScreen(const Point2d& matrix_pos) const
   return { matrix_pos.x * m_zoom + m_pan.x, matrix_pos.y * m_zoom + m_pan.y };
 }
 
-void View::applyViewTransformation(Primitive* primitive)
+void View::applyViewTransform(Primitive* primitive)
 {
   if (!primitive)
     return;
 
-  if (primitive->data.is_null() ||
-      !primitive->data.contains("original_offset")) {
-    primitive->data["original_offset"] = { { "x", primitive->offset[0] },
-                                           { "y", primitive->offset[1] },
-                                           { "z", primitive->offset[2] } };
-  }
+  // Get view-specific work coordinate offset
+  Point2d work_offset = getWorkOffset();
 
-  double orig_x = primitive->data["original_offset"]["x"].get<double>();
-  double orig_y = primitive->data["original_offset"]["y"].get<double>();
-  primitive->offset[0] = orig_x * m_zoom + m_pan.x;
-  primitive->offset[1] = orig_y * m_zoom + m_pan.y;
-  primitive->scale = m_zoom;
+  // Calculate work coordinate offset transform values
+  // This combines pan with work offset scaled by zoom
+  const double wco_x = m_pan.x + std::abs(work_offset.x * m_zoom);
+  const double wco_y = m_pan.y + std::abs(work_offset.y * m_zoom);
+
+  // Prepare transform data
+  TransformData transform;
+  transform.zoom = m_zoom;
+  transform.pan_x = m_pan.x;
+  transform.pan_y = m_pan.y;
+  transform.wco_x = wco_x;
+  transform.wco_y = wco_y;
+
+  // Apply transform using polymorphic dispatch
+  primitive->applyTransform(transform);
 }
 
-std::function<void(Primitive*)> View::getViewMatrixCallback()
+std::function<void(Primitive*)> View::getTransformCallback()
 {
-  return [this](Primitive* primitive) { applyViewTransformation(primitive); };
+  return [this](Primitive* primitive) { applyViewTransform(primitive); };
 }

@@ -38,23 +38,17 @@ public:
   double getZoom() const { return m_zoom; }
   void   setZoom(double zoom) { m_zoom = zoom; }
   void   adjustZoom(double zoom_factor, const Point2d& zoom_center);
-  void   zoomIn(const Point2d& center = { 0, 0 })
-  {
-    adjustZoom(1.1, center);
-  }
-  void zoomOut(const Point2d& center = { 0, 0 })
-  {
-    adjustZoom(0.9, center);
-  }
-  void resetZoom()
+  void   zoomIn(const Point2d& center = { 0, 0 }) { adjustZoom(1.1, center); }
+  void   zoomOut(const Point2d& center = { 0, 0 }) { adjustZoom(0.9, center); }
+  void   resetZoom()
   {
     m_zoom = 1.0;
     m_pan = { 0, 0 };
   }
 
   const Point2d& getPan() const { return m_pan; }
-  void                  setPan(const Point2d& pan) { m_pan = pan; }
-  void                  adjustPan(const Point2d& delta)
+  void           setPan(const Point2d& pan) { m_pan = pan; }
+  void           adjustPan(const Point2d& delta)
   {
     m_pan.x += delta.x;
     m_pan.y += delta.y;
@@ -70,17 +64,22 @@ public:
   Point2d matrixToScreen(const Point2d& matrix_pos) const;
 
   // Matrix transformation callback for primitives
-  void                            applyViewTransformation(Primitive* primitive);
-  std::function<void(Primitive*)> getViewMatrixCallback();
+  void                            applyViewTransform(Primitive* primitive);
+  std::function<void(Primitive*)> getTransformCallback();
+
+  // Virtual method for view-specific coordinate offsets (e.g., machine work
+  // offsets) Default implementation returns (0, 0) - override in derived
+  // classes as needed
+  virtual Point2d getWorkOffset() const { return { 0.0, 0.0 }; }
 
 protected:
   NcApp* m_app{ nullptr };
 
   // View-specific transform state
-  double         m_zoom{ 1.0 };
+  double  m_zoom{ 1.0 };
   Point2d m_pan{ 0.0, 0.0 };
 
   // Pan/drag state
-  bool           m_move_view{ false };
+  bool    m_move_view{ false };
   Point2d m_last_mouse_pos{ 0.0, 0.0 };
 };

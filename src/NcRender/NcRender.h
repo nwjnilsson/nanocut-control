@@ -8,12 +8,12 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <string>
 #include <sys/time.h>
 #include <variant>
-#include <vector>
 
 #ifdef __APPLE__
 #  define GL_SILENCE_DEPRECATION
@@ -71,8 +71,8 @@ private:
   std::string        m_gui_style;
   std::string        m_current_view;
 
-  std::vector<std::unique_ptr<Primitive>> m_primitive_stack;
-  std::vector<NcRenderTimer>              m_timer_stack;
+  std::deque<std::unique_ptr<Primitive>> m_primitive_stack;
+  std::vector<NcRenderTimer>             m_timer_stack;
 
   static void
   keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -170,7 +170,7 @@ public:
   Point2d     getWindowSize();
   uint8_t     getFramesPerSecond();
   std::string getCurrentView() const;
-  std::vector<std::unique_ptr<Primitive>>& getPrimitiveStack();
+  std::deque<std::unique_ptr<Primitive>>& getPrimitiveStack();
 
   /* Debugging */
   nlohmann::json dumpPrimitiveStack();

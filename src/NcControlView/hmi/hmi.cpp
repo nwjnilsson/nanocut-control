@@ -249,7 +249,7 @@ void NcHmi::handleButton(const std::string& id)
     }
     if (id == "Clean") {
       LOG_F(INFO, "Clicked Clean");
-      m_app->getRenderer().deletePrimitivesById("gcode_highlights");
+      clearHighlights();
     }
     else if (id == "Fit") {
       LOG_F(INFO, "Clicked Fit");
@@ -455,6 +455,7 @@ void NcHmi::reverse(Primitive* p)
       out << std::endl;
     }
     out.close();
+    clearHighlights();
     if (control_view.getGCode().openFile(filename)) {
       auto& gcode = control_view.getGCode();
       m_app->getRenderer().pushTimer(0,
@@ -577,34 +578,6 @@ void NcHmi::mouseCallback(Primitive* c, const nlohmann::json& e)
   }
 }
 
-void NcHmi::viewMatrix(Primitive* p)
-{
-  if (!m_app)
-    return;
-  auto&   control_view = m_app->getControlView();
-  double  current_zoom = m_view->getZoom();
-  Point2d current_pan = m_view->getPan();
-
-  // Calculate work coordinate offset (WCO) transform values
-  const double wco_zoom_x =
-    current_pan.x +
-    abs(control_view.m_machine_parameters.work_offset[0] * current_zoom);
-  const double wco_zoom_y =
-    current_pan.y +
-    abs(control_view.m_machine_parameters.work_offset[1] * current_zoom);
-
-  // Prepare transform data
-  TransformData transform;
-  transform.zoom = current_zoom;
-  transform.pan_x = current_pan.x;
-  transform.pan_y = current_pan.y;
-  transform.wco_x = wco_zoom_x;
-  transform.wco_y = wco_zoom_y;
-
-  // Apply transform using polymorphic dispatch
-  p->applyTransform(transform);
-}
-
 bool NcHmi::updateTimer()
 {
   if (!m_app)
@@ -656,10 +629,13 @@ bool NcHmi::updateTimer()
         m_dro_backpane->color[1] = 32;
         m_dro_backpane->color[2] = 48;
       }
-      if ((bool) dro_data["ARC_OK"] == false) {
+      // if ((bool) dro_data["ARC_OK"] == false) {
+      if ((bool) dro_data["ARC_OK"] == true) {
         m_app->getRenderer().setColorByName(m_dro.arc_readout->color, "red");
         // Keep adding m_points to current highlight path
-        const Point2d wc_point{ abs(wcx), abs(wcy) };
+        // Negated because this is how gcode is interpreted to be consistent
+        // with grbl's machine coordinates
+        const Point2d wc_point{ -wcx, -wcy };
         if (not m_arc_okay_highlight_path) {
           std::vector<Point2d> path{ wc_point };
           m_arc_okay_highlight_path =
@@ -669,9 +645,8 @@ bool NcHmi::updateTimer()
           m_arc_okay_highlight_path->m_width = 3;
           m_app->getRenderer().setColorByName(m_arc_okay_highlight_path->color,
                                               "green");
-          auto& control_view = m_app->getControlView();
           m_arc_okay_highlight_path->matrix_callback =
-            control_view.m_view_matrix;
+            m_view->getTransformCallback();
         }
         else {
           m_arc_okay_highlight_path->m_points.push_back(wc_point);
@@ -844,6 +819,14 @@ void NcHmi::pushButtonGroup(const std::string& b1, const std::string& b2)
   m_app->getRenderer().setColorByName(group.button_two.label->color, "white");
 
   m_button_groups.push_back(group);
+}
+
+void NcHmi::clearHighlights()
+{
+  if (!m_app)
+    return;
+  m_app->getRenderer().deletePrimitivesById("gcode_highlights");
+  m_arc_okay_highlight_path = nullptr;
 }
 
 void NcHmi::tabKeyUpCallback(const nlohmann::json& e)
@@ -1209,7 +1192,7 @@ void NcHmi::init()
   control_view.m_machine_plane->color[2] =
     control_view.m_preferences.machine_plane_color[2] * 255.0f;
   control_view.m_machine_plane->matrix_callback =
-    m_view->getViewMatrixCallback();
+    m_view->getTransformCallback();
   control_view.m_machine_plane->mouse_callback =
     [this](Primitive* c, const nlohmann::json& e) { mouseCallback(c, e); };
 
@@ -1232,7 +1215,7 @@ void NcHmi::init()
   control_view.m_cuttable_plane->color[2] =
     control_view.m_preferences.cuttable_plane_color[2] * 255.0f;
   control_view.m_cuttable_plane->matrix_callback =
-    m_view->getViewMatrixCallback();
+    m_view->getTransformCallback();
 
   m_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
@@ -1360,7 +1343,7 @@ void NcHmi::init()
   m_app->getRenderer().setColorByName(control_view.m_torch_pointer->color,
                                       "green");
   control_view.m_torch_pointer->matrix_callback =
-    m_view->getViewMatrixCallback();
+    m_view->getTransformCallback();
 
   control_view.m_waypoint_pointer =
     m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 8);
@@ -1369,7 +1352,7 @@ void NcHmi::init()
   m_app->getRenderer().setColorByName(control_view.m_waypoint_pointer->color,
                                       "orange");
   control_view.m_waypoint_pointer->matrix_callback =
-    m_view->getViewMatrixCallback();
+    m_view->getTransformCallback();
   control_view.m_waypoint_pointer->visible = false;
 
   // Events now handled through NcControlView delegation system

@@ -93,7 +93,7 @@ private:
                       int&   show_edit_tool_operation,
                       Part*& selected_part);
   void renderPartsViewer(Part*& selected_part);
-  void renderOperationsViewer(int& show_edit_tool_operation);
+  void renderOperationsViewer(bool& show_create_operation, int& show_edit_tool_operation);
   void renderLayersViewer();
 
   // Action handlers

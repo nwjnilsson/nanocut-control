@@ -54,6 +54,17 @@ void        Circle::processMouse(float mpos_x, float mpos_y)
     }
   }
 }
+
+void Circle::applyTransform(const TransformData& transform)
+{
+  if (id == "torch_pointer" or id == "waypoint_pointer") {
+    // Scale radius to keep pointers size consistent
+    m_radius *= scale / transform.zoom;
+  }
+  // Apply default screen-coordinate transform
+  Primitive::applyTransform(transform);
+}
+
 void Circle::renderArc(
   double cx, double cy, double radius, double start_angle, double end_angle)
 {

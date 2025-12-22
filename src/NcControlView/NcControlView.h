@@ -79,7 +79,6 @@ public:
   Circle*                         m_waypoint_pointer;
   MachineParameters               m_machine_parameters;
   Point2d                         m_way_point_position;
-  std::function<void(Primitive*)> m_view_matrix;
 
   // UI elements
   NcRender::NcRenderGui* m_menu_bar = nullptr;
@@ -103,7 +102,7 @@ public:
   explicit NcControlView(NcApp* app)
     : View(app), m_machine_plane(nullptr), m_cuttable_plane(nullptr),
       m_torch_pointer(nullptr), m_waypoint_pointer(nullptr),
-      m_way_point_position{}, m_view_matrix(), m_motion_controller(nullptr),
+      m_way_point_position{}, m_motion_controller(nullptr),
       m_hmi(nullptr), m_app(app) {
         // Dependency injection constructor
       };
@@ -128,6 +127,13 @@ public:
                             const InputState&     input) override;
   void handleWindowResize(const WindowResizeEvent& e,
                           const InputState&        input) override;
+
+  // Override to provide machine work coordinate offset for transformations
+  Point2d getWorkOffset() const override
+  {
+    return { m_machine_parameters.work_offset[0],
+             m_machine_parameters.work_offset[1] };
+  }
 
   // Motion controller access
   MotionController& getMotionController() { return *m_motion_controller; }

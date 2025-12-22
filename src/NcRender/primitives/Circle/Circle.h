@@ -3,6 +3,7 @@
 
 #include "../../geometry/geometry.h"
 #include "../Primitive.h"
+#include <NcRender/logging/loguru.h>
 #include <string>
 
 class Circle : public Primitive {
@@ -13,7 +14,7 @@ public:
   std::string m_style; // solid, dashed
 
   Circle(Point2d c, float r)
-    : m_center(c), m_radius(r), m_width(1), m_style("solid")
+    : m_center(c), m_radius(r), m_width(2), m_style("solid")
   {
   }
 
@@ -24,21 +25,7 @@ public:
   nlohmann::json serialize() override;
 
   // Override transform - adjust radius for specific pointer IDs
-  void applyTransform(const TransformData& transform) override
-  {
-    // Apply default screen-coordinate transform
-    scale = transform.zoom;
-    offset[0] = transform.pan_x;
-    offset[1] = transform.pan_y;
-
-    // Adjust radius inversely with zoom for specific IDs
-    if (id == "torch_pointer") {
-      m_radius = 5.0f / transform.zoom;
-    }
-    else if (id == "waypoint_pointer") {
-      m_radius = 8.0f / transform.zoom;
-    }
-  }
+  void applyTransform(const TransformData& transform) override;
 
   // Circle-specific methods
   void renderArc(

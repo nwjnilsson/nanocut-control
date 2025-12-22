@@ -75,10 +75,11 @@ public:
 
   // Callbacks for primitives
   void mouseCallback(Primitive* c, const nlohmann::json& e);
-  void viewMatrix(Primitive* p);
 
   // Utility methods
   void getBoundingBox(Point2d* bbox_min, Point2d* bbox_max);
+
+  void clearHighlights();
 
 private:
   // Application context

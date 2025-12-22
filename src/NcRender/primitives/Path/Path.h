@@ -9,12 +9,12 @@
 class Path : public Primitive {
 public:
   std::vector<Point2d> m_points;
-  bool                        m_is_closed;
-  float                       m_width;
-  std::string                 m_style; // solid, dashed
+  bool                 m_is_closed;
+  float                m_width;
+  std::string          m_style; // solid, dashed
 
   Path(const std::vector<Point2d>& p)
-    : m_points(p), m_is_closed(true), m_width(1), m_style("solid")
+    : m_points(p), m_is_closed(true), m_width(2), m_style("solid")
   {
   }
 

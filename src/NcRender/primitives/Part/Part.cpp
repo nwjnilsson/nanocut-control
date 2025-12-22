@@ -239,11 +239,17 @@ void Part::render()
     for (std::vector<path_t>::iterator it = m_paths.begin();
          it != m_paths.end();
          ++it) {
-      // LOG_F(INFO, "Rebuilding part!");
       it->built_points.clear();
       try {
         std::vector<Point2d> simplified;
-        simplify(it->points, simplified, m_control.smoothing);
+
+        // For closed paths with very few points, skip simplification to preserve geometry
+        if (it->is_closed && it->points.size() <= 6) {
+          simplified = it->points;
+        } else {
+          simplify(it->points, simplified, m_control.smoothing);
+        }
+
         for (size_t i = 0; i < simplified.size(); i++) {
           Point2d rotated =
             g.rotatePoint({ 0, 0 }, simplified[i], m_control.angle);
@@ -254,6 +260,10 @@ void Part::render()
         }
         if (it->toolpath_visible == true) {
           if (it->is_closed == true) {
+            // Need at least 3 points to form a valid closed polygon
+            if (it->built_points.size() < 3) {
+              continue;
+            }
             if (it->is_inside_contour == true) {
               std::vector<std::vector<Point2d>> tpaths = offsetPath(
                 it->built_points, -(double) fabs(it->toolpath_offset));

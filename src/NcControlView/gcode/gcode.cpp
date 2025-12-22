@@ -44,7 +44,6 @@ bool GCode::openFile(const std::string& filepath)
   if (m_file.is_open()) {
     renderer.deletePrimitivesById("gcode");
     renderer.deletePrimitivesById("gcode_arrows");
-    renderer.deletePrimitivesById("gcode_highlights");
     m_line_count = countLines(filepath);
     m_lines_consumed = 0;
     m_filename = filepath;
@@ -94,8 +93,10 @@ nlohmann::json GCode::parseLine(const std::string& line)
       }
     }
   }
-  ret["x"] = atof(x_value.c_str());
-  ret["y"] = atof(y_value.c_str());
+  // Store gcode internally as negated values since
+  // grbl does this for machine coordinates
+  ret["x"] = -atof(x_value.c_str());
+  ret["y"] = -atof(y_value.c_str());
   return ret;
 }
 
@@ -117,19 +118,20 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
             (point_count == 0 && i + 1 < simplified.size())) {
           std::vector<Point2d> arrow_path;
           Point2d midpoint = geo.midpoint(simplified[i + 1], simplified[i]);
-          arrow_path.push_back({ midpoint.x, midpoint.y });
-          double angle =
+          double  angle =
             geo.measurePolarAngle(simplified[i + 1], simplified[i]);
           Point2d p1 =
             geo.createPolarLine(midpoint, angle + 30, SCALE(0.5)).end;
           Point2d p2 =
             geo.createPolarLine(midpoint, angle - 30, SCALE(0.5)).end;
           arrow_path.push_back({ p1.x, p1.y });
+          arrow_path.push_back({ midpoint.x, midpoint.y });
           arrow_path.push_back({ p2.x, p2.y });
           Path* direction_indicator = renderer.pushPrimitive<Path>(arrow_path);
+          direction_indicator->m_is_closed = false; // V shaped
           renderer.setColorByName(direction_indicator->color, "blue");
           direction_indicator->id = "gcode_arrows";
-          direction_indicator->matrix_callback = m_view->m_view_matrix;
+          direction_indicator->matrix_callback = m_view->getTransformCallback();
           direction_indicator->visible = false;
         }
         path.push_back({ simplified[i].x, simplified[i].y });
@@ -143,7 +145,7 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
       g->id = "gcode";
       g->data = { { "rapid_line", rapid_line } };
       renderer.setColorByName(g->color, "white");
-      g->matrix_callback = m_view->m_view_matrix;
+      g->matrix_callback = m_view->getTransformCallback();
       g->mouse_callback = [view = m_view](Primitive*            c,
                                           const nlohmann::json& e) {
         view->getHmi().mouseCallback(c, e);
@@ -189,7 +191,7 @@ bool GCode::parseTimer()
             l->id = "gcode";
             l->m_style = "dashed";
             renderer.setColorByName(l->color, "grey");
-            l->matrix_callback = m_view->m_view_matrix;
+            l->matrix_callback = m_view->getTransformCallback();
             l->visible = false;
           }
         }

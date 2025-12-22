@@ -204,11 +204,6 @@ void NcControlView::preInit()
     m_machine_parameters.invert_step_enable = false;
     m_machine_parameters.precise_jog_units = SCALE(5.f);
   }
-  m_view_matrix = [this](Primitive* p) {
-    if (m_hmi) {
-      m_hmi->viewMatrix(p);
-    }
-  };
 }
 
 void NcControlView::renderUI()
