@@ -629,8 +629,7 @@ bool NcHmi::updateTimer()
         m_dro_backpane->color[1] = 32;
         m_dro_backpane->color[2] = 48;
       }
-      // if ((bool) dro_data["ARC_OK"] == false) {
-      if ((bool) dro_data["ARC_OK"] == true) {
+      if ((bool) dro_data["ARC_OK"] == false) {
         m_app->getRenderer().setColorByName(m_dro.arc_readout->color, "red");
         // Keep adding m_points to current highlight path
         // Negated because this is how gcode is interpreted to be consistent
@@ -1337,7 +1336,7 @@ void NcHmi::init()
   m_dro.run_time->color[2] = 15;
 
   control_view.m_torch_pointer =
-    m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 10);
+    m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 5);
   control_view.m_torch_pointer->zindex = 500;
   control_view.m_torch_pointer->id = "torch_pointer";
   m_app->getRenderer().setColorByName(control_view.m_torch_pointer->color,
@@ -1346,11 +1345,11 @@ void NcHmi::init()
     m_view->getTransformCallback();
 
   control_view.m_waypoint_pointer =
-    m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 8);
+    m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 5);
   control_view.m_waypoint_pointer->zindex = 501;
   control_view.m_waypoint_pointer->id = "waypoint_pointer";
   m_app->getRenderer().setColorByName(control_view.m_waypoint_pointer->color,
-                                      "orange");
+                                      "yellow");
   control_view.m_waypoint_pointer->matrix_callback =
     m_view->getTransformCallback();
   control_view.m_waypoint_pointer->visible = false;

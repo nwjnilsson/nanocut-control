@@ -1,6 +1,6 @@
 #include "DXFParsePathAdaptor.h"
-#include "application.h"
 #include "NcCamView/NcCamView.h"
+#include "application.h"
 #include <NcRender/logging/loguru.h>
 #include <cmath>
 #include <dxf/spline/Bezier.h>
@@ -413,7 +413,7 @@ DXFParsePathAdaptor::DXFParsePathAdaptor(
   NcRender*                                              nc_render_instance,
   std::function<void(Primitive*)>                        view_callback,
   std::function<void(Primitive*, const nlohmann::json&)> mouse_callback,
-  NcCamView*                                            cam_view)
+  NcCamView*                                             cam_view)
 {
   m_current_layer = "default";
   m_filename = "";
@@ -423,7 +423,7 @@ DXFParsePathAdaptor::DXFParsePathAdaptor(
   m_cam_view = cam_view;
   m_smoothing = SCALE(0.25);
   m_import_scale = 1.0;
-  m_chain_tolerance = SCALE(0.5);
+  m_chain_tolerance = SCALE(0.25);
 }
 
 void DXFParsePathAdaptor::setImportScale(double scale)
@@ -641,7 +641,6 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
           for (size_t idx : it_start->second) {
             if (!used[idx]) {
               candidates.push_back(idx);
-              break;
             }
           }
         }
@@ -651,7 +650,6 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
           for (size_t idx : it_end->second) {
             if (!used[idx]) {
               candidates.push_back(idx);
-              break;
             }
           }
         }
@@ -663,25 +661,32 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
     candidates.erase(std::unique(candidates.begin(), candidates.end()),
                      candidates.end());
 
-    // Search in index order (matching original's for loop order)
+    // Find the CLOSEST match within tolerance, not just the first
     Point2d p2;
+    int best_idx = -1;
+    double best_dist = tolerance;
+
     for (size_t idx : candidates) {
       // Check start point
       p2.x = haystack[idx].start.x;
       p2.y = haystack[idx].start.y;
-      if (g.distance(p1, p2) < tolerance) {
-        return idx;
+      double dist_start = g.distance(p1, p2);
+      if (dist_start < best_dist) {
+        best_dist = dist_start;
+        best_idx = idx;
       }
 
       // Check end point
       p2.x = haystack[idx].end.x;
       p2.y = haystack[idx].end.y;
-      if (g.distance(p1, p2) < tolerance) {
-        return idx;
+      double dist_end = g.distance(p1, p2);
+      if (dist_end < best_dist) {
+        best_dist = dist_end;
+        best_idx = idx;
       }
     }
 
-    return -1;
+    return best_idx;
   };
 
   // Process all lines
@@ -772,7 +777,7 @@ void DXFParsePathAdaptor::scaleAllPoints(double scale)
     for (auto& v : pl.points) {
       v.point.x *= scale;
       v.point.y *= scale;
-      v.bulge *= scale;
+      // Note: bulge is a dimensionless ratio (tan(angle/4)), not scaled
     }
   }
   for (auto& s : m_splines) {
@@ -784,9 +789,7 @@ void DXFParsePathAdaptor::scaleAllPoints(double scale)
       p.x *= scale;
       p.y *= scale;
     }
-    for (auto& k : s.knots) {
-      k *= scale;
-    }
+    // Note: knots are parameter values, not spatial coordinates - don't scale them
   }
   for (auto& l : m_line_stack) {
     l.start.x *= scale;
@@ -1038,6 +1041,7 @@ void DXFParsePathAdaptor::finish()
   // Chain all lines into contours
   std::vector<std::vector<Point2d>> chains =
     chainify(m_line_stack, m_chain_tolerance);
+
   std::vector<Part::path_t> paths;
   Point2d                   bb_min, bb_max;
   getBoundingBox(chains, bb_min, bb_max);
@@ -1054,8 +1058,8 @@ void DXFParsePathAdaptor::finish()
       path.is_closed = true;
     }
 
-    m_nc_render_instance->setColorByName(
-      path.color, m_cam_view->m_outside_contour_color);
+    m_nc_render_instance->setColorByName(path.color,
+                                         m_cam_view->m_outside_contour_color);
 
     for (size_t j = 0; j < chains[i].size(); j++) {
       const double px = chains[i][j].x - bb_min.x;
@@ -1117,20 +1121,23 @@ void DXFParsePathAdaptor::explodeArcToLines(double cx,
 
   pointList.push_back(Point(start.x, start.y));
 
-  double diff =
-    std::max(start_angle, end_angle) - std::min(start_angle, end_angle);
-  if (diff > 180)
-    diff = 360 - diff;
-  double angle_increment = diff / num_segments;
+  // DXF arcs are always counter-clockwise from start_angle to end_angle
+  double angle_span = end_angle - start_angle;
+  if (angle_span < 0.0)
+    angle_span += 360.0;
+
+  double angle_increment = angle_span / num_segments;
   double angle_pointer = start_angle + angle_increment;
 
-  for (int i = 0; i < num_segments; i++) {
+  // Generate num_segments-1 intermediate points (the last iteration would equal end_angle)
+  for (int i = 0; i < num_segments - 1; i++) {
     sweeper.x = cx + (r * cosf((angle_pointer) *M_PI / 180.0f));
     sweeper.y = cy + (r * sinf((angle_pointer) *M_PI / 180.0f));
     angle_pointer += angle_increment;
     pointList.push_back(Point(sweeper.x, sweeper.y));
   }
 
+  // Always add the exact end point
   pointList.push_back(Point(end.x, end.y));
 
   for (size_t i = 1; i < pointList.size(); i++) {
