@@ -106,31 +106,31 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
     return;
   auto& renderer = m_app->getRenderer();
 
-  Geometry geo;
   try {
     if (m_current_path.points.size() > 1) {
       std::vector<Point2d> simplified =
-        geo.simplify(m_current_path.points, SCALE(0.25));
+        geo::simplify(m_current_path.points, SCALE(0.25));
       std::vector<Point2d> path;
       int                  point_count = 0;
       for (int i = 0; i < simplified.size(); i++) {
         if ((i == 0 && i + 1 < simplified.size()) ||
             (point_count == 0 && i + 1 < simplified.size())) {
           std::vector<Point2d> arrow_path;
-          Point2d midpoint = geo.midpoint(simplified[i + 1], simplified[i]);
+          Point2d midpoint = geo::midpoint(simplified[i + 1], simplified[i]);
           double  angle =
-            geo.measurePolarAngle(simplified[i + 1], simplified[i]);
+            geo::measurePolarAngle(simplified[i + 1], simplified[i]);
           Point2d p1 =
-            geo.createPolarLine(midpoint, angle + 30, SCALE(0.5)).end;
+            geo::createPolarLine(midpoint, angle + 30, SCALE(0.5)).end;
           Point2d p2 =
-            geo.createPolarLine(midpoint, angle - 30, SCALE(0.5)).end;
+            geo::createPolarLine(midpoint, angle - 30, SCALE(0.5)).end;
           arrow_path.push_back({ p1.x, p1.y });
           arrow_path.push_back({ midpoint.x, midpoint.y });
           arrow_path.push_back({ p2.x, p2.y });
           Path* direction_indicator = renderer.pushPrimitive<Path>(arrow_path);
           direction_indicator->m_is_closed = false; // V shaped
-          renderer.setColorByName(direction_indicator->color, "blue");
+          direction_indicator->color = getColor(Color::Blue);
           direction_indicator->id = "gcode_arrows";
+          direction_indicator->flags = PrimitiveFlags::GCode | PrimitiveFlags::GCodeArrow;
           direction_indicator->matrix_callback = m_view->getTransformCallback();
           direction_indicator->visible = false;
         }
@@ -143,11 +143,12 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
       Path* g = renderer.pushPrimitive<Path>(path);
       g->m_is_closed = false;
       g->id = "gcode";
-      g->data = { { "rapid_line", rapid_line } };
-      renderer.setColorByName(g->color, "white");
+      g->flags = PrimitiveFlags::GCode;
+      g->user_data = rapid_line;  // Store rapid_line index as type-safe int
+      g->color = getColor(Color::White);
       g->matrix_callback = m_view->getTransformCallback();
-      g->mouse_callback = [view = m_view](Primitive*            c,
-                                          const nlohmann::json& e) {
+      g->mouse_callback = [view = m_view](Primitive*                           c,
+                                          const Primitive::MouseEventData& e) {
         view->getHmi().mouseCallback(c, e);
       };
       g->visible = false;
@@ -189,8 +190,9 @@ bool GCode::parseTimer()
             Line* l = renderer.pushPrimitive<Line>(
               last_path_endpoint, Point2d{ (double) g["x"], (double) g["y"] });
             l->id = "gcode";
+            l->flags = PrimitiveFlags::GCode;
             l->m_style = "dashed";
-            renderer.setColorByName(l->color, "grey");
+            l->color = getColor(Color::Grey);
             l->matrix_callback = m_view->getTransformCallback();
             l->visible = false;
           }
@@ -227,8 +229,7 @@ bool GCode::parseTimer()
       m_view->getDialogs().showProgressWindow(false);
       auto& stack = renderer.getPrimitiveStack();
       for (size_t x = 0; x < stack.size(); x++) {
-        if (stack.at(x)->id == "gcode" || stack.at(x)->id == "gcode_arrows" ||
-            stack.at(x)->id == "gcode_highlights") {
+        if ((stack.at(x)->flags & PrimitiveFlags::GCode) != PrimitiveFlags::None) {
           stack.at(x)->visible = true;
         }
       }

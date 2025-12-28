@@ -9,7 +9,6 @@ pkgs.stdenv.mkDerivation {
     libGL
     zlib
     libGLU
-    llvmPackages.openmp
     glfw
   ];
 }

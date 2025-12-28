@@ -17,7 +17,7 @@ public:
     bool                 toolpath_visible;
     bool                 is_closed;
     bool                 is_inside_contour;
-    float                color[4];
+    Color4f              color;
   };
   struct part_control_data_t {
     Point2d offset;
@@ -32,8 +32,8 @@ public:
     {
       return (offset.x == a.offset.x && offset.y == a.offset.y &&
               lead_in_length == a.lead_in_length &&
-              lead_out_length == a.lead_out_length &&
-              scale == a.scale && smoothing == a.smoothing && angle == a.angle &&
+              lead_out_length == a.lead_out_length && scale == a.scale &&
+              smoothing == a.smoothing && angle == a.angle &&
               mouse_mode == a.mouse_mode);
     }
   };

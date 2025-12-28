@@ -74,18 +74,18 @@ void NcDialogs::renderPreferences()
       m_app->getControlView().m_preferences.background_color[1] * 255.0f,
       m_app->getControlView().m_preferences.background_color[2] * 255.0f);
 
-    m_app->getControlView().m_machine_plane->color[0] =
+    m_app->getControlView().m_machine_plane->color.r =
       m_app->getControlView().m_preferences.machine_plane_color[0] * 255.0f;
-    m_app->getControlView().m_machine_plane->color[1] =
+    m_app->getControlView().m_machine_plane->color.g =
       m_app->getControlView().m_preferences.machine_plane_color[1] * 255.0f;
-    m_app->getControlView().m_machine_plane->color[2] =
+    m_app->getControlView().m_machine_plane->color.b =
       m_app->getControlView().m_preferences.machine_plane_color[2] * 255.0f;
 
-    m_app->getControlView().m_cuttable_plane->color[0] =
+    m_app->getControlView().m_cuttable_plane->color.r =
       m_app->getControlView().m_preferences.cuttable_plane_color[0] * 255.0f;
-    m_app->getControlView().m_cuttable_plane->color[1] =
+    m_app->getControlView().m_cuttable_plane->color.g =
       m_app->getControlView().m_preferences.cuttable_plane_color[1] * 255.0f;
-    m_app->getControlView().m_cuttable_plane->color[2] =
+    m_app->getControlView().m_cuttable_plane->color.b =
       m_app->getControlView().m_preferences.cuttable_plane_color[2] * 255.0f;
 
     // Write preferences to file
@@ -117,7 +117,7 @@ void NcDialogs::renderPreferences()
       m_app->getControlView().m_preferences.window_size[1];
 
     std::ofstream out(m_app->getRenderer().getConfigDirectory() +
-                      "m_preferences.json");
+                      "preferences.json");
     out << preferences.dump();
     out.close();
     showPreferences(false);
@@ -137,7 +137,7 @@ void NcDialogs::showMachineParameters(bool visible)
 void NcDialogs::renderMachineParameters()
 {
   static NcControlView::MachineParameters temp_parameters =
-    m_app->getControlView().m_machine_parameters;
+    m_view->m_machine_parameters;
   ImGui::Begin("Machine Parameters",
                &m_machine_parameters_window_handle->visible,
                ImGuiWindowFlags_AlwaysAutoResize);

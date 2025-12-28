@@ -35,19 +35,13 @@ void        Box::processMouse(float mpos_x, float mpos_y)
       mpos_y < (m_bottom_left.y + m_height) &&
       mpos_y > m_bottom_left.y) {
     if (mouse_over == false) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseIn },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
       mouse_over = true;
     }
   }
   else {
     if (mouse_over == true) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseOut },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
       mouse_over = false;
     }
   }
@@ -126,10 +120,10 @@ void Box::render()
     glScalef(scale,
              scale,
              scale);
-    glColor4f(color[0] / 255,
-              color[1] / 255,
-              color[2] / 255,
-              color[3] / 255);
+    glColor4f(color.r / 255,
+              color.g / 255,
+              color.b / 255,
+              color.a / 255);
     render_rectangle_with_radius(m_bottom_left.x,
                                        m_bottom_left.y + m_height,
                                        m_width,

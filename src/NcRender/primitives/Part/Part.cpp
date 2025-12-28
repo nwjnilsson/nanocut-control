@@ -32,13 +32,12 @@ void        Part::processMouse(float mpos_x, float mpos_y)
   if (visible == true) {
     mpos_x = (mpos_x - offset[0]) / scale;
     mpos_y = (mpos_y - offset[1]) / scale;
-    Geometry g;
     size_t   path_index = -1;
     if (m_control.mouse_mode == 0) {
       bool mouse_is_over_path = false;
       for (size_t x = 0; x < m_paths.size(); x++) {
         for (size_t i = 1; i < m_paths[x].built_points.size(); i++) {
-          if (g.lineIntersectsWithCircle(
+          if (geo::lineIntersectsWithCircle(
                 { { m_paths[x].built_points.at(i - 1).x,
                     m_paths[x].built_points.at(i - 1).y },
                   { m_paths[x].built_points.at(i).x,
@@ -51,7 +50,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
           }
         }
         if (m_paths[x].is_closed == true) {
-          if (g.lineIntersectsWithCircle(
+          if (geo::lineIntersectsWithCircle(
                 { { m_paths[x].built_points.at(0).x,
                     m_paths[x].built_points.at(0).y },
                   { m_paths[x]
@@ -69,21 +68,13 @@ void        Part::processMouse(float mpos_x, float mpos_y)
       }
       if (mouse_is_over_path == true) {
         if (mouse_over == false) {
-          m_mouse_event = {
-            { "event", NcRender::EventType::MouseIn },
-            { "path_index", path_index },
-            { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-          };
+          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
           mouse_over = true;
         }
       }
       else {
         if (mouse_over == true) {
-          m_mouse_event = {
-            { "event", NcRender::EventType::MouseOut },
-            { "path_index", path_index },
-            { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-          };
+          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
           mouse_over = false;
         }
       }
@@ -102,21 +93,13 @@ void        Part::processMouse(float mpos_x, float mpos_y)
       }
       if (mouse_is_inside_perimeter == true) {
         if (mouse_over == false) {
-          m_mouse_event = {
-            { "event", NcRender::EventType::MouseIn },
-            { "path_index", path_index },
-            { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-          };
+          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
           mouse_over = true;
         }
       }
       else {
         if (mouse_over == true) {
-          m_mouse_event = {
-            { "event", NcRender::EventType::MouseOut },
-            { "path_index", path_index },
-            { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-          };
+          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
           mouse_over = false;
         }
       }
@@ -234,7 +217,6 @@ void Part::render()
 {
   if (!(m_last_control == m_control)) {
     m_number_of_verticies = 0;
-    Geometry g;
     m_tool_paths.clear();
     for (std::vector<path_t>::iterator it = m_paths.begin();
          it != m_paths.end();
@@ -252,7 +234,7 @@ void Part::render()
 
         for (size_t i = 0; i < simplified.size(); i++) {
           Point2d rotated =
-            g.rotatePoint({ 0, 0 }, simplified[i], m_control.angle);
+            geo::rotatePoint({ 0, 0 }, simplified[i], m_control.angle);
           it->built_points.push_back(
             { (rotated.x + m_control.offset.x) * m_control.scale,
               (rotated.y + m_control.offset.y) * m_control.scale });
@@ -325,10 +307,10 @@ void Part::render()
   glLineWidth(m_width);
   for (std::vector<path_t>::iterator it = m_paths.begin(); it != m_paths.end();
        ++it) {
-    glColor4f(it->color[0] / 255,
-              it->color[1] / 255,
-              it->color[2] / 255,
-              it->color[3] / 255);
+    glColor4f(it->color.r / 255,
+              it->color.g / 255,
+              it->color.b / 255,
+              it->color.a / 255);
     if (it->is_closed == true) {
       glBegin(GL_LINE_LOOP);
     }
@@ -438,7 +420,6 @@ bool Part::checkIfPathIsInsidePath(std::vector<Point2d> path1,
 }
 std::vector<std::vector<Point2d>> Part::getOrderedToolpaths()
 {
-  Geometry                          g;
   std::vector<std::vector<Point2d>> toolpaths = m_tool_paths;
   std::vector<std::vector<Point2d>> ret;
   if (toolpaths.size() > 0) {
@@ -449,8 +430,8 @@ std::vector<std::vector<Point2d>> Part::getOrderedToolpaths()
     while (toolpaths.size() > 0) {
       for (size_t x = 0; x < toolpaths.size(); x++) {
         if (toolpaths[x].size() > 0) {
-          if (g.distance(toolpaths[x][0], ret.back()[0]) < smallest_distance) {
-            smallest_distance = g.distance(toolpaths[x][0], ret.back()[0]);
+          if (geo::distance(toolpaths[x][0], ret.back()[0]) < smallest_distance) {
+            smallest_distance = geo::distance(toolpaths[x][0], ret.back()[0]);
             winner_index = x;
           }
         }
@@ -501,11 +482,10 @@ Point2d* Part::getClosestPoint(size_t*               index,
                                Point2d               point,
                                std::vector<Point2d>* points)
 {
-  Geometry g;
   double   smallest_distance = 1000000;
   int      smallest_index = 0;
   for (size_t x = 0; x < points->size(); x++) {
-    double dist = g.distance(point, (*points)[x]);
+    double dist = geo::distance(point, (*points)[x]);
     if (dist < smallest_distance) {
       smallest_distance = dist;
       smallest_index = x;
@@ -527,13 +507,12 @@ bool Part::createToolpathLeads(std::vector<Point2d>* tpath,
 {
   if (length == 0)
     return true;
-  Geometry                          g;
   std::vector<std::vector<Point2d>> lead_offset =
     offsetPath(*tpath, (double) fabs(length) * (double) direction);
   for (size_t x = 0; x < lead_offset.size(); x++) {
     Point2d* point = getClosestPoint(NULL, position, &lead_offset[x]);
     if (point != NULL) {
-      if (g.distance(position, (*point)) <= (length * 1.1)) {
+      if (geo::distance(position, (*point)) <= (length * 1.1)) {
         tpath->insert(tpath->begin(), 1, (*point));
         tpath->push_back((*point));
         return true;

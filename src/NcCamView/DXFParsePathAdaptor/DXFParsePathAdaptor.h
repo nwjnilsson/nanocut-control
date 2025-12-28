@@ -69,10 +69,10 @@ struct spline_t {
 class DXFParsePathAdaptor : public DL_CreationAdapter {
 public:
   DXFParsePathAdaptor(
-    NcRender*                                              nc_render_instance,
-    std::function<void(Primitive*)>                        view_callback,
-    std::function<void(Primitive*, const nlohmann::json&)> mouse_callback,
-    NcCamView*                                            cam_view);
+    NcRender*                                                     nc_render_instance,
+    std::function<void(Primitive*)>                               view_callback,
+    std::function<void(Primitive*, const Primitive::MouseEventData&)> mouse_callback,
+    NcCamView*                                                    cam_view);
 
   enum class Units : int {
     None = 0,
@@ -100,10 +100,10 @@ public:
   virtual void addKnot(const DL_KnotData& data);
   virtual void setVariableInt(const std::string&, int, int);
 
-  NcRender*                                              m_nc_render_instance;
-  std::function<void(Primitive*)>                        m_view_callback;
-  std::function<void(Primitive*, const nlohmann::json&)> m_mouse_callback;
-  NcCamView*                                            m_cam_view;
+  NcRender*                                                     m_nc_render_instance;
+  std::function<void(Primitive*)>                               m_view_callback;
+  std::function<void(Primitive*, const Primitive::MouseEventData&)> m_mouse_callback;
+  NcCamView*                                                    m_cam_view;
 
   void printAttributes();
   void setFilename(std::string f);

@@ -3,19 +3,41 @@
 #include "../input/InputEvents.h"
 #include "../input/InputState.h"
 #include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"
-#include "PolyNest/PolyNest.h"
 #include "NcControlView/NcControlView.h"
+#include "PolyNest/PolyNest.h"
+#include <NcControlView/util.h>
 #include <NcRender/NcRender.h>
 #include <NcRender/gui/ImGuiFileDialog.h>
 #include <NcRender/gui/imgui.h>
 #include <NcRender/logging/loguru.h>
 #include <dxf/dxflib/dl_dxf.h>
-#include <NcControlView/util.h>
+
+// JSON serialization for ToolData
+void NcCamView::to_json(nlohmann::json& j, const ToolData& tool)
+{
+  j = nlohmann::json{ { "tool_name", tool.tool_name },
+                      { "pierce_height", tool.pierce_height },
+                      { "pierce_delay", tool.pierce_delay },
+                      { "cut_height", tool.cut_height },
+                      { "kerf_width", tool.kerf_width },
+                      { "feed_rate", tool.feed_rate },
+                      { "thc", tool.thc } };
+}
+
+void NcCamView::from_json(const nlohmann::json& j, ToolData& tool)
+{
+  tool.tool_name = j.at("tool_name").get<std::string>();
+  tool.pierce_height = j.at("pierce_height").get<float>();
+  tool.pierce_delay = j.at("pierce_delay").get<float>();
+  tool.cut_height = j.at("cut_height").get<float>();
+  tool.kerf_width = j.at("kerf_width").get<float>();
+  tool.feed_rate = j.at("feed_rate").get<float>();
+  tool.thc = j.at("thc").get<float>();
+}
 
 // Static reference to current instance for callback access
 
-void NcCamView::zoomEventCallback(const ScrollEvent& e,
-                                   const InputState&  input)
+void NcCamView::zoomEventCallback(const ScrollEvent& e, const InputState& input)
 {
   if (!m_app)
     return;
@@ -56,73 +78,69 @@ void NcCamView::zoomEventCallback(const ScrollEvent& e,
   adjustZoom(zoom_factor, screen_center);
 }
 
-void NcCamView::mouseEventCallback(Primitive* c, const nlohmann::json& e)
+void NcCamView::mouseEventCallback(Primitive*                       c,
+                                   const Primitive::MouseEventData& e)
 {
-  // LOG_F(INFO, "%s", e.dump().c_str());
   using EventType = NcRender::EventType;
-  NcRender::EventType event{};
   if (!m_app)
     return;
 
-  if (e.contains("event")) {
-    event = e.at("event").get<EventType>();
+  // Only handle hover events (not button clicks)
+  if (std::holds_alternative<MouseHoverEvent>(e)) {
+    const auto& hover = std::get<MouseHoverEvent>(e);
+
     if (m_current_tool == JetCamTool::Contour) {
       Part* part = dynamic_cast<Part*>(c);
       if (part) {
-        if (event == EventType::MouseIn) {
-          size_t x = (size_t) e["path_index"];
-          m_app->getRenderer().setColorByName(part->m_paths[x].color,
-                                              m_mouse_over_color);
+        if (hover.event == EventType::MouseIn) {
+          size_t x =
+            (hover.path_index >= 0) ? static_cast<size_t>(hover.path_index) : 0;
+          part->m_paths[x].color = getColor(m_mouse_over_color);
           m_mouse_over_part = part;
           m_mouse_over_path = x;
         }
-        if (event == EventType::MouseOut) {
+        if (hover.event == EventType::MouseOut) {
           m_mouse_over_part = NULL;
           for (auto& path : part->m_paths) {
             if (path.is_inside_contour == true) {
               if (path.is_closed == true) {
-                m_app->getRenderer().setColorByName(path.color,
-                                                    m_inside_contour_color);
+                path.color = getColor(m_inside_contour_color);
               }
               else {
-                m_app->getRenderer().setColorByName(path.color,
-                                                    m_open_contour_color);
+                path.color = getColor(m_open_contour_color);
               }
             }
             else {
-              m_app->getRenderer().setColorByName(path.color,
-                                                  m_outside_contour_color);
+              path.color = getColor(m_outside_contour_color);
             }
           }
         }
       }
     }
-  }
-  if (m_current_tool == JetCamTool::Nesting) {
-    Part* part = dynamic_cast<Part*>(c);
-    if (part) {
-      if (event == EventType::MouseIn) {
-        part->m_is_part_selected = true;
-        for (auto& path : part->m_paths) {
-          m_app->getRenderer().setColorByName(path.color, m_mouse_over_color);
+
+    if (m_current_tool == JetCamTool::Nesting) {
+      Part* part = dynamic_cast<Part*>(c);
+      if (part) {
+        if (hover.event == EventType::MouseIn) {
+          part->m_is_part_selected = true;
+          for (auto& path : part->m_paths) {
+            path.color = getColor(m_mouse_over_color);
+          }
         }
-      }
-      else if (event == EventType::MouseOut) {
-        part->m_is_part_selected = false;
-        for (auto& path : part->m_paths) {
-          if (path.is_inside_contour == true) {
-            if (path.is_closed == true) {
-              m_app->getRenderer().setColorByName(path.color,
-                                                  m_inside_contour_color);
+        else if (hover.event == EventType::MouseOut) {
+          part->m_is_part_selected = false;
+          for (auto& path : part->m_paths) {
+            if (path.is_inside_contour == true) {
+              if (path.is_closed == true) {
+                path.color = getColor(m_inside_contour_color);
+              }
+              else {
+                path.color = getColor(m_open_contour_color);
+              }
             }
             else {
-              m_app->getRenderer().setColorByName(path.color,
-                                                  m_open_contour_color);
+              path.color = getColor(m_outside_contour_color);
             }
-          }
-          else {
-            m_app->getRenderer().setColorByName(path.color,
-                                                m_outside_contour_color);
           }
         }
       }
@@ -163,8 +181,8 @@ void NcCamView::RenderUI()
 // ============================================================================
 
 void NcCamView::renderDialogs(std::string& filePathName,
-                               std::string& fileName,
-                               bool&        show_edit_contour)
+                              std::string& fileName,
+                              bool&        show_edit_contour)
 {
   if (!m_app)
     return;
@@ -248,10 +266,8 @@ in the part's properties after importing.
       renderer.stringToFile(renderer.getConfigDirectory() +
                               "last_nc_post_path.conf",
                             filePath + "/");
-      action_t action;
-      action.action_id = "post_process";
-      action.data["file"] = filePathName;
-      m_action_stack.push_back(action);
+      m_action_stack.push_back(
+        std::make_unique<PostProcessAction>(filePathName));
     }
     ImGuiFileDialog::Instance()->Close();
   }
@@ -268,9 +284,7 @@ in the part's properties after importing.
       part->m_paths[m_edit_contour_path].layer = std::string(layer);
     }
     if (ImGui::Button("Ok")) {
-      action_t action;
-      action.action_id = "rebuild_part_toolpaths";
-      m_action_stack.push_back(action);
+      m_action_stack.push_back(std::make_unique<RebuildToolpathsAction>());
       show_edit_contour = false;
     }
     ImGui::End();
@@ -429,12 +443,12 @@ void NcCamView::renderPropertiesWindow(Part*& selected_part)
 }
 
 void NcCamView::renderLeftPane(bool&  show_create_operation,
-                                bool&  show_job_options,
-                                bool&  show_tool_library,
-                                bool&  show_new_tool,
-                                int&   show_tool_edit,
-                                int&   show_edit_tool_operation,
-                                Part*& selected_part)
+                               bool&  show_job_options,
+                               bool&  show_tool_library,
+                               bool&  show_new_tool,
+                               int&   show_tool_edit,
+                               int&   show_edit_tool_operation,
+                               Part*& selected_part)
 {
   if (!m_app)
     return;
@@ -498,23 +512,25 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
     // Auto-set lead in/out based on tool kerf width
     if (m_tool_library.size() > static_cast<size_t>(operation_tool) &&
-        operation_tool != -1 &&
-        operation.lead_in_length == DEFAULT_LEAD_IN &&
+        operation_tool != -1 && operation.lead_in_length == DEFAULT_LEAD_IN &&
         operation.lead_out_length == DEFAULT_LEAD_OUT) {
       operation.lead_in_length =
-        m_tool_library[operation_tool].params.at("kerf_width") * 1.5;
+        m_tool_library[operation_tool].kerf_width * 1.5;
       operation.lead_out_length =
-        m_tool_library[operation_tool].params.at("kerf_width") * 1.5;
+        m_tool_library[operation_tool].kerf_width * 1.5;
     }
 
     // Tool selection combo
     if (ImGui::BeginCombo("Choose Tool",
-                          operation_tool >= 0 && operation_tool < static_cast<int>(m_tool_library.size())
-                          ? m_tool_library[operation_tool].tool_name
-                          : "Select...")) {
+                          operation_tool >= 0 &&
+                              operation_tool <
+                                static_cast<int>(m_tool_library.size())
+                            ? m_tool_library[operation_tool].tool_name.c_str()
+                            : "Select...")) {
       for (size_t i = 0; i < m_tool_library.size(); i++) {
         bool is_selected = (operation_tool == static_cast<int>(i));
-        if (ImGui::Selectable(m_tool_library[i].tool_name, is_selected)) {
+        if (ImGui::Selectable(m_tool_library[i].tool_name.c_str(),
+                              is_selected)) {
           operation_tool = i;
         }
         if (is_selected) {
@@ -525,12 +541,13 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     }
 
     // Layer selection combo
-    static int                   layer_selection = -1;
-    std::vector<std::string>     layers = getAllLayers();
+    static int               layer_selection = -1;
+    std::vector<std::string> layers = getAllLayers();
     if (ImGui::BeginCombo("Choose Layer",
-                          layer_selection >= 0 && layer_selection < static_cast<int>(layers.size())
-                          ? layers[layer_selection].c_str()
-                          : "Select...")) {
+                          layer_selection >= 0 &&
+                              layer_selection < static_cast<int>(layers.size())
+                            ? layers[layer_selection].c_str()
+                            : "Select...")) {
       for (size_t i = 0; i < layers.size(); i++) {
         bool is_selected = (layer_selection == static_cast<int>(i));
         if (ImGui::Selectable(layers[i].c_str(), is_selected)) {
@@ -574,46 +591,51 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   if (show_new_tool == true) {
     static ToolData tool;
     ImGui::Begin("New Tool", &show_new_tool, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::InputText("Tool Name", tool.tool_name, IM_ARRAYSIZE(tool.tool_name));
 
-    for (auto& [key, value] : tool.params) {
-      ImGui::InputFloat(key.c_str(), &value);
-    }
+    // Using a buffer for ImGui::InputText since it needs a mutable char array
+    static char tool_name_buffer[1024] = "";
+    ImGui::InputText(
+      "Tool Name", tool_name_buffer, IM_ARRAYSIZE(tool_name_buffer));
+
+    ImGui::InputFloat("pierce_height", &tool.pierce_height);
+    ImGui::InputFloat("pierce_delay", &tool.pierce_delay);
+    ImGui::InputFloat("cut_height", &tool.cut_height);
+    ImGui::InputFloat("kerf_width", &tool.kerf_width);
+    ImGui::InputFloat("feed_rate", &tool.feed_rate);
+    ImGui::InputFloat("thc", &tool.thc);
 
     if (ImGui::Button("OK")) {
       bool skip_save = false;
-      for (const auto& [key, value] : tool.params) {
-        if (value < 0.f || value > 50000.f) {
-          LOG_F(WARNING, "Invalid tool input parameters.");
-          skip_save = true;
-          break;
-        }
+      // Validate all parameters
+      if (tool.pierce_height < 0.f || tool.pierce_height > 50000.f ||
+          tool.pierce_delay < 0.f || tool.pierce_delay > 50000.f ||
+          tool.cut_height < 0.f || tool.cut_height > 50000.f ||
+          tool.kerf_width < 0.f || tool.kerf_width > 50000.f ||
+          tool.feed_rate < 0.f || tool.feed_rate > 50000.f || tool.thc < 0.f ||
+          tool.thc > 50000.f) {
+        LOG_F(WARNING, "Invalid tool input parameters.");
+        skip_save = true;
       }
+
       if (!skip_save) {
+        tool.tool_name = std::string(tool_name_buffer);
         m_tool_library.push_back(tool);
 
-        // Save to file
+        // Save to file using custom serialization
         nlohmann::json tool_library;
         for (size_t x = 0; x < m_tool_library.size(); x++) {
           nlohmann::json tool_json;
-          tool_json["tool_name"] = std::string(m_tool_library[x].tool_name);
-          for (const auto& [key, value] : m_tool_library[x].params) {
-            tool_json[key] = value;
-          }
+          NcCamView::to_json(tool_json, m_tool_library[x]);
           tool_library.push_back(tool_json);
         }
 
-        renderer.dumpJsonToFile(renderer.getConfigDirectory() + "tool_library.json",
-                                tool_library);
+        renderer.dumpJsonToFile(
+          renderer.getConfigDirectory() + "tool_library.json", tool_library);
         show_new_tool = false;
 
         // Reset tool data for next use
-        memset(tool.tool_name, 0, sizeof(tool.tool_name));
-        tool.params = {
-          { "pierce_height", 1.f }, { "pierce_delay", 1.f },
-          { "cut_height", 1.f },    { "kerf_width", DEFAULT_KERF_WIDTH },
-          { "feed_rate", 1.f },     { "thc", 0.f }
-        };
+        memset(tool_name_buffer, 0, sizeof(tool_name_buffer));
+        tool = ToolData(); // Reset to default values
       }
     }
     ImGui::End();
@@ -621,59 +643,70 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
   // Edit Tool Dialog
   static ToolData edit_tool;
+  static char     edit_tool_name_buffer[1024] = "";
   if (show_tool_edit != -1) {
-    if (!edit_tool.tool_name[0]) {
-      sprintf(edit_tool.tool_name, "%s", m_tool_library[show_tool_edit].tool_name);
-      edit_tool.params = m_tool_library[show_tool_edit].params;
+    if (edit_tool.tool_name.empty()) {
+      edit_tool = m_tool_library[show_tool_edit];
+      snprintf(edit_tool_name_buffer,
+               sizeof(edit_tool_name_buffer),
+               "%s",
+               edit_tool.tool_name.c_str());
     }
 
     ImGui::Begin("Tool Edit", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::InputText("Tool Name",
-                     m_tool_library[show_tool_edit].tool_name,
-                     IM_ARRAYSIZE(m_tool_library[show_tool_edit].tool_name));
+    ImGui::InputText(
+      "Tool Name", edit_tool_name_buffer, IM_ARRAYSIZE(edit_tool_name_buffer));
 
-    for (const auto& [key, value] : m_tool_library[show_tool_edit].params) {
-      ImGui::InputFloat(key.c_str(), &edit_tool.params[key]);
-    }
+    ImGui::InputFloat("pierce_height", &edit_tool.pierce_height);
+    ImGui::InputFloat("pierce_delay", &edit_tool.pierce_delay);
+    ImGui::InputFloat("cut_height", &edit_tool.cut_height);
+    ImGui::InputFloat("kerf_width", &edit_tool.kerf_width);
+    ImGui::InputFloat("feed_rate", &edit_tool.feed_rate);
+    ImGui::InputFloat("thc", &edit_tool.thc);
 
     if (ImGui::Button("OK")) {
       bool skip_save = false;
-      for (const auto& [key, value] : edit_tool.params) {
-        if (value < 0.f || value > 50000.f) {
-          LOG_F(WARNING, "Invalid tool input parameters.");
-          skip_save = true;
-          break;
-        }
+      // Validate all parameters
+      if (edit_tool.pierce_height < 0.f || edit_tool.pierce_height > 50000.f ||
+          edit_tool.pierce_delay < 0.f || edit_tool.pierce_delay > 50000.f ||
+          edit_tool.cut_height < 0.f || edit_tool.cut_height > 50000.f ||
+          edit_tool.kerf_width < 0.f || edit_tool.kerf_width > 50000.f ||
+          edit_tool.feed_rate < 0.f || edit_tool.feed_rate > 50000.f ||
+          edit_tool.thc < 0.f || edit_tool.thc > 50000.f) {
+        LOG_F(WARNING, "Invalid tool input parameters.");
+        skip_save = true;
       }
-      if (!skip_save) {
-        m_tool_library[show_tool_edit].params = edit_tool.params;
 
-        // Save to file
+      if (!skip_save) {
+        edit_tool.tool_name = std::string(edit_tool_name_buffer);
+        m_tool_library[show_tool_edit] = edit_tool;
+
+        // Save to file using custom serialization
         nlohmann::json tool_library;
         for (size_t x = 0; x < m_tool_library.size(); x++) {
           nlohmann::json tool_json;
-          tool_json["tool_name"] = std::string(m_tool_library[x].tool_name);
-          for (const auto& [key, value] : m_tool_library[x].params) {
-            tool_json[key] = value;
-          }
+          NcCamView::to_json(tool_json, m_tool_library[x]);
           tool_library.push_back(tool_json);
         }
 
-        renderer.dumpJsonToFile(renderer.getConfigDirectory() + "tool_library.json",
-                                tool_library);
+        renderer.dumpJsonToFile(
+          renderer.getConfigDirectory() + "tool_library.json", tool_library);
         show_tool_edit = -1;
       }
     }
     ImGui::End();
   }
   else {
-    memset(edit_tool.tool_name, 0, sizeof(edit_tool.tool_name));
+    edit_tool = ToolData(); // Reset to default
+    memset(edit_tool_name_buffer, 0, sizeof(edit_tool_name_buffer));
   }
 
   // Tool Library Dialog
   if (show_tool_library == true) {
-    ImGui::Begin("Tool Library", &show_tool_library, ImGuiWindowFlags_AlwaysAutoResize);
-    if (ImGui::BeginTable("Tools", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    ImGui::Begin(
+      "Tool Library", &show_tool_library, ImGuiWindowFlags_AlwaysAutoResize);
+    if (ImGui::BeginTable(
+          "Tools", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
       ImGui::TableSetupColumn("Tool Name");
       ImGui::TableSetupColumn("Pierce Height");
       ImGui::TableSetupColumn("Pierce Delay");
@@ -687,21 +720,22 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
       for (size_t x = 0; x < m_tool_library.size(); ++x) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::Text("%s", m_tool_library[x].tool_name);
+        ImGui::Text("%s", m_tool_library[x].tool_name.c_str());
         ImGui::TableSetColumnIndex(1);
-        ImGui::Text("%.4f", m_tool_library[x].params.at("pierce_height"));
+        ImGui::Text("%.4f", m_tool_library[x].pierce_height);
         ImGui::TableSetColumnIndex(2);
-        ImGui::Text("%.4f", m_tool_library[x].params.at("pierce_delay"));
+        ImGui::Text("%.4f", m_tool_library[x].pierce_delay);
         ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%.4f", m_tool_library[x].params.at("cut_height"));
+        ImGui::Text("%.4f", m_tool_library[x].cut_height);
         ImGui::TableSetColumnIndex(4);
-        ImGui::Text("%.4f", m_tool_library[x].params.at("kerf_width"));
+        ImGui::Text("%.4f", m_tool_library[x].kerf_width);
         ImGui::TableSetColumnIndex(5);
-        ImGui::Text("%.4f", m_tool_library[x].params.at("feed_rate"));
+        ImGui::Text("%.4f", m_tool_library[x].feed_rate);
         ImGui::TableSetColumnIndex(6);
-        ImGui::Text("%.4f", m_tool_library[x].params.at("thc"));
+        ImGui::Text("%.4f", m_tool_library[x].thc);
         ImGui::TableSetColumnIndex(7);
-        if (ImGui::Button(std::string("Edit##Edit-" + std::to_string(x)).c_str())) {
+        if (ImGui::Button(
+              std::string("Edit##Edit-" + std::to_string(x)).c_str())) {
           show_tool_edit = x;
           LOG_F(INFO, "show_tool_edit: %d", show_tool_edit);
         }
@@ -794,18 +828,14 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
       }
       ImGui::Separator();
       if (ImGui::MenuItem("New Duplicate")) {
-        action_t action;
-        action.action_id = "duplicate_part";
-        action.data["part_name"] = part->m_part_name;
-        m_action_stack.push_back(action);
+        m_action_stack.push_back(
+          std::make_unique<DuplicatePartAction>(part->m_part_name));
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Delete Master Part")) {
         LOG_F(INFO, "Delete Master Part: %s", part->m_part_name.c_str());
-        action_t action;
-        action.action_id = "delete_parts";
-        action.data["part_name"] = part->m_part_name;
-        m_action_stack.push_back(action);
+        m_action_stack.push_back(
+          std::make_unique<DeletePartsAction>(part->m_part_name));
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Properties")) {
@@ -822,7 +852,8 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
   ImGui::EndTable();
 }
 
-void NcCamView::renderOperationsViewer(bool& show_create_operation, int& show_edit_tool_operation)
+void NcCamView::renderOperationsViewer(bool& show_create_operation,
+                                       int&  show_edit_tool_operation)
 {
   if (!ImGui::BeginTable("operations_view_table",
                          1,
@@ -852,15 +883,14 @@ void NcCamView::renderOperationsViewer(bool& show_create_operation, int& show_ed
       ImGui::Text("Jet: %s", operation.layer.c_str());
     }
     ImGui::SameLine();
-    if (ImGui::Button(std::string("Edit##edit-op-" + std::to_string(x)).c_str())) {
+    if (ImGui::Button(
+          std::string("Edit##edit-op-" + std::to_string(x)).c_str())) {
       show_edit_tool_operation = x;
     }
     ImGui::SameLine();
-    if (ImGui::Button(std::string("Delete##del-op-" + std::to_string(x)).c_str())) {
-      action_t action;
-      action.action_id = "delete_operation";
-      action.data["index"] = x;
-      m_action_stack.push_back(action);
+    if (ImGui::Button(
+          std::string("Delete##del-op-" + std::to_string(x)).c_str())) {
+      m_action_stack.push_back(std::make_unique<DeleteOperationAction>(x));
     }
   }
   ImGui::EndTable();
@@ -973,59 +1003,48 @@ std::vector<std::string> NcCamView::getAllLayers()
 // Action Handler Methods
 // ============================================================================
 
-void NcCamView::handlePostProcessAction(const action_t& action)
+// PostProcessAction implementation
+void NcCamView::PostProcessAction::execute(NcCamView* view)
 {
-  if (!m_app)
+  if (!view->m_app)
     return;
-  auto&         renderer = m_app->getRenderer();
+  auto&         renderer = view->m_app->getRenderer();
   std::ofstream gcode_file;
-  std::string   file = action.data.at("file").get<std::string>();
-  gcode_file.open(file);
+  gcode_file.open(m_file);
 
   if (!gcode_file.is_open()) {
     LOG_F(WARNING, "Could not open gcode file for writing!");
     return;
   }
 
-  for (size_t i = 0; i < m_toolpath_operations.size(); i++) {
+  for (size_t i = 0; i < view->m_toolpath_operations.size(); i++) {
     LOG_F(INFO,
           "Posting toolpath operation: %lu on layer: %s",
           i,
-          m_toolpath_operations[i].layer.c_str());
+          view->m_toolpath_operations[i].layer.c_str());
 
-    forEachVisiblePart([&](Part* part) {
+    view->forEachVisiblePart([&](Part* part) {
       std::vector<std::vector<Point2d>> tool_paths =
         part->getOrderedToolpaths();
 
-      if (m_tool_library.size() > m_toolpath_operations[i].tool_number) {
+      if (view->m_tool_library.size() >
+          view->m_toolpath_operations[i].tool_number) {
+        const auto& tool =
+          view->m_tool_library[view->m_toolpath_operations[i].tool_number];
+
         // Output tool-specific THC target
-        if (float thc_val =
-              m_tool_library[m_toolpath_operations[i].tool_number].params.at(
-                "thc");
-            thc_val > 0) {
-          gcode_file << "$T=" << thc_val << "\n";
+        if (tool.thc > 0) {
+          gcode_file << "$T=" << tool.thc << "\n";
         }
 
         for (size_t x = 0; x < tool_paths.size(); x++) {
           gcode_file << "G0 X" << tool_paths[x][0].x << " Y"
                      << tool_paths[x][0].y << "\n";
-          gcode_file
-            << "fire_torch "
-            << m_tool_library[m_toolpath_operations[i].tool_number].params.at(
-                 "pierce_height")
-            << " "
-            << m_tool_library[m_toolpath_operations[i].tool_number].params.at(
-                 "pierce_delay")
-            << " "
-            << m_tool_library[m_toolpath_operations[i].tool_number].params.at(
-                 "cut_height")
-            << "\n";
+          gcode_file << "fire_torch " << tool.pierce_height << " "
+                     << tool.pierce_delay << " " << tool.cut_height << "\n";
           for (size_t z = 0; z < tool_paths[x].size(); z++) {
             gcode_file << "G1 X" << tool_paths[x][z].x << " Y"
-                       << tool_paths[x][z].y << " F"
-                       << m_tool_library[m_toolpath_operations[i].tool_number]
-                            .params.at("feed_rate")
-                       << "\n";
+                       << tool_paths[x][z].y << " F" << tool.feed_rate << "\n";
           }
           gcode_file << "torch_off\n";
         }
@@ -1038,29 +1057,51 @@ void NcCamView::handlePostProcessAction(const action_t& action)
   LOG_F(INFO, "Finished writing gcode file!");
 }
 
-void NcCamView::handleRebuildToolpathsAction(const action_t& action)
+// RebuildToolpathsAction implementation
+void NcCamView::RebuildToolpathsAction::execute(NcCamView* view)
 {
-  forEachPart([](Part* part) { part->m_last_control.angle = 1; });
+  view->forEachPart([](Part* part) { part->m_last_control.angle = 1; });
 
-  for (size_t x = 0; x < m_toolpath_operations.size(); x++) {
-    m_toolpath_operations[x].last_enabled = false;
+  for (size_t x = 0; x < view->m_toolpath_operations.size(); x++) {
+    view->m_toolpath_operations[x].last_enabled = false;
   }
 }
 
-void NcCamView::handleDeleteOperationAction(const action_t& action)
+// DeleteOperationAction implementation
+void NcCamView::DeleteOperationAction::execute(NcCamView* view)
 {
-  size_t index = action.data.at("index").get<size_t>();
-  if (m_toolpath_operations.size() > index) {
-    m_toolpath_operations.erase(m_toolpath_operations.begin() + index);
+  if (view->m_toolpath_operations.size() > m_index) {
+    view->m_toolpath_operations.erase(view->m_toolpath_operations.begin() +
+                                      m_index);
   }
 }
 
-void NcCamView::handleDeleteDuplicatePartsAction(const action_t& action)
+// DeleteDuplicatePartsAction implementation
+void NcCamView::DeleteDuplicatePartsAction::execute(NcCamView* view)
 {
-  if (!m_app)
+  if (!view->m_app)
     return;
-  auto&       renderer = m_app->getRenderer();
-  std::string part_name = action.data.at("part_name").get<std::string>();
+  auto& renderer = view->m_app->getRenderer();
+
+  auto& stack = renderer.getPrimitiveStack();
+  stack.erase(
+    std::remove_if(stack.begin(),
+                   stack.end(),
+                   [&](const auto& primitive) {
+                     auto* part = dynamic_cast<Part*>(primitive.get());
+                     return part && part->view == renderer.getCurrentView() &&
+                            part->m_part_name.find(m_part_name + ":") !=
+                              std::string::npos;
+                   }),
+    stack.end());
+}
+
+// DeletePartsAction implementation
+void NcCamView::DeletePartsAction::execute(NcCamView* view)
+{
+  if (!view->m_app)
+    return;
+  auto& renderer = view->m_app->getRenderer();
 
   auto& stack = renderer.getPrimitiveStack();
   stack.erase(std::remove_if(stack.begin(),
@@ -1070,75 +1111,57 @@ void NcCamView::handleDeleteDuplicatePartsAction(const action_t& action)
                                  dynamic_cast<Part*>(primitive.get());
                                return part &&
                                       part->view == renderer.getCurrentView() &&
-                                      part->m_part_name.find(part_name + ":") !=
+                                      part->m_part_name.find(m_part_name) !=
                                         std::string::npos;
                              }),
               stack.end());
 }
 
-void NcCamView::handleDeletePartsAction(const action_t& action)
+// DeletePartAction implementation
+void NcCamView::DeletePartAction::execute(NcCamView* view)
 {
-  if (!m_app)
+  if (!view->m_app)
     return;
-  auto&       renderer = m_app->getRenderer();
-  std::string part_name = action.data.at("part_name").get<std::string>();
-
-  auto& stack = renderer.getPrimitiveStack();
-  stack.erase(std::remove_if(
-                stack.begin(),
-                stack.end(),
-                [&](const auto& primitive) {
-                  auto* part = dynamic_cast<Part*>(primitive.get());
-                  return part && part->view == renderer.getCurrentView() &&
-                         part->m_part_name.find(part_name) != std::string::npos;
-                }),
-              stack.end());
-}
-
-void NcCamView::handleDeletePartAction(const action_t& action)
-{
-  if (!m_app)
-    return;
-  auto&       renderer = m_app->getRenderer();
-  std::string part_name = action.data.at("part_name").get<std::string>();
+  auto& renderer = view->m_app->getRenderer();
 
   auto& stack = renderer.getPrimitiveStack();
   for (auto it = stack.begin(); it != stack.end(); ++it) {
     auto* part = dynamic_cast<Part*>(it->get());
     if (part && part->view == renderer.getCurrentView() &&
-        part->m_part_name.find(part_name) != std::string::npos) {
+        part->m_part_name.find(m_part_name) != std::string::npos) {
       stack.erase(it);
       break;
     }
   }
 }
 
-void NcCamView::handleDuplicatePartAction(const action_t& action)
+// DuplicatePartAction implementation
+void NcCamView::DuplicatePartAction::execute(NcCamView* view)
 {
-  if (!m_app)
+  if (!view->m_app)
     return;
-  auto&       renderer = m_app->getRenderer();
-  std::string part_name = action.data.at("part_name").get<std::string>();
+  auto& renderer = view->m_app->getRenderer();
 
   // Count duplicates
   int dup_count = 1;
-  forEachPart([&](Part* part) {
-    if (part->m_part_name.find(part_name + ":") != std::string::npos) {
+  view->forEachPart([&](Part* part) {
+    if (part->m_part_name.find(m_part_name + ":") != std::string::npos) {
       dup_count++;
     }
   });
 
   // Setup nesting
-  m_dxf_nest = PolyNest::PolyNest();
-  m_dxf_nest.setExtents(
-    PolyNest::PolyPoint(m_material_plane->m_bottom_left.x,
-                        m_material_plane->m_bottom_left.y),
-    PolyNest::PolyPoint(
-      m_material_plane->m_bottom_left.x + m_material_plane->m_width,
-      m_material_plane->m_bottom_left.y + m_material_plane->m_height));
+  view->m_dxf_nest = PolyNest::PolyNest();
+  view->m_dxf_nest.setExtents(
+    PolyNest::PolyPoint(view->m_material_plane->m_bottom_left.x,
+                        view->m_material_plane->m_bottom_left.y),
+    PolyNest::PolyPoint(view->m_material_plane->m_bottom_left.x +
+                          view->m_material_plane->m_width,
+                        view->m_material_plane->m_bottom_left.y +
+                          view->m_material_plane->m_height));
 
   // Add existing parts to nesting
-  forEachPart([&](Part* part) {
+  view->forEachPart([&](Part* part) {
     std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
     for (const auto& path : part->m_paths) {
       if (path.is_inside_contour == false) {
@@ -1150,17 +1173,17 @@ void NcCamView::handleDuplicatePartAction(const action_t& action)
         poly_part.push_back(std::move(points));
       }
     }
-    m_dxf_nest.pushPlacedPolyPart(poly_part,
-                                  &part->m_control.offset.x,
-                                  &part->m_control.offset.y,
-                                  &part->m_control.angle,
-                                  &part->visible);
+    view->m_dxf_nest.pushPlacedPolyPart(poly_part,
+                                        &part->m_control.offset.x,
+                                        &part->m_control.offset.y,
+                                        &part->m_control.angle,
+                                        &part->visible);
   });
 
   // Find and duplicate the master part
   Part* new_part = nullptr;
-  forEachPart([&](Part* part) {
-    if (part->m_part_name == part_name && !new_part) {
+  view->forEachPart([&](Part* part) {
+    if (part->m_part_name == m_part_name && !new_part) {
       std::vector<Part::path_t>                     paths;
       std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
 
@@ -1181,8 +1204,8 @@ void NcCamView::handleDuplicatePartAction(const action_t& action)
 
       // Set initial position
       if (dup_count > 1) {
-        Part* prev_dup =
-          findPartByName(part_name + ":" + std::to_string(dup_count - 1));
+        Part* prev_dup = view->findPartByName(m_part_name + ":" +
+                                              std::to_string(dup_count - 1));
         if (prev_dup) {
           new_part->m_control.offset = prev_dup->m_control.offset;
         }
@@ -1195,17 +1218,18 @@ void NcCamView::handleDuplicatePartAction(const action_t& action)
       new_part->mouse_callback = part->mouse_callback;
       new_part->matrix_callback = part->matrix_callback;
 
-      m_dxf_nest.pushUnplacedPolyPart(poly_part,
-                                      &new_part->m_control.offset.x,
-                                      &new_part->m_control.offset.y,
-                                      &new_part->m_control.angle,
-                                      &new_part->visible);
+      view->m_dxf_nest.pushUnplacedPolyPart(poly_part,
+                                            &new_part->m_control.offset.x,
+                                            &new_part->m_control.offset.y,
+                                            &new_part->m_control.angle,
+                                            &new_part->visible);
     }
   });
 
-  m_dxf_nest.beginPlaceUnplacedPolyParts();
-  renderer.pushTimer(
-    0, [this]() { return m_dxf_nest.placeUnplacedPolyPartsTick(&m_dxf_nest); });
+  view->m_dxf_nest.beginPlaceUnplacedPolyParts();
+  renderer.pushTimer(0, [view]() {
+    return view->m_dxf_nest.placeUnplacedPolyPartsTick(&view->m_dxf_nest);
+  });
 }
 
 void NcCamView::renderProgressWindow(void* p)
@@ -1228,9 +1252,9 @@ void NcCamView::showProgressWindow(bool v)
 }
 
 bool NcCamView::dxfFileOpen(std::string filename,
-                             std::string name,
-                             int         import_quality,
-                             float       import_scale)
+                            std::string name,
+                            int         import_quality,
+                            float       import_scale)
 {
   if (!m_app)
     return false;
@@ -1269,7 +1293,7 @@ bool NcCamView::dxfFileOpen(std::string filename,
     m_dxf_creation_interface = std::make_unique<DXFParsePathAdaptor>(
       &renderer,
       getTransformCallback(),
-      [this](Primitive* c, const nlohmann::json& e) {
+      [this](Primitive* c, const Primitive::MouseEventData& e) {
         mouseEventCallback(c, e);
       },
       this);
@@ -1353,10 +1377,10 @@ void NcCamView::preInit()
   if (!m_app)
     return;
   auto& renderer = m_app->getRenderer();
-  m_mouse_over_color = "blue";       // wtf
-  m_outside_contour_color = "white"; // wtf
-  m_inside_contour_color = "grey";   // wtf
-  m_open_contour_color = "yellow";   // wtf
+  m_mouse_over_color = Color::Blue;
+  m_outside_contour_color = Color::White;
+  m_inside_contour_color = Color::Grey;
+  m_open_contour_color = Color::Yellow;
 
   m_show_viewer_context_menu.x = -inf<double>();
   m_show_viewer_context_menu.y = -inf<double>();
@@ -1376,12 +1400,8 @@ void NcCamView::preInit()
       "Found %s!",
       std::string(renderer.getConfigDirectory() + "tool_library.json").c_str());
     for (size_t x = 0; x < tool_library.size(); x++) {
-      ToolData    tool;
-      std::string tool_name = tool_library[x]["tool_name"];
-      sprintf(tool.tool_name, "%s", tool_name.c_str());
-      for (auto& [key, value] : tool.params) {
-        value = static_cast<float>(tool_library[x][key]);
-      }
+      ToolData tool;
+      NcCamView::from_json(tool_library[x], tool);
       m_tool_library.push_back(tool);
     }
   }
@@ -1409,13 +1429,16 @@ void NcCamView::init()
                                             m_job_options.material_size[1],
                                             0);
   m_material_plane->id = "material_plane";
+  m_material_plane->flags = PrimitiveFlags::MaterialPlane;
   m_material_plane->zindex = -20;
-  m_material_plane->color[0] = 100;
-  m_material_plane->color[1] = 0;
-  m_material_plane->color[2] = 0;
+  m_material_plane->color.r = 100;
+  m_material_plane->color.g = 0;
+  m_material_plane->color.b = 0;
   m_material_plane->matrix_callback = getTransformCallback();
   m_material_plane->mouse_callback =
-    [this](Primitive* c, const nlohmann::json& e) { mouseEventCallback(c, e); };
+    [this](Primitive* c, const Primitive::MouseEventData& e) {
+      mouseEventCallback(c, e);
+    };
   // TODO: Implement SetShowFPS in NcApp if needed
 }
 void NcCamView::tick()
@@ -1437,8 +1460,7 @@ void NcCamView::tick()
           if (path.layer == m_toolpath_operations[x].layer) {
             if (m_tool_library.size() > m_toolpath_operations[x].tool_number) {
               path.toolpath_offset =
-                m_tool_library[m_toolpath_operations[x].tool_number].params.at(
-                  "kerf_width");
+                m_tool_library[m_toolpath_operations[x].tool_number].kerf_width;
             }
             path.toolpath_visible = m_toolpath_operations[x].enabled;
             part->m_control.lead_in_length =
@@ -1452,35 +1474,17 @@ void NcCamView::tick()
     m_toolpath_operations[x].last_enabled = m_toolpath_operations[x].enabled;
   }
   // Process action stack
-  while (m_action_stack.size() > 0) {
-    action_t action = m_action_stack[0];
-    m_action_stack.erase(m_action_stack.begin());
-
+  // Process all pending actions using virtual dispatch
+  while (!m_action_stack.empty()) {
     try {
-      if (action.action_id == "post_process") {
-        handlePostProcessAction(action);
-      }
-      else if (action.action_id == "rebuild_part_toolpaths") {
-        handleRebuildToolpathsAction(action);
-      }
-      else if (action.action_id == "delete_operation") {
-        handleDeleteOperationAction(action);
-      }
-      else if (action.action_id == "delete_duplicate_parts") {
-        handleDeleteDuplicatePartsAction(action);
-      }
-      else if (action.action_id == "delete_parts") {
-        handleDeletePartsAction(action);
-      }
-      else if (action.action_id == "delete_part") {
-        handleDeletePartAction(action);
-      }
-      else if (action.action_id == "duplicate_part") {
-        handleDuplicatePartAction(action);
-      }
+      auto action = std::move(m_action_stack.front());
+      m_action_stack.erase(m_action_stack.begin());
+      action->execute(this);
     }
     catch (const std::exception& e) {
-      LOG_F(ERROR, "(NcCamView::Tick) Exception: %s", e.what());
+      LOG_F(ERROR,
+            "(NcCamView::tick) Exception during action execution: %s",
+            e.what());
     }
   }
 }
@@ -1499,20 +1503,20 @@ void NcCamView::makeActive()
 }
 void NcCamView::close() {}
 
-void NcCamView::handleScrollEvent(const ScrollEvent& e,
-                                   const InputState&  input)
+void NcCamView::handleScrollEvent(const ScrollEvent& e, const InputState& input)
 {
   zoomEventCallback(e, input);
 }
 
 void NcCamView::handleMouseEvent(const MouseButtonEvent& e,
-                                  const InputState&       input)
+                                 const InputState&       input)
 {
   if (!m_app)
     return;
 
   // Check if ImGui wants to capture input
-  if (m_app->getRenderer().imgui_io->WantCaptureMouse) {
+  auto& io = ImGui::GetIO();
+  if (io.WantCaptureMouse) {
     m_left_click_pressed = false;
     return;
   }
@@ -1540,10 +1544,7 @@ void NcCamView::handleMouseEvent(const MouseButtonEvent& e,
       // Show context menu if hovering over a part (Contour tool only)
       if (m_current_tool == JetCamTool::Contour) {
         if (m_mouse_over_part != NULL) {
-          m_show_viewer_context_menu = {
-            m_app->getRenderer().imgui_io->MousePos.x,
-            m_app->getRenderer().imgui_io->MousePos.y
-          };
+          m_show_viewer_context_menu = { io.MousePos.x, io.MousePos.y };
         }
       }
     }
@@ -1564,7 +1565,7 @@ void NcCamView::handleKeyEvent(const KeyEvent& e, const InputState& input)
 }
 
 void NcCamView::handleMouseMoveEvent(const MouseMoveEvent& e,
-                                      const InputState&     input)
+                                     const InputState&     input)
 {
   if (!m_app)
     return;
@@ -1575,8 +1576,8 @@ void NcCamView::handleMouseMoveEvent(const MouseMoveEvent& e,
   handleMouseMove(mouse_pos);
 
   // Check if ImGui wants to capture input
-  if (!m_app->getRenderer().imgui_io->WantCaptureKeyboard ||
-      !m_app->getRenderer().imgui_io->WantCaptureMouse) {
+  auto& io = ImGui::GetIO();
+  if (!io.WantCaptureKeyboard || !io.WantCaptureMouse) {
 
     // Calculate mouse drag distance
     Point2d mouse_drag = { e.x - m_last_mouse_click_position.x,

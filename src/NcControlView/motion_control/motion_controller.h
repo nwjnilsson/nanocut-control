@@ -7,6 +7,66 @@
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <string>
+
+// Type-safe data structures for runtime data (replacing JSON)
+
+enum class MachineStatus {
+  Idle,
+  Cycle,
+  Alarm,
+  Homing,
+  Hold,
+  Check,
+  Door,
+  Unknown
+};
+
+struct MCSCoordinates {
+  float x{ 0.0f };
+  float y{ 0.0f };
+  float z{ 0.0f };
+};
+
+struct DROData {
+  MachineStatus  status{ MachineStatus::Unknown };
+  MCSCoordinates mcs;
+  MCSCoordinates wcs;
+  int            feed{ 0 };
+  int            voltage{ 0 };
+  bool           in_motion{ false };
+  // arc_ok just reflects the pin value on the MCU currently and the assumption
+  // is made that arc_ok == false when we do have arc ok. TODO: fix?
+  // I think most plasmas have a dry relay closed for arc okay so in 99% of
+  // cases you'd pull up the input pin and let the relay glose it to GND, making
+  // arc_ok = false.
+  bool arc_ok{ false };
+  bool torch_on{ false };
+};
+
+struct TorchParameters {
+  double pierce_height{ 0.0 };
+  double pierce_delay{ 0.0 };
+  double cut_height{ 0.0 };
+};
+
+struct RuntimeData {
+  unsigned long hours{ 0 };
+  unsigned long minutes{ 0 };
+  unsigned long seconds{ 0 };
+};
+
+enum class GrblMessageType {
+  DROData,           // JSON status data
+  UnlockRequired,    // [MSG:'$H'|'$X' to unlock]
+  ChecksumFailure,   // [CHECKSUM_FAILURE]
+  Error,             // error:X
+  Alarm,             // ALARM:X
+  Crash,             // [CRASH]
+  ProbeResult,       // [PRB
+  GrblReady,         // Grbl startup message
+  Unknown            // Unidentified message
+};
 
 class MotionController {
 public:
@@ -31,11 +91,11 @@ public:
   void triggerReset();
 
   // State queries
-  bool           isReady() const { return m_controller_ready; }
-  bool           isTorchOn() const { return m_torch_on; }
-  bool           needsHoming() const { return m_needs_homed; }
-  nlohmann::json getDRO() const { return m_dro_data; }
-  nlohmann::json getRunTime() const;
+  bool              isReady() const { return m_controller_ready; }
+  bool              isTorchOn() const { return m_torch_on; }
+  bool              needsHoming() const { return m_needs_homed; }
+  const DROData&    getDRO() const { return m_dro_data; }
+  const RuntimeData getRunTime() const;
 
   // Parameter management
   void saveParameters();
@@ -53,9 +113,9 @@ private:
   // Command queue
   std::deque<std::string> m_gcode_queue;
 
-  // Data storage
-  nlohmann::json m_dro_data;
-  nlohmann::json m_callback_args;
+  // Data storage (type-safe structs instead of JSON)
+  DROData         m_dro_data;
+  TorchParameters m_torch_params;
 
   // State variables
   bool m_controller_ready{ false };

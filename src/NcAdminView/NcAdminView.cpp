@@ -1,14 +1,15 @@
 #include "NcAdminView.h"
 #include "../application/NcApp.h"
 #include "../input/InputState.h"
-#include "WebsocketClient/WebsocketClient.h"
 #include "NcCamView/NcCamView.h"
 #include "NcControlView/NcControlView.h"
+#include "WebsocketClient/WebsocketClient.h"
 #include <NcRender/NcRender.h>
 #include <NcRender/gui/imgui.h>
 #include <NcRender/logging/loguru.h>
 
-void NcAdminView::zoomEventCallback(const ScrollEvent& e, const InputState& input)
+void NcAdminView::zoomEventCallback(const ScrollEvent& e,
+                                    const InputState&  input)
 {
   if (!m_app)
     return;
@@ -106,7 +107,7 @@ void NcAdminView::init()
   // Initialize UI - scroll events now handled through view delegation
 
   m_app->getRenderer().setCurrentView("NcAdminView");
-  ui = m_app->getRenderer().pushGui(true, [this]() { this->renderUI(); });
+  ui = m_app->getRenderer().pushGui(true, [this]() { renderUI(); });
   // globals->renderer->SetShowFPS(true);
 }
 void NcAdminView::tick() {}
@@ -122,7 +123,8 @@ void NcAdminView::makeActive()
 }
 void NcAdminView::close() {}
 
-void NcAdminView::handleScrollEvent(const ScrollEvent& e, const InputState& input)
+void NcAdminView::handleScrollEvent(const ScrollEvent& e,
+                                    const InputState&  input)
 {
   zoomEventCallback(e, input);
 }

@@ -1,6 +1,6 @@
 # NanoCut Refactoring Roadmap
 
-**Last Updated**: 2025-12-21
+**Last Updated**: 2025-12-27
 
 This document tracks architectural improvements and refactoring opportunities identified during comprehensive code review. The codebase has been successfully modernized from C-style to modern C++20, but significant opportunities remain for improving type safety, reducing boilerplate, and enhancing maintainability.
 
@@ -33,97 +33,104 @@ This document tracks architectural improvements and refactoring opportunities id
 
 **Files**: `src/NcControlView/motion_control/motion_controller.h`, `motion_controller.cpp`
 
-- [ ] **Replace `m_dro_data` JSON with typed struct** (HIGH PRIORITY)
-  - **Location**: `motion_controller.h:57`
-  - **Problem**: Digital readout data stored as untyped JSON, accessed every frame
-  - **Current**: `m_dro_data["IN_MOTION"]`, `m_dro_data["ARC_OK"]`, `m_dro_data["MCS"]["x"]`
-  - **Solution**:
-    ```cpp
-    struct MCSCoordinates { float x, y, z; };
-    struct DROData {
-        MCSCoordinates mcs;
-        MCSCoordinates wcs;
-        bool in_motion;
-        bool arc_ok;
-        bool torch_on;
-        // ... other fields
-    };
-    ```
-  - **Impact**: Compile-time checking, better performance, clearer API
+- [x] **Replace `m_dro_data` JSON with typed struct** ✅ COMPLETED
+  - **Location**: `motion_controller.h:31-45`
+  - **Solution Implemented**: Created `MachineStatus` enum (lines 14-23), `MCSCoordinates` struct (lines 25-29), and `DROData` struct (lines 31-45)
+  - **Impact**: Achieved compile-time checking, better performance, clearer API
   - **References**: Used throughout `motion_controller.cpp` and `hmi.cpp`
 
-- [ ] **Replace `m_callback_args` JSON with typed struct** (HIGH PRIORITY)
-  - **Location**: `motion_controller.h:58`
-  - **Problem**: Torch parameters stored as JSON, no compile-time checking
-  - **Current**: Lines 398-410 show string key access
-  - **Solution**:
-    ```cpp
-    struct TorchParameters {
-        double pierce_height;
-        double pierce_delay;
-        double cut_height;
-        double kerf_width;
-        double traverse_height;
-    };
-    ```
-  - **Impact**: Type safety for critical cutting parameters
+- [x] **Replace `m_callback_args` JSON with typed struct** ✅ COMPLETED
+  - **Location**: `motion_controller.h:47-51`
+  - **Solution Implemented**: Created `TorchParameters` struct with pierce_height, pierce_delay, and cut_height fields
+  - **Impact**: Type safety achieved for critical cutting parameters
 
-- [ ] **Replace `Primitive::data` JSON field** (MEDIUM PRIORITY)
-  - **Location**: `src/NcRender/primitives/Primitive.h:36`
-  - **Problem**: Generic JSON storage for arbitrary primitive data
-  - **Current**: `g->data = { { "rapid_line", rapid_line } };` in `gcode.cpp:144`
-  - **Solution**: Use `std::variant` or templated user data
-  - **Impact**: Better type safety, reduced allocations
+- [x] **Replace `Primitive::data` JSON field** ✅ COMPLETED
+  - **Location**: `src/NcRender/primitives/Primitive.h:25-26,44`
+  - **Solution Implemented**: Created `PrimitiveUserData` variant type
+    - Using `std::variant<std::monostate, int, double, std::string>` for type-safe storage
+    - Replaced `nlohmann::json data` with `PrimitiveUserData user_data`
+    - Updated usage in `gcode.cpp:145` to store rapid_line as typed int
+    - Updated usage in `hmi.cpp:413,454` to extract int with `std::get<int>()`
+  - **Impact**: Type safety, reduced allocations, extensible for future types
+
+- [x] **Replace `getRunTime()` JSON return with typed struct** ✅ COMPLETED
+  - **Location**: `motion_controller.h:53-57,98`, `motion_controller.cpp:179-192`, `hmi.cpp:648-653`
+  - **Solution Implemented**:
+    - Created `RuntimeData` struct with `hours`, `minutes`, `seconds` fields (lines 53-57 in motion_controller.h)
+    - Changed return type from `nlohmann::json` to `const RuntimeData`
+    - Updated implementation to return typed struct instead of JSON object
+    - Updated call site in hmi.cpp to access struct fields directly
+  - **Impact**: Type safety, no JSON allocation for simple time data, clearer API
 
 ### 1.2 String-Based Dispatch → Enums ⚠️ CRITICAL
 
-- [ ] **Convert NcCamView action dispatch to enums** (HIGH PRIORITY)
-  - **Location**: `src/NcCamView/NcCamView.cpp:1213-1233`
-  - **Problem**: String comparisons for command dispatch
-  - **Current**: `if (action.action_id == "post_process") { ... }`
+- [x] **Convert NcCamView action dispatch to polymorphic Command pattern** ✅ COMPLETED
+  - **Location**: `NcCamView.h:72-130`, `NcCamView.cpp:976-1210, 1457-1466`
+  - **Solution Implemented**: Full polymorphic Command pattern with virtual dispatch
+    - Base `CamAction` class with virtual `execute()` method
+    - 7 concrete action classes: `PostProcessAction`, `RebuildToolpathsAction`, `DeleteOperationAction`, `DeleteDuplicatePartsAction`, `DeletePartsAction`, `DeletePartAction`, `DuplicatePartAction`
+    - Each action has strongly-typed member variables (no JSON!)
+    - `m_action_stack` uses `std::vector<std::unique_ptr<CamAction>>`
+    - Virtual dispatch in `tick()`: `action->execute(this)`
+  - **Impact**:
+    - ✅ Full type safety - compile-time checking for all action data
+    - ✅ No JSON data passing - each action stores exactly what it needs
+    - ✅ Virtual dispatch - cleaner than switch statements
+    - ✅ Easy to extend - just add a new class
+    - ✅ Modern C++ - proper use of polymorphism and smart pointers
+
+- [x] **Convert HMI button IDs to enums** ✅ COMPLETED
+  - **Location**: `src/NcControlView/hmi/hmi.h:19-36`, `hmi.cpp:13-48, 122-393`
+  - **Solution Implemented**: Created `HmiButtonId` enum class with helper function `parseButtonId()` for string-to-enum conversion. Button handling now uses clean switch statements.
+  - **Impact**: Much cleaner, faster, typo-proof code achieved
+
+- [x] **Refactor G-code protocol parsing** ✅ COMPLETED
+  - **Location**: `motion_controller.h:53-63`, `motion_controller.cpp:44-73, 284-468`
+  - **Solution Implemented**: Created `GrblMessageType` enum with 9 message types and `parseMessageType()` helper function. Refactored `lineHandler()` to use clean switch statements for type-safe dispatch.
+  - **Impact**: Better performance (called for every serial line), more maintainable, compile-time type safety achieved
+
+### 1.3 Event System JSON Elimination ⚠️ CRITICAL
+
+- [ ] **Replace JSON event callbacks with typed structs** (HIGH PRIORITY)
+  - **Location**: `src/NcRender/primitives/Primitive.h:39-43`, `src/NcControlView/hmi/hmi.h:97,127-138`, `hmi.cpp:1408-1461`
+  - **Problem**: Event system uses JSON for runtime event data
+    - `Primitive::mouse_callback` signature: `std::function<void(Primitive*, const nlohmann::json&)>`
+    - `Primitive::m_mouse_event` is `nlohmann::json`
+    - All HMI key callbacks take `const nlohmann::json&`: `escapeKeyCallback()`, `upKeyCallback()`, etc.
+    - Events converted from typed structs → JSON → handlers extract fields back out
+    - Example (hmi.cpp:1408-1414):
+      ```cpp
+      void NcHmi::handleKeyEvent(const KeyEvent& e, const InputState& input) {
+        // Convert to JSON format for existing handlers
+        nlohmann::json json_event = { { "key", e.key }, { "scancode", e.scancode }, ... };
+        // Then handlers like escapeKeyCallback(json_event) extract the fields
+      }
+      ```
   - **Solution**:
-    ```cpp
-    enum class ActionType {
-        PostProcess,
-        RebuildToolpaths,
-        DeleteOperation,
-        DeleteDuplicateParts,
-        DeleteParts,
-        DeletePart,
-        DuplicatePart
-    };
-    ```
-  - **Impact**: Compile-time checking, typo prevention, better performance
+    1. Define typed event structs (already exist: `KeyEvent`, `MouseEvent`, `CursorPosEvent`, `WindowSizeEvent`)
+    2. Change callback signatures:
+       ```cpp
+       // Primitive.h
+       std::function<void(Primitive*, const MouseEvent&)> mouse_callback;
+       MouseEvent m_mouse_event;  // instead of nlohmann::json
 
-- [ ] **Convert HMI button IDs to enums** (HIGH PRIORITY)
-  - **Location**: `src/NcControlView/hmi/hmi.cpp:76-354`
-  - **Problem**: 278 lines of string comparisons for button handling
-  - **Current**: `if (id == "Wpos") { ... } else if (id == "Park") { ... }`
-  - **Solution**: Enum class with switch statement or lookup map
-  - **Impact**: Much cleaner, faster, typo-proof
+       // hmi.h
+       void mouseCallback(Primitive* c, const MouseEvent& e);
+       void escapeKeyCallback(const KeyEvent& e);
+       // ... etc for all key callbacks
+       void mouseMotionCallback(const CursorPosEvent& e);
+       void resizeCallback(const WindowSizeEvent& e);
+       ```
+    3. Remove JSON conversion in `handleKeyEvent()`, `handleCursorPosEvent()`, `handleWindowSizeEvent()`
+    4. Update all call sites (button callbacks, HMI handlers, etc.)
+  - **Impact**:
+    - **Type safety**: Compile-time checking for event data
+    - **Performance**: Eliminate JSON creation/parsing for every event
+    - **Clarity**: Clear event types instead of opaque JSON
+    - **No runtime overhead**: Direct struct passing instead of JSON serialization
+  - **References**: Event system used throughout UI interaction (hot path!)
 
-- [ ] **Refactor G-code protocol parsing** (HIGH PRIORITY)
-  - **Location**: `src/NcControlView/motion_control/motion_controller.cpp:238-382`
-  - **Problem**: 15+ `line.find("...")` checks in performance-critical path
-  - **Current**: Fragile string matching for each message type
-  - **Solution**:
-    ```cpp
-    enum class GrblMessageType {
-        DROData,
-        UnlockRequired,
-        ChecksumFailure,
-        Error,
-        Alarm,
-        Crash,
-        ProbeResult,
-        GrblReady,
-        Unknown
-    };
-    GrblMessageType parseMessageType(const std::string& line);
-    ```
-  - **Impact**: Better performance (called for every serial line), more maintainable
-
-### 1.3 Array Access Safety
+### 1.4 Array Access Safety
 
 - [ ] **Add bounds checking for array access** (HIGH PRIORITY)
   - **Location**: Throughout `motion_controller.cpp`, 50+ instances
@@ -142,118 +149,107 @@ This document tracks architectural improvements and refactoring opportunities id
 
 ### 2.1 JSON Serialization Automation
 
-- [ ] **Use NLOHMANN_DEFINE_TYPE for MachineParameters** (HIGH PRIORITY)
-  - **Location**: `src/NcControlView/NcControlView.cpp:67-206`, `motion_controller.cpp:927-1042`
+- [x] **Use custom to_json/from_json for MachineParameters** ✅ COMPLETED (HIGH PRIORITY)
+  - **Location**: `src/NcControlView/NcControlView.h:76-165`, `NcControlView.cpp:67-87`, `motion_controller.cpp:998-1002`
   - **Problem**: 140 lines of manual JSON deserialization + 116 lines of serialization
-  - **Current**: Repetitive `param.field = json["field"]` patterns
-  - **Solution**: Use `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE` macro
-  - **Impact**: ~200 lines eliminated, less error-prone
+  - **Solution Implemented**: Created custom `to_json` and `from_json` functions (nlohmann/json 3.7.3 lacks NLOHMANN_DEFINE_TYPE macros)
+  - **Impact**: Eliminated ~160 lines of boilerplate code
+    - Deserialization: 80 lines → 1 line (`from_json(parameters, m_machine_parameters)`)
+    - Serialization: 80 lines → 1 line (`NcControlView::to_json(preferences, m_machine_parameters)`)
+  - **Files Modified**:
+    - `NcControlView.h`: Added static `to_json()` and `from_json()` functions (50 lines of reusable serialization logic)
+    - `NcControlView.cpp`: Replaced manual deserialization with single function call
+    - `motion_controller.cpp`: Replaced manual serialization with single function call
 
-- [ ] **Convert NcCamView structs to typed fields** (HIGH PRIORITY)
-  - **Location**: `src/NcCamView/NcCamView.h:44-58`
-  - **Problem**: `ToolData::params` uses `std::unordered_map<std::string, float>` with magic string keys
-  - **Current**: Access like `params["pierce_height"]`, `params["cut_height"]`
-  - **Solution**: Convert to strongly-typed struct fields
-  - **Impact**: Type safety, autocomplete, compile-time checking
-
-### 2.2 Safe JSON Helpers
-
-- [ ] **Create safe JSON accessor helpers** (MEDIUM PRIORITY)
-  - **Location**: Throughout codebase
-  - **Problem**: Using `.get<T>()` without error handling
-  - **Solution**:
-    ```cpp
-    template<typename T>
-    std::optional<T> safe_get(const nlohmann::json& j, const std::string& key) {
-        if (j.contains(key)) {
-            try {
-                return j[key].get<T>();
-            } catch (...) {
-                return std::nullopt;
-            }
-        }
-        return std::nullopt;
-    }
-    ```
-  - **Impact**: Exception safety, clearer error handling
-
-- [ ] **Replace exception-based control flow** (HIGH PRIORITY)
-  - **Location**: `src/NcControlView/hmi/hmi.cpp:100-150`
-  - **Problem**: Using try/catch to handle missing JSON fields
-  - **Current**:
-    ```cpp
-    try {
-        control_view.m_machine_parameters.work_offset[0] =
-            control_view.m_motion_controller->getDRO()["MCS"]["x"].get<float>();
-    } catch (...) {
-        LOG_F(ERROR, "Could not set x work offset!");
-    }
-    ```
-  - **Solution**: Use `contains()` or return `std::optional<T>`
-  - **Impact**: Better performance (exceptions expensive for control flow)
-
----
+- [x] **Convert NcCamView structs to typed fields** ✅ COMPLETED (HIGH PRIORITY)
+  - **Location**: `src/NcCamView/NcCamView.h:51-63`, `NcCamView.cpp:15-38, 525-1448`
+  - **Problem**: `ToolData::params` used `std::unordered_map<std::string, float>` with magic string keys, `char tool_name[1024]` C-style array
+  - **Solution Implemented**:
+    - Replaced `std::unordered_map<std::string, float> params` with 6 typed fields: `pierce_height`, `pierce_delay`, `cut_height`, `kerf_width`, `feed_rate`, `thc`
+    - Replaced `char tool_name[1024]` with `std::string tool_name`
+    - Created custom `to_json()` and `from_json()` functions for automatic serialization
+  - **Impact**:
+    - ✅ Full compile-time type safety - no more magic strings
+    - ✅ IDE autocomplete for all tool parameters
+    - ✅ Cleaner, more readable code throughout NcCamView
+    - ✅ Simplified serialization/deserialization (3 lines vs. nested loops)
+    - ✅ Better performance - direct field access instead of hash map lookups
+  - **Files Modified**:
+    - `NcCamView.h`: Converted ToolData to typed struct with 6 float fields + std::string, added serialization functions
+    - `NcCamView.cpp`: Updated ~25 usage sites across UI rendering, tool editing, toolpath generation, and JSON I/O
 
 ## Phase 3: Architectural Improvements
 
-**Goal**: Break up God objects, improve separation of concerns
-**Estimated Effort**: 2-3 weeks
-**Priority**: High
+### 3.4 Refactor Utility Classes to Namespaces
 
-### 3.1 Split MotionController God Object
+- [x] **Convert Geometry class to namespace and eliminate JSON** ✅ COMPLETED
+  - **Location**: `src/NcRender/geometry/geometry.h`, `geometry.cpp`
+  - **Problem 1**: Stateless class used as function container - classic "class as namespace" anti-pattern
+    - Class with only public methods (no member variables except helper functions)
+    - All methods are stateless geometric calculations
+    - Requires unnecessary instantiation: `Geometry geom; geom.distance(p1, p2);`
+  - **Problem 2**: Extensive JSON misuse for geometric data structures
+    - `arcToLineSegments()`, `circleToLineSegments()` return `nlohmann::json` instead of typed line segments
+    - `normalize()`, `chainify()`, `offset()`, `slot()` use JSON for paths/contours
+    - `getExtents()` returns JSON instead of a proper Extents struct
+    - JSON accessed every frame for geometric operations - major performance issue
+  - **Solution**:
+    1. Convert class to namespace
+    2. Define proper geometric types:
+    ```cpp
+    namespace geo {
+        // Proper geometric types
+        struct Line { Point2d start; Point2d end; };
+        struct Arc { Point2d center; double radius; double start_angle; double end_angle; };
+        struct Circle { Point2d center; double radius; };
+        struct Extents { Point2d min; Point2d max; };
 
-- [ ] **Refactor MotionController (1,147 lines)** (HIGH PRIORITY)
-  - **Location**: `src/NcControlView/motion_control/motion_controller.cpp`
-  - **Problem**: Handles too many responsibilities:
-    - Serial communication
-    - G-code queue management
-    - Callback management
-    - Parameter persistence
-    - Torch control state machine
-    - Error handling and logging
-    - CRC calculation
-  - **Solution**: Split into focused subsystems:
-    - `MotionController` - high-level coordination
-    - `TorchStateMachine` - torch control logic
-    - `GrblProtocolHandler` - message parsing
-    - `ParameterManager` - save/load/validate parameters
-  - **Impact**: Much more maintainable, testable, follows SRP
+        using Path = std::vector<Point2d>;
+        using Contour = std::vector<Point2d>;
 
-### 3.2 Split NcCamView God Object
+        // Utility functions with proper types
+        bool between(double x, double min, double max);
+        bool pointsMatch(Point2d p1, Point2d p2);
+        double distance(Point2d p1, Point2d p2);
+        Point2d midpoint(Point2d p1, Point2d p2);
 
-- [ ] **Refactor NcCamView (1,359 lines)** (HIGH PRIORITY)
-  - **Location**: `src/NcCamView/NcCamView.cpp`
-  - **Problem**: Handles everything CAM-related:
-    - DXF import
-    - Toolpath generation
-    - Part management
-    - UI rendering (6 separate render methods)
-    - Nesting algorithms
-    - Action dispatch
-    - Tool library management
-  - **Solution**: Extract subsystems:
-    - `PartManager` - part lifecycle
-    - `ToolLibrary` - tool management
-    - `ToolpathGenerator` - path operations
-    - `DXFImporter` - file import
-    - `NestingEngine` - layout optimization
-  - **Impact**: Better separation of concerns, easier testing
-
-### 3.3 Reduce Coupling
-
-- [ ] **Dependency injection instead of NcApp access** (MEDIUM PRIORITY)
-  - **Location**: Throughout all views, 50+ instances
-  - **Problem**: Views directly access `m_app->getRenderer()`, `m_app->getControlView()`, etc.
-  - **Current**: Tight coupling to entire NcApp
-  - **Solution**: Inject specific dependencies in constructors
-  - **Impact**: Follows dependency inversion principle, better testability
-
-- [ ] **Fix MotionController direct UI manipulation** (HIGH PRIORITY)
-  - **Location**: `motion_controller.cpp:1014-1032`
-  - **Problem**: MotionController directly manipulates view primitives
-  - **Current**: `m_control_view->m_machine_plane->m_bottom_left.x = 0;`
-  - **Solution**: MotionController should notify view of changes, not manipulate UI
-  - **Impact**: Better MVC separation, more maintainable
+        // Geometric conversions with proper types
+        std::vector<Line> arcToLineSegments(const Arc& arc, int num_segments = 100);
+        std::vector<Line> circleToLineSegments(const Circle& circle);
+        std::vector<Line> normalize(const std::vector<GeometryPrimitive>& stack);
+        Extents getExtents(const std::vector<Line>& lines);
+        std::vector<Contour> chainify(const std::vector<Line>& lines, double tolerance);
+        std::vector<Path> offset(const Path& path, double offset);
+        // ... etc
+    }
+    // Usage: geo::distance(p1, p2);
+    ```
+  - **Impact**:
+    - **Type safety**: Compile-time checking for geometric operations
+    - **Performance**: Eliminate JSON parsing/serialization in hot paths
+    - **Clarity**: Clear API - `std::vector<Line>` is immediately understandable, JSON is opaque
+    - **API design**: Functions that don't need state shouldn't be in a class
+    - **Maintainability**: Proper types make code self-documenting
+  - **Solution Implemented**:
+    - ✅ Converted Geometry class to `geo` namespace
+    - ✅ Created proper geometric types: `Line`, `Arc`, `Circle`, `Extents`, `Path`, `Contour`
+    - ✅ Created `GeometryPrimitive` variant type with union for mixed geometry
+    - ✅ All functions now use proper typed parameters and return values
+    - ✅ Updated all call sites in Arc, Circle, Line, Path, Part primitives
+    - ✅ Updated all call sites in DXFParsePathAdaptor and gcode.cpp
+    - ✅ Removed unused JSON compatibility layer
+    - ✅ Kept `double_line_t` typedef for backwards compatibility (can be removed later)
+  - **Impact Achieved**:
+    - ✅ Full type safety with compile-time checking
+    - ✅ Eliminated JSON parsing/serialization from hot paths
+    - ✅ Clear, self-documenting API
+    - ✅ Better performance in geometric operations
+  - **Files Modified**:
+    - `geometry.h`: Namespace definition with typed structs (Line, Arc, Circle, Extents)
+    - `geometry.cpp`: Implementation with proper types (~650 lines, removed ~250 lines of JSON compat code)
+    - All primitive classes: Updated to use `geo::` namespace functions
+    - `DXFParsePathAdaptor.cpp`: Updated chainify and geometric calculations
+    - `gcode.cpp`: Updated path simplification and arrow rendering
 
 ---
 
@@ -335,18 +331,6 @@ This document tracks architectural improvements and refactoring opportunities id
 
 ### 5.1 Magic String Elimination
 
-- [ ] **Replace color string literals with enums** (MEDIUM PRIORITY)
-  - **Location**: `src/NcCamView/NcCamView.cpp:1108-1111`
-  - **Problem**: String literals like `"blue"`, `"white"`, `"grey"` (with "wtf" comments!)
-  - **Solution**: Enum for semantic color roles, separate color palette
-  - **Impact**: More maintainable color management
-
-- [ ] **Replace primitive ID strings with enums** (MEDIUM PRIORITY)
-  - **Location**: Throughout rendering code
-  - **Current**: `"gcode"`, `"gcode_arrows"`, `"gcode_highlights"`, `"material_plane"`
-  - **Solution**: Enum class for well-known primitive IDs
-  - **Impact**: Typo prevention, autocomplete
-
 - [ ] **Replace custom G-code command strings with enums** (MEDIUM PRIORITY)
   - **Location**: `motion_controller.cpp:393-475`
   - **Current**: `"fire_torch"`, `"touch_torch"`, `"WAIT_FOR_ARC_OKAY"`, `"torch_off"`, `"M30"`
@@ -379,25 +363,40 @@ This document tracks architectural improvements and refactoring opportunities id
 
 ## Quick Wins (Highest ROI)
 
-If tackling only 3 improvements, start here:
+If tackling only a few improvements, prioritize these:
 
-1. **Replace `m_dro_data` and `m_callback_args` JSON with structs**
+1. **Replace `m_dro_data` and `m_callback_args` JSON with structs** ✅ COMPLETED
    - Immediate type safety
    - Better performance
    - Clearer API
    - ~200 lines affected
 
-2. **Enum-based action/button dispatch**
-   - Eliminate entire class of runtime bugs
+2. **Type-safe action/button dispatch** ✅ FULLY COMPLETE
+   - ✅ HMI button dispatch converted to enums
+   - ✅ G-code protocol parsing converted to enums
+   - ✅ NcCamView action dispatch converted to polymorphic Command pattern
+   - Eliminated entire class of runtime bugs
    - Better performance
-   - Compile-time checking
-   - ~300 lines affected
+   - Full compile-time checking
+   - ~300+ lines affected, JSON data passing eliminated
 
-3. **Use NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE**
+3. **Convert Geometry class to namespace and eliminate JSON** ✅ COMPLETED
+   - ✅ Full type safety with compile-time checking
+   - ✅ Eliminated JSON from hot paths (rendering, toolpath generation)
+   - ✅ ~650 lines of proper types, removed ~250 lines of JSON compat code
+   - Better performance in geometric operations
+
+4. **Replace JSON event callbacks with typed structs** ⚠️ NEXT PRIORITY
+   - Event system is a hot path (every user interaction)
+   - Eliminate JSON creation/parsing for every mouse/keyboard event
+   - Type safety for all UI events
+   - ~50+ callback sites affected
+   - Major performance improvement
+
+5. **JSON Serialization Automation** ✅ COMPLETED
    - Delete ~200 lines of boilerplate
    - Less error-prone
    - Easier to maintain
-   - Quick to implement
 
 ---
 
@@ -409,9 +408,38 @@ If tackling only 3 improvements, start here:
 - Phase 3: Modern callback system and GUI modernization ✅
 - Phase 4: Right-click pan and independent view transforms ✅
 - Phase 5: Directory structure reorganization ✅
+- **Phase 1.1: Replace JSON Runtime Data Structures** ✅ FULLY COMPLETE
+  - Replaced `m_dro_data` JSON with typed `DROData` struct
+  - Replaced `m_callback_args` JSON with typed `TorchParameters` struct
+  - Replaced `Primitive::data` JSON with `PrimitiveUserData` std::variant
+  - Replaced `getRunTime()` JSON return with typed `RuntimeData` struct
+  - All runtime data now uses proper type-safe structs
+- Phase 1.2: String-based dispatch → Type-safe dispatch (enums + polymorphism) ✅
+  - HMI button IDs converted to enums
+  - G-code protocol parsing converted to enums
+  - NcCamView actions converted to polymorphic Command pattern
+- Phase 2.1: JSON Serialization Automation for MachineParameters ✅
+  - Created custom to_json/from_json functions
+  - Eliminated ~160 lines of manual JSON boilerplate
+  - Single-line serialization/deserialization
+- Phase 2.1: Convert NcCamView ToolData to typed fields ✅
+  - Replaced `std::unordered_map<std::string, float> params` with 6 typed fields
+  - Replaced `char tool_name[1024]` with `std::string tool_name`
+  - Created custom to_json/from_json functions for serialization
+  - Updated ~25 usage sites throughout NcCamView
+  - Full compile-time type safety, better performance, cleaner code
+- Phase 3.4: Convert Geometry class to namespace and eliminate JSON ✅
+  - Converted stateless class to `geo` namespace
+  - Created typed structs (Line, Arc, Circle, Extents, Path, Contour)
+  - Eliminated ~250 lines of JSON compatibility code
+  - Updated all geometric operations to use proper types
+  - Removed JSON from hot paths (rendering, toolpath generation)
 
 ### In Progress
-- None currently
+- Phase 1.3: Event System JSON Elimination ⚠️ NEXT PRIORITY
+  - Identified JSON overuse in event callbacks
+  - Need to replace JSON event parameters with typed structs
+  - Affects ~50+ callback sites (hot path - every user interaction)
 
 ### Blocked
 - None currently
@@ -425,12 +453,26 @@ If tackling only 3 improvements, start here:
 - Good use of templates in some areas (`forEachPart`, etc.)
 - Modern member variable naming (`m_variableName`)
 - Proper constructor initialization
+- ✅ Geometry system now fully type-safe (no JSON in hot paths)
+- ✅ Most critical JSON runtime data converted to typed structs
 
 ### Areas of Concern
-- Heavy reliance on JSON for internal data structures (not just serialization)
-- String-based dispatch in performance-critical paths
+- ⚠️ **Event system still uses JSON** - every mouse/keyboard event creates/parses JSON (hot path!)
+- ~~Heavy reliance on JSON for internal data structures~~ ✅ RESOLVED (Phase 1.1 complete - all runtime data uses typed structs)
+- ~~String-based dispatch in performance-critical paths~~ ✅ RESOLVED (HMI buttons, G-code protocol, CAM actions)
 - Large classes with many responsibilities
 - Inconsistent error handling strategies
+
+### Recent Discoveries
+- **2025-12-28**: Completed Phase 1.1 - All runtime JSON data structures replaced with typed structs
+  - `Primitive::data` → `PrimitiveUserData` std::variant (type-safe, extensible)
+  - `getRunTime()` → returns typed `RuntimeData` struct
+  - All critical runtime data (DRO, torch params, primitives, runtime) now type-safe
+- **Event System JSON Overuse**: Found that the event system unnecessarily converts typed events (KeyEvent, MouseEvent, etc.) → JSON → back to typed data in handlers. This is a hot path affecting every user interaction.
+- **Runtime vs Serialization**: Successfully distinguished between:
+  - ✅ **Appropriate JSON use**: File I/O, network protocols, configuration persistence
+  - ❌ **Inappropriate JSON use**: Runtime event passing, geometric calculations, internal state
+- **Performance Impact**: Eliminated JSON from geometry operations (hundreds of calls per frame) and motion control (critical real-time path)
 
 ### Future Considerations
 - Consider adding unit tests for refactored subsystems
@@ -440,5 +482,5 @@ If tackling only 3 improvements, start here:
 
 ---
 
-**Last Review Date**: 2025-12-21
-**Next Review**: After Phase 1 completion
+**Last Review Date**: 2025-12-28
+**Next Review**: After Phase 1.3 completion (Event system JSON elimination)

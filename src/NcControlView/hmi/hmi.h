@@ -11,9 +11,32 @@ class NcControlView;
 class InputState;
 class Box;
 class Path;
+class Primitive;
 struct KeyEvent;
+struct MouseButtonEvent;
+struct MouseHoverEvent;
 struct MouseMoveEvent;
 struct WindowResizeEvent;
+
+// HMI Button IDs (type-safe enum for button handling)
+enum class HmiButtonId {
+  Wpos,
+  Park,
+  ZeroX,
+  ZeroY,
+  ZeroZ,
+  SpindleOn,
+  SpindleOff,
+  Retract,
+  Touch,
+  Run,
+  TestRun,
+  Abort,
+  Clean,
+  Fit,
+  THC,
+  Unknown
+};
 
 // HMI data structures
 struct hmi_button_t {
@@ -73,8 +96,8 @@ public:
   // Button handling
   void handleButton(const std::string& id);
 
-  // Callbacks for primitives
-  void mouseCallback(Primitive* c, const nlohmann::json& e);
+  // Callbacks for primitives (uses MouseEventData from Primitive.h)
+  void mouseCallback(Primitive* c, const Primitive::MouseEventData& e);
 
   // Utility methods
   void getBoundingBox(Point2d* bbox_min, Point2d* bbox_max);
@@ -104,18 +127,18 @@ private:
   void pushButtonGroup(const std::string& b1, const std::string& b2);
 
   // Key event callbacks
-  void escapeKeyCallback(const nlohmann::json& e);
-  void upKeyCallback(const nlohmann::json& e);
-  void downKeyCallback(const nlohmann::json& e);
-  void rightKeyCallback(const nlohmann::json& e);
-  void leftKeyCallback(const nlohmann::json& e);
-  void pageUpKeyCallback(const nlohmann::json& e);
-  void pageDownKeyCallback(const nlohmann::json& e);
-  void tabKeyUpCallback(const nlohmann::json& e);
+  void escapeKeyCallback(const KeyEvent& e);
+  void upKeyCallback(const KeyEvent& e);
+  void downKeyCallback(const KeyEvent& e);
+  void rightKeyCallback(const KeyEvent& e);
+  void leftKeyCallback(const KeyEvent& e);
+  void pageUpKeyCallback(const KeyEvent& e);
+  void pageDownKeyCallback(const KeyEvent& e);
+  void tabKeyUpCallback(const KeyEvent& e);
 
   // Other callbacks
-  void mouseMotionCallback(const nlohmann::json& e);
-  void resizeCallback(const nlohmann::json& e);
+  void mouseMotionCallback(const MouseMoveEvent& e);
+  void resizeCallback(const WindowResizeEvent& e);
 
   // Timer callback
   bool updateTimer();

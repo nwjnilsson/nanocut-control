@@ -18,6 +18,60 @@ void removeSubstrs(std::string& s, std::string p)
     s.erase(i, n);
 }
 
+// Helper function to parse machine status string into enum
+static MachineStatus parseMachineStatus(const std::string& status_str)
+{
+  if (status_str == "Idle" || status_str == "IDLE")
+    return MachineStatus::Idle;
+  if (status_str == "Cycle" || status_str == "CYCLE")
+    return MachineStatus::Cycle;
+  if (status_str == "Alarm" || status_str == "ALARM")
+    return MachineStatus::Alarm;
+  if (status_str == "Homing" || status_str == "HOMING")
+    return MachineStatus::Homing;
+  if (status_str == "Hold" || status_str == "HOLD")
+    return MachineStatus::Hold;
+  if (status_str == "Check" || status_str == "CHECK")
+    return MachineStatus::Check;
+  if (status_str == "Door" || status_str == "DOOR")
+    return MachineStatus::Door;
+
+  LOG_F(WARNING, "Unknown machine status: %s", status_str.c_str());
+  return MachineStatus::Unknown;
+}
+
+// Helper function to parse GRBL message type for efficient dispatch
+static GrblMessageType parseMessageType(const std::string& line)
+{
+  // Check for JSON data (most common case first for performance)
+  if (line.find("{") != std::string::npos)
+    return GrblMessageType::DROData;
+
+  // Check for specific message patterns
+  if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos)
+    return GrblMessageType::UnlockRequired;
+
+  if (line.find("[CHECKSUM_FAILURE]") != std::string::npos)
+    return GrblMessageType::ChecksumFailure;
+
+  if (line.find("error") != std::string::npos)
+    return GrblMessageType::Error;
+
+  if (line.find("ALARM") != std::string::npos)
+    return GrblMessageType::Alarm;
+
+  if (line.find("[CRASH]") != std::string::npos)
+    return GrblMessageType::Crash;
+
+  if (line.find("[PRB") != std::string::npos)
+    return GrblMessageType::ProbeResult;
+
+  if (line.find("Grbl") != std::string::npos)
+    return GrblMessageType::GrblReady;
+
+  return GrblMessageType::Unknown;
+}
+
 std::vector<std::string> split(std::string str, char delimiter)
 {
   std::vector<std::string> internal;
@@ -90,31 +144,26 @@ void MotionController::tick()
     m_needs_homed = true;
   }
 
-  try {
-    if (m_torch_on == true) {
-      auto current_time = std::chrono::steady_clock::now();
-      auto arc_stable_duration = std::chrono::milliseconds(static_cast<long>(
-        m_control_view->m_machine_parameters.arc_stabilization_time +
-        (m_callback_args.at("pierce_delay").get<double>() * 1000)));
+  if (m_torch_on == true) {
+    auto current_time = std::chrono::steady_clock::now();
+    auto arc_stable_duration = std::chrono::milliseconds(static_cast<long>(
+      m_control_view->m_machine_parameters.arc_stabilization_time +
+      (m_torch_params.pierce_delay * 1000)));
 
-      if ((current_time - m_arc_okay_timer) > arc_stable_duration) {
-        // LOG_F(INFO, "Arc is stabalized!");
-        /*
-            Need to implement real-time command that takes 4 bytes.
-            byte 1 -> THC set command
-            byte 2 -> value low bit
-            byte 3 -> value high bit
-            byte 4 -> End THC set command
+    if ((current_time - m_arc_okay_timer) > arc_stable_duration) {
+      // LOG_F(INFO, "Arc is stabalized!");
+      /*
+          Need to implement real-time command that takes 4 bytes.
+          byte 1 -> THC set command
+          byte 2 -> value low bit
+          byte 3 -> value high bit
+          byte 4 -> End THC set command
 
-            This way THC can be changed on the fly withouth injecting into the
-           gcode stream which under long line moves could b some time after this
-           event occurs... Also would allow setting thc on the fly manually
-        */
-      }
+          This way THC can be changed on the fly withouth injecting into the
+         gcode stream which under long line moves could b some time after this
+         event occurs... Also would allow setting thc on the fly manually
+      */
     }
-  }
-  catch (...) {
-    LOG_F(ERROR, "Error parsing callback args for Smart THC");
   }
 }
 
@@ -127,21 +176,19 @@ void MotionController::shutdown()
   m_arc_okay_callback = nullptr;
 }
 
-nlohmann::json MotionController::getRunTime() const
+const RuntimeData MotionController::getRunTime() const
 {
-  unsigned long seconds{};
-  unsigned long minutes{};
-  unsigned long hours{};
+  RuntimeData runtime;
   if (m_program_start_time != std::chrono::steady_clock::time_point{}) {
     auto now = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       now - m_program_start_time);
     unsigned long m = duration.count();
-    seconds = (m / 1000) % 60;
-    minutes = (m / (1000 * 60)) % 60;
-    hours = (m / (1000 * 60 * 60)) % 24;
+    runtime.seconds = (m / 1000) % 60;
+    runtime.minutes = (m / (1000 * 60)) % 60;
+    runtime.hours = (m / (1000 * 60 * 60)) % 24;
   }
-  return { { "seconds", seconds }, { "minutes", minutes }, { "hours", hours } };
+  return runtime;
 }
 
 void MotionController::sendCommand(const std::string& cmd)
@@ -234,150 +281,186 @@ bool MotionController::byteHandler(uint8_t b)
 
 void MotionController::lineHandler(std::string line)
 {
+  // Parse message type once for efficient dispatch
+  GrblMessageType msg_type = parseMessageType(line);
+
   if (m_controller_ready == true) {
-    if (line.find("{") != std::string::npos) {
-      try {
-        m_dro_data = nlohmann::json::parse(line);
-        if (m_dro_data["ARC_OK"] == false) {
-          if (m_arc_okay_callback) {
-            m_arc_okay_callback();
-            m_arc_okay_callback = nullptr;
-            m_arc_okay_timer = std::chrono::steady_clock::now();
+    // Handle messages when controller is ready
+    switch (msg_type) {
+      case GrblMessageType::DROData:
+        try {
+          // Parse JSON into typed struct
+          nlohmann::json j = nlohmann::json::parse(line);
+          m_dro_data.status =
+            parseMachineStatus(j.at("STATUS").get<std::string>());
+          m_dro_data.mcs.x = j.at("MCS").at("x").get<float>();
+          m_dro_data.mcs.y = j.at("MCS").at("y").get<float>();
+          m_dro_data.mcs.z = j.at("MCS").at("z").get<float>();
+          m_dro_data.wcs.x = j.at("WCS").at("x").get<float>();
+          m_dro_data.wcs.y = j.at("WCS").at("y").get<float>();
+          m_dro_data.wcs.z = j.at("WCS").at("z").get<float>();
+          m_dro_data.feed = j.at("FEED").get<int>();
+          m_dro_data.voltage = j.at("V").get<int>();
+          m_dro_data.in_motion = j.at("IN_MOTION").get<bool>();
+          m_dro_data.arc_ok = j.at("ARC_OK").get<bool>();
+          m_dro_data.torch_on = m_torch_on;
+
+          if (m_dro_data.arc_ok == false) {
+            if (m_arc_okay_callback) {
+              m_arc_okay_callback();
+              m_arc_okay_callback = nullptr;
+              m_arc_okay_timer = std::chrono::steady_clock::now();
+            }
+          }
+          if (m_abort_pending == true && m_dro_data.in_motion == false) {
+            logRuntime();
+            m_serial.delay(300);
+            LOG_F(INFO, "Handling pending abort -> Sending Reset!");
+            m_serial.sendByte(0x18);
+            m_serial.delay(300);
+            m_abort_pending = false;
+            m_program_start_time = std::chrono::steady_clock::time_point{};
+            m_arc_retry_count = 0;
+            m_torch_on = false;
+            m_handling_crash = false;
+            m_controller_ready = false;
           }
         }
-        if (m_abort_pending == true &&
-            static_cast<bool>(m_dro_data["IN_MOTION"]) == false) {
-          logRuntime();
-          m_serial.delay(300);
-          LOG_F(INFO, "Handling pending abort -> Sending Reset!");
-          m_serial.sendByte(0x18);
-          m_serial.delay(300);
-          m_abort_pending = false;
-          m_program_start_time = std::chrono::steady_clock::time_point{};
-          m_arc_retry_count = 0;
-          m_torch_on = false;
-          m_handling_crash = false;
-          m_controller_ready = false;
+        catch (...) {
+          LOG_F(ERROR, "Error parsing DRO JSON data!");
         }
-      }
-      catch (...) {
-        LOG_F(ERROR, "Error parsing DRO JSON data!");
-      }
-    }
-    else if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos) {
-      if (m_control_view->m_machine_parameters.homing_enabled == false) {
-        LOG_F(
-          WARNING,
-          "Controller lockout for unknown reason. Automatically unlocking...");
-        send("$X");
-      }
-      else {
-        LOG_F(WARNING,
-              "Controller lockout for unknown reason. Machine will need to be "
-              "re-homed...");
-        m_needs_homed = true;
-      }
-    }
-    else if (line.find("[CHECKSUM_FAILURE]") != std::string::npos) {
-      auto current_time = std::chrono::steady_clock::now();
-      auto last_error_duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-          current_time -
-          std::chrono::steady_clock::time_point{
-            std::chrono::milliseconds{ m_last_checksum_error } });
+        break;
 
-      if (m_last_checksum_error > 0 &&
-          last_error_duration < std::chrono::milliseconds{ 100 }) {
-        m_control_view->getDialogs().setInfoValue(
-          "Program aborted due to multiple communication "
-          "checksum errors in a short period of time!");
-        sendCommand("abort");
-      }
-      else {
-        LOG_F(WARNING,
-              "(motion_control) Communication checksum error, resending last "
-              "send communication!");
-        m_last_checksum_error =
+      case GrblMessageType::UnlockRequired:
+        if (m_control_view->m_machine_parameters.homing_enabled == false) {
+          LOG_F(WARNING,
+                "Controller lockout for unknown reason. Automatically "
+                "unlocking...");
+          send("$X");
+        }
+        else {
+          LOG_F(WARNING,
+                "Controller lockout for unknown reason. Machine will need to be "
+                "re-homed...");
+          m_needs_homed = true;
+        }
+        break;
+
+      case GrblMessageType::ChecksumFailure: {
+        auto current_time = std::chrono::steady_clock::now();
+        auto last_error_duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(
-            current_time.time_since_epoch())
-            .count();
-        m_serial.resend();
-      }
-    }
-    else if (line.find("error") != std::string::npos) {
-      removeSubstrs(line, "error:");
-      logControllerError(atoi(line.c_str()));
-    }
-    else if (line.find("ALARM") != std::string::npos) {
-      removeSubstrs(line, "ALARM:");
-      handleAlarm(atoi(line.c_str()));
-    }
-    else if (line.find("[CRASH]") != std::string::npos &&
-             m_handling_crash == false) {
-      auto current_time = std::chrono::steady_clock::now();
-      auto torch_duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(current_time -
-                                                              m_torch_on_timer);
+            current_time - std::chrono::steady_clock::time_point{
+                             std::chrono::milliseconds{ m_last_checksum_error } });
 
-      if (m_torch_on == true &&
-          torch_duration > std::chrono::milliseconds{ 2000 }) {
-        m_control_view->getDialogs().setInfoValue(
-          "Program was aborted because torch crash was detected!");
-        sendCommand("abort");
-        m_handling_crash = true;
-      }
-    }
-    else if (line.find("[PRB") != std::string::npos) {
-      LOG_F(INFO, "Probe finished - Running callback!");
-      if (m_probe_callback) {
-        m_probe_callback();
-      }
-    }
-    else if (line.find("Grbl") != std::string::npos) {
-      LOG_F(WARNING,
-            "Received Grbl start message while in ready state. Was the "
-            "controller reset?");
-    }
-    else {
-      LOG_F(WARNING, "Unidentified line received - %s", line.c_str());
+        if (m_last_checksum_error > 0 &&
+            last_error_duration < std::chrono::milliseconds{ 100 }) {
+          m_control_view->getDialogs().setInfoValue(
+            "Program aborted due to multiple communication "
+            "checksum errors in a short period of time!");
+          sendCommand("abort");
+        }
+        else {
+          LOG_F(WARNING,
+                "(motion_control) Communication checksum error, resending last "
+                "send communication!");
+          m_last_checksum_error =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+              current_time.time_since_epoch())
+              .count();
+          m_serial.resend();
+        }
+      } break;
+
+      case GrblMessageType::Error:
+        removeSubstrs(line, "error:");
+        logControllerError(atoi(line.c_str()));
+        break;
+
+      case GrblMessageType::Alarm:
+        removeSubstrs(line, "ALARM:");
+        handleAlarm(atoi(line.c_str()));
+        break;
+
+      case GrblMessageType::Crash:
+        if (m_handling_crash == false) {
+          auto current_time = std::chrono::steady_clock::now();
+          auto torch_duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+              current_time - m_torch_on_timer);
+
+          if (m_torch_on == true &&
+              torch_duration > std::chrono::milliseconds{ 2000 }) {
+            m_control_view->getDialogs().setInfoValue(
+              "Program was aborted because torch crash was detected!");
+            sendCommand("abort");
+            m_handling_crash = true;
+          }
+        }
+        break;
+
+      case GrblMessageType::ProbeResult:
+        LOG_F(INFO, "Probe finished - Running callback!");
+        if (m_probe_callback) {
+          m_probe_callback();
+        }
+        break;
+
+      case GrblMessageType::GrblReady:
+        LOG_F(WARNING,
+              "Received Grbl start message while in ready state. Was the "
+              "controller reset?");
+        break;
+
+      case GrblMessageType::Unknown:
+        LOG_F(WARNING, "Unidentified line received - %s", line.c_str());
+        break;
     }
   }
   else if (m_controller_ready == false) {
-    if (line.find("Grbl") != std::string::npos) {
-      LOG_F(INFO, "Controller ready!");
-      m_controller_ready = true;
-      m_gcode_queue.push_back(
-        "G10 L2 P0 X" +
-        std::to_string(m_control_view->m_machine_parameters.work_offset[0]) +
-        " Y" +
-        std::to_string(m_control_view->m_machine_parameters.work_offset[1]) +
-        " Z" +
-        std::to_string(m_control_view->m_machine_parameters.work_offset[2]));
-      m_gcode_queue.push_back("M30");
-      runStack();
-    }
-    else if (line.find("[MSG:'$H'|'$X' to unlock]") != std::string::npos) {
-      if (m_control_view->m_machine_parameters.homing_enabled == true) {
-        LOG_F(INFO, "Controller ready, but needs homing.");
+    // Handle messages when controller is not ready
+    switch (msg_type) {
+      case GrblMessageType::GrblReady:
+        LOG_F(INFO, "Controller ready!");
         m_controller_ready = true;
-        m_needs_homed = true;
         m_gcode_queue.push_back(
           "G10 L2 P0 X" +
-          std::to_string(
-            m_control_view->m_machine_parameters.work_offset[0]) +
+          std::to_string(m_control_view->m_machine_parameters.work_offset[0]) +
           " Y" +
-          std::to_string(
-            m_control_view->m_machine_parameters.work_offset[1]) +
+          std::to_string(m_control_view->m_machine_parameters.work_offset[1]) +
           " Z" +
-          std::to_string(
-            m_control_view->m_machine_parameters.work_offset[2]));
+          std::to_string(m_control_view->m_machine_parameters.work_offset[2]));
         m_gcode_queue.push_back("M30");
         runStack();
-      }
-      else {
-        LOG_F(WARNING, "Controller locked out. Unlocking...");
-        send("$X");
-      }
+        break;
+
+      case GrblMessageType::UnlockRequired:
+        if (m_control_view->m_machine_parameters.homing_enabled == true) {
+          LOG_F(INFO, "Controller ready, but needs homing.");
+          m_controller_ready = true;
+          m_needs_homed = true;
+          m_gcode_queue.push_back(
+            "G10 L2 P0 X" +
+            std::to_string(
+              m_control_view->m_machine_parameters.work_offset[0]) +
+            " Y" +
+            std::to_string(
+              m_control_view->m_machine_parameters.work_offset[1]) +
+            " Z" +
+            std::to_string(
+              m_control_view->m_machine_parameters.work_offset[2]));
+          m_gcode_queue.push_back("M30");
+          runStack();
+        }
+        else {
+          LOG_F(WARNING, "Controller locked out. Unlocking...");
+          send("$X");
+        }
+        break;
+
+      default:
+        // Ignore other messages when controller is not ready
+        break;
     }
   }
 }
@@ -396,18 +479,15 @@ void MotionController::runPop()
         "[fire_torch] Sending probing cycle! - Waiting for probe to finish!");
       std::vector<std::string> args = split(line, ' ');
       if (args.size() == 4) {
-        m_callback_args["pierce_height"] =
-          static_cast<double>(atof(args[1].c_str()));
-        m_callback_args["pierce_delay"] =
-          static_cast<double>(atof(args[2].c_str()));
-        m_callback_args["cut_height"] =
-          static_cast<double>(atof(args[3].c_str()));
+        m_torch_params.pierce_height = static_cast<double>(atof(args[1].c_str()));
+        m_torch_params.pierce_delay = static_cast<double>(atof(args[2].c_str()));
+        m_torch_params.cut_height = static_cast<double>(atof(args[3].c_str()));
       }
       else {
         LOG_F(ERROR, "[fire_torch] Invalid arguments - Using defaults!");
-        m_callback_args["pierce_height"] = c_default_pierce_height;
-        m_callback_args["pierce_delay"] = c_default_pierce_delay_s;
-        m_callback_args["cut_height"] = c_default_cut_height;
+        m_torch_params.pierce_height = c_default_pierce_height;
+        m_torch_params.pierce_delay = c_default_pierce_delay_s;
+        m_torch_params.cut_height = c_default_cut_height;
       }
 
       if (m_arc_retry_count > 3) {
@@ -435,18 +515,15 @@ void MotionController::runPop()
         "[touch_torch] Sending probing cycle! - Waiting for probe to finish!");
       std::vector<std::string> args = split(line, ' ');
       if (args.size() == 4) {
-        m_callback_args["pierce_height"] =
-          static_cast<double>(atof(args[1].c_str()));
-        m_callback_args["pierce_delay"] =
-          static_cast<double>(atof(args[2].c_str()));
-        m_callback_args["cut_height"] =
-          static_cast<double>(atof(args[3].c_str()));
+        m_torch_params.pierce_height = static_cast<double>(atof(args[1].c_str()));
+        m_torch_params.pierce_delay = static_cast<double>(atof(args[2].c_str()));
+        m_torch_params.cut_height = static_cast<double>(atof(args[3].c_str()));
       }
       else {
         LOG_F(WARNING, "[touch_torch] No arguments - Using default!");
-        m_callback_args["pierce_height"] = c_default_pierce_height;
-        m_callback_args["pierce_delay"] = c_default_pierce_delay_s;
-        m_callback_args["cut_height"] = c_default_cut_height;
+        m_torch_params.pierce_height = c_default_pierce_height;
+        m_torch_params.pierce_delay = c_default_pierce_delay_s;
+        m_torch_params.cut_height = c_default_cut_height;
       }
       m_okay_callback = nullptr;
       m_probe_callback = [this]() { touchTorchAndBackOff(); };
@@ -456,9 +533,9 @@ void MotionController::runPop()
       LOG_F(INFO,
             "[run_pop] Setting arc_okay callback and arc_okay expire timer => "
             "fires in %.4f ms!",
-            (3 + static_cast<double>(m_callback_args["pierce_delay"])) * 1000);
+            (3 + m_torch_params.pierce_delay) * 1000);
       m_renderer->pushTimer(
-        (3 + static_cast<double>(m_callback_args["pierce_delay"])) * 1000,
+        (3 + m_torch_params.pierce_delay) * 1000,
         std::bind(&MotionController::arcOkayExpireTimer, this));
       m_arc_okay_callback = [this]() { lowerToCutHeightAndRunProgram(); };
       m_okay_callback = nullptr;
@@ -507,14 +584,11 @@ bool MotionController::arcOkayExpireTimer()
     m_torch_on = false;
 
     m_gcode_queue.push_front("fire_torch " +
-                             to_string_strip_zeros(static_cast<double>(
-                               m_callback_args["pierce_height"])) +
+                             to_string_strip_zeros(m_torch_params.pierce_height) +
                              " " +
-                             to_string_strip_zeros(static_cast<double>(
-                               m_callback_args["pierce_delay"])) +
+                             to_string_strip_zeros(m_torch_params.pierce_delay) +
                              " " +
-                             to_string_strip_zeros(static_cast<double>(
-                               m_callback_args["cut_height"])));
+                             to_string_strip_zeros(m_torch_params.cut_height));
     m_gcode_queue.push_front("G0 Z0");
     m_gcode_queue.push_front("M5");
 
@@ -531,14 +605,13 @@ bool MotionController::arcOkayExpireTimer()
 bool MotionController::statusTimer()
 {
   if (m_controller_ready == true) {
-    if (m_dro_data.contains("STATUS")) {
+    if (m_dro_data.status != MachineStatus::Unknown) {
       auto current_time = std::chrono::steady_clock::now();
       auto program_duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(
           current_time - m_program_start_time);
 
-      if (m_motion_sync_callback &&
-          static_cast<bool>(m_dro_data["IN_MOTION"]) == false &&
+      if (m_motion_sync_callback && m_dro_data.in_motion == false &&
           program_duration > std::chrono::milliseconds{ 500 }) {
         LOG_F(INFO, "Motion is synced, calling pending callback!");
         m_motion_sync_callback();
@@ -569,8 +642,7 @@ void MotionController::homingDoneCallback()
   m_okay_callback = nullptr;
   m_needs_homed = false;
   LOG_F(INFO, "Homing finished! Saving Z work offset...");
-  m_control_view->m_machine_parameters.work_offset[2] =
-    static_cast<float>(getDRO()["MCS"]["z"]);
+  m_control_view->m_machine_parameters.work_offset[2] = getDRO().mcs.z;
   m_gcode_queue.push_back("G10 L20 P0 Z0");
   m_gcode_queue.push_back("M30");
   runStack();
@@ -589,10 +661,8 @@ void MotionController::lowerToCutHeightAndRunProgram()
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front(
     "G91G0 Z" + to_string_strip_zeros(
-                  static_cast<double>(m_callback_args["pierce_height"]) -
-                  static_cast<double>(m_callback_args["cut_height"])));
-  m_gcode_queue.push_front("G4P" + to_string_strip_zeros(static_cast<double>(
-                                     m_callback_args["pierce_delay"])));
+                  m_torch_params.pierce_height - m_torch_params.cut_height));
+  m_gcode_queue.push_front("G4P" + to_string_strip_zeros(m_torch_params.pierce_delay));
   LOG_F(INFO, "Running callback => lower_to_cut_height_and_run_program()");
   runPop();
 }
@@ -605,8 +675,7 @@ void MotionController::raiseToPierceHeightAndFireTorch()
   m_gcode_queue.push_front("WAIT_FOR_ARC_OKAY");
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front("M3S1000");
-  m_gcode_queue.push_front("G0Z-" + to_string_strip_zeros(static_cast<double>(
-                                      m_callback_args["pierce_height"])));
+  m_gcode_queue.push_front("G0Z-" + to_string_strip_zeros(m_torch_params.pierce_height));
   m_gcode_queue.push_front(
     "G0Z-" + to_string_strip_zeros(
                m_control_view->m_machine_parameters.floating_head_backlash));
@@ -926,89 +995,9 @@ void MotionController::handleAlarm(int alarm)
 
 void MotionController::saveParameters()
 {
+  // Use automatic serialization via to_json
   nlohmann::json preferences;
-  preferences["work_offset"]["x"] =
-    m_control_view->m_machine_parameters.work_offset[0];
-  preferences["work_offset"]["y"] =
-    m_control_view->m_machine_parameters.work_offset[1];
-  preferences["work_offset"]["z"] =
-    m_control_view->m_machine_parameters.work_offset[2];
-  preferences["machine_extents"]["x"] =
-    m_control_view->m_machine_parameters.machine_extents[0];
-  preferences["machine_extents"]["y"] =
-    m_control_view->m_machine_parameters.machine_extents[1];
-  preferences["machine_extents"]["z"] =
-    m_control_view->m_machine_parameters.machine_extents[2];
-  preferences["cutting_extents"]["x1"] =
-    m_control_view->m_machine_parameters.cutting_extents[0];
-  preferences["cutting_extents"]["y1"] =
-    m_control_view->m_machine_parameters.cutting_extents[1];
-  preferences["cutting_extents"]["x2"] =
-    m_control_view->m_machine_parameters.cutting_extents[2];
-  preferences["cutting_extents"]["y2"] =
-    m_control_view->m_machine_parameters.cutting_extents[3];
-  preferences["axis_scale"]["x"] =
-    m_control_view->m_machine_parameters.axis_scale[0];
-  preferences["axis_scale"]["y"] =
-    m_control_view->m_machine_parameters.axis_scale[1];
-  preferences["axis_scale"]["z"] =
-    m_control_view->m_machine_parameters.axis_scale[2];
-  preferences["max_vel"]["x"] =
-    m_control_view->m_machine_parameters.max_vel[0];
-  preferences["max_vel"]["y"] =
-    m_control_view->m_machine_parameters.max_vel[1];
-  preferences["max_vel"]["z"] =
-    m_control_view->m_machine_parameters.max_vel[2];
-  preferences["max_accel"]["x"] =
-    m_control_view->m_machine_parameters.max_accel[0];
-  preferences["max_accel"]["y"] =
-    m_control_view->m_machine_parameters.max_accel[1];
-  preferences["max_accel"]["z"] =
-    m_control_view->m_machine_parameters.max_accel[2];
-  preferences["junction_deviation"] =
-    m_control_view->m_machine_parameters.junction_deviation;
-  preferences["arc_stabilization_time"] =
-    m_control_view->m_machine_parameters.arc_stabilization_time;
-  preferences["arc_voltage_divider"] =
-    m_control_view->m_machine_parameters.arc_voltage_divider;
-  preferences["floating_head_backlash"] =
-    m_control_view->m_machine_parameters.floating_head_backlash;
-  preferences["z_probe_feedrate"] =
-    m_control_view->m_machine_parameters.z_probe_feedrate;
-  preferences["axis_invert"]["x"] =
-    m_control_view->m_machine_parameters.axis_invert[0];
-  preferences["axis_invert"]["y1"] =
-    m_control_view->m_machine_parameters.axis_invert[1];
-  preferences["axis_invert"]["y2"] =
-    m_control_view->m_machine_parameters.axis_invert[2];
-  preferences["axis_invert"]["z"] =
-    m_control_view->m_machine_parameters.axis_invert[3];
-  preferences["soft_limits_enabled"] =
-    m_control_view->m_machine_parameters.soft_limits_enabled;
-  preferences["homing_enabled"] =
-    m_control_view->m_machine_parameters.homing_enabled;
-  preferences["homing_dir_invert"]["x"] =
-    m_control_view->m_machine_parameters.homing_dir_invert[0];
-  preferences["homing_dir_invert"]["y"] =
-    m_control_view->m_machine_parameters.homing_dir_invert[1];
-  preferences["homing_dir_invert"]["z"] =
-    m_control_view->m_machine_parameters.homing_dir_invert[2];
-  preferences["homing_feed"] =
-    m_control_view->m_machine_parameters.homing_feed;
-  preferences["homing_seek"] =
-    m_control_view->m_machine_parameters.homing_seek;
-  preferences["homing_debounce"] =
-    m_control_view->m_machine_parameters.homing_debounce;
-  preferences["homing_pull_off"] =
-    m_control_view->m_machine_parameters.homing_pull_off;
-  preferences["invert_limit_pins"] =
-    m_control_view->m_machine_parameters.invert_limit_pins;
-  preferences["invert_probe_pin"] =
-    m_control_view->m_machine_parameters.invert_probe_pin;
-  preferences["invert_step_enable"] =
-    m_control_view->m_machine_parameters.invert_step_enable;
-  preferences["precise_jog_units"] =
-    m_control_view->m_machine_parameters.precise_jog_units;
+  NcControlView::to_json(preferences, m_control_view->m_machine_parameters);
 
   // Update machine plane parameters
   m_control_view->m_machine_plane->m_bottom_left.x = 0;
@@ -1032,7 +1021,7 @@ void MotionController::saveParameters()
 
   try {
     std::ofstream out(m_renderer->getConfigDirectory() +
-                      "m_machine_parameters.json");
+                      "machine_parameters.json");
     out << preferences.dump();
     out.close();
   }

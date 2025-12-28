@@ -27,7 +27,7 @@ public:
   // Override transform - gcode paths use WCO, others use default
   void applyTransform(const TransformData& transform) override
   {
-    if (id == "gcode" || id == "gcode_highlights" || id == "gcode_arrows") {
+    if ((flags & PrimitiveFlags::GCode) != PrimitiveFlags::None) {
       // Use work coordinate offset for gcode paths
       scale = transform.zoom;
       offset[0] = transform.wco_x;

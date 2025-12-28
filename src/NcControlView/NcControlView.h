@@ -72,6 +72,98 @@ public:
     float thc_set_value{ 0.f };
     float precise_jog_units = 0.0f;
   };
+
+  // JSON serialization functions for MachineParameters
+  static void to_json(nlohmann::json& j, const MachineParameters& p)
+  {
+    j["work_offset"]["x"] = p.work_offset[0];
+    j["work_offset"]["y"] = p.work_offset[1];
+    j["work_offset"]["z"] = p.work_offset[2];
+    j["machine_extents"]["x"] = p.machine_extents[0];
+    j["machine_extents"]["y"] = p.machine_extents[1];
+    j["machine_extents"]["z"] = p.machine_extents[2];
+    j["cutting_extents"]["x1"] = p.cutting_extents[0];
+    j["cutting_extents"]["y1"] = p.cutting_extents[1];
+    j["cutting_extents"]["x2"] = p.cutting_extents[2];
+    j["cutting_extents"]["y2"] = p.cutting_extents[3];
+    j["axis_scale"]["x"] = p.axis_scale[0];
+    j["axis_scale"]["y"] = p.axis_scale[1];
+    j["axis_scale"]["z"] = p.axis_scale[2];
+    j["max_vel"]["x"] = p.max_vel[0];
+    j["max_vel"]["y"] = p.max_vel[1];
+    j["max_vel"]["z"] = p.max_vel[2];
+    j["max_accel"]["x"] = p.max_accel[0];
+    j["max_accel"]["y"] = p.max_accel[1];
+    j["max_accel"]["z"] = p.max_accel[2];
+    j["junction_deviation"] = p.junction_deviation;
+    j["arc_stabilization_time"] = p.arc_stabilization_time;
+    j["arc_voltage_divider"] = p.arc_voltage_divider;
+    j["floating_head_backlash"] = p.floating_head_backlash;
+    j["z_probe_feedrate"] = p.z_probe_feedrate;
+    j["axis_invert"]["x"] = p.axis_invert[0];
+    j["axis_invert"]["y1"] = p.axis_invert[1];
+    j["axis_invert"]["y2"] = p.axis_invert[2];
+    j["axis_invert"]["z"] = p.axis_invert[3];
+    j["soft_limits_enabled"] = p.soft_limits_enabled;
+    j["homing_enabled"] = p.homing_enabled;
+    j["homing_dir_invert"]["x"] = p.homing_dir_invert[0];
+    j["homing_dir_invert"]["y"] = p.homing_dir_invert[1];
+    j["homing_dir_invert"]["z"] = p.homing_dir_invert[2];
+    j["homing_feed"] = p.homing_feed;
+    j["homing_seek"] = p.homing_seek;
+    j["homing_debounce"] = p.homing_debounce;
+    j["homing_pull_off"] = p.homing_pull_off;
+    j["invert_limit_pins"] = p.invert_limit_pins;
+    j["invert_probe_pin"] = p.invert_probe_pin;
+    j["invert_step_enable"] = p.invert_step_enable;
+    j["precise_jog_units"] = p.precise_jog_units;
+  }
+
+  static void from_json(const nlohmann::json& j, MachineParameters& p)
+  {
+    p.work_offset[0] = j.at("work_offset").at("x").get<float>();
+    p.work_offset[1] = j.at("work_offset").at("y").get<float>();
+    p.work_offset[2] = j.at("work_offset").at("z").get<float>();
+    p.machine_extents[0] = j.at("machine_extents").at("x").get<float>();
+    p.machine_extents[1] = j.at("machine_extents").at("y").get<float>();
+    p.machine_extents[2] = j.at("machine_extents").at("z").get<float>();
+    p.cutting_extents[0] = j.at("cutting_extents").at("x1").get<float>();
+    p.cutting_extents[1] = j.at("cutting_extents").at("y1").get<float>();
+    p.cutting_extents[2] = j.at("cutting_extents").at("x2").get<float>();
+    p.cutting_extents[3] = j.at("cutting_extents").at("y2").get<float>();
+    p.axis_scale[0] = j.at("axis_scale").at("x").get<float>();
+    p.axis_scale[1] = j.at("axis_scale").at("y").get<float>();
+    p.axis_scale[2] = j.at("axis_scale").at("z").get<float>();
+    p.max_vel[0] = j.at("max_vel").at("x").get<float>();
+    p.max_vel[1] = j.at("max_vel").at("y").get<float>();
+    p.max_vel[2] = j.at("max_vel").at("z").get<float>();
+    p.max_accel[0] = j.at("max_accel").at("x").get<float>();
+    p.max_accel[1] = j.at("max_accel").at("y").get<float>();
+    p.max_accel[2] = j.at("max_accel").at("z").get<float>();
+    p.junction_deviation = j.at("junction_deviation").get<float>();
+    p.arc_stabilization_time = j.at("arc_stabilization_time").get<float>();
+    p.arc_voltage_divider = j.at("arc_voltage_divider").get<float>();
+    p.floating_head_backlash = j.at("floating_head_backlash").get<float>();
+    p.z_probe_feedrate = j.at("z_probe_feedrate").get<float>();
+    p.axis_invert[0] = j.at("axis_invert").at("x").get<bool>();
+    p.axis_invert[1] = j.at("axis_invert").at("y1").get<bool>();
+    p.axis_invert[2] = j.at("axis_invert").at("y2").get<bool>();
+    p.axis_invert[3] = j.at("axis_invert").at("z").get<bool>();
+    p.soft_limits_enabled = j.at("soft_limits_enabled").get<bool>();
+    p.homing_enabled = j.at("homing_enabled").get<bool>();
+    p.homing_dir_invert[0] = j.at("homing_dir_invert").at("x").get<bool>();
+    p.homing_dir_invert[1] = j.at("homing_dir_invert").at("y").get<bool>();
+    p.homing_dir_invert[2] = j.at("homing_dir_invert").at("z").get<bool>();
+    p.homing_feed = j.at("homing_feed").get<float>();
+    p.homing_seek = j.at("homing_seek").get<float>();
+    p.homing_debounce = j.at("homing_debounce").get<float>();
+    p.homing_pull_off = j.at("homing_pull_off").get<float>();
+    p.invert_limit_pins = j.at("invert_limit_pins").get<bool>();
+    p.invert_probe_pin = j.at("invert_probe_pin").get<bool>();
+    p.invert_step_enable = j.at("invert_step_enable").get<bool>();
+    p.precise_jog_units = j.at("precise_jog_units").get<float>();
+  }
+
   Preferences                     m_preferences;
   Box*                            m_machine_plane;
   Box*                            m_cuttable_plane;

@@ -5,3 +5,4 @@ undefined
 build/
 NanoCut
 .release_time
+.cache/

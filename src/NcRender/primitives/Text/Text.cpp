@@ -38,19 +38,13 @@ void        Text::processMouse(float mpos_x, float mpos_y)
   if (mpos_x > m_position.x && mpos_x < (m_position.x + m_width) &&
       mpos_y > m_position.y && mpos_y < (m_position.y + m_height)) {
     if (mouse_over == false) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseIn },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
       mouse_over = true;
     }
   }
   else {
     if (mouse_over == true) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseOut },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
       mouse_over = false;
     }
   }
@@ -157,10 +151,10 @@ void Text::render()
                offset[2]);
   glScalef(
     scale, scale, scale);
-  glColor4f(color[0] / 255,
-            color[1] / 255,
-            color[2] / 255,
-            color[3] / 255);
+  glColor4f(color.r / 255,
+            color.g / 255,
+            color.b / 255,
+            color.a / 255);
   if (m_texture == -1) {
     bool ret = InitFontFromFile(m_font_file.c_str(), m_font_size);
     if (ret == false) {

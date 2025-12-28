@@ -114,7 +114,7 @@ void NcSerial::tick()
                          m_connect_description.begin(),
                          [](unsigned char c) { return std::tolower(c); });
           std::vector<std::string> multiple_descriptions =
-            this->split(m_connect_description, '|');
+            split(m_connect_description, '|');
           for (int x = 0; x < multiple_descriptions.size(); x++) {
             if (device.description.find(multiple_descriptions[x]) !=
                 std::string::npos) {
@@ -135,7 +135,7 @@ void NcSerial::tick()
           if (m_serial.isOpen()) {
             m_is_connected = true;
             m_serial.setDTR(true);
-            this->delay(100);
+            delay(100);
             m_serial.setDTR(false);
             LOG_F(INFO,
                   "Opened port: %s at %d baudrate",

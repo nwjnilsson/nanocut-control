@@ -49,13 +49,18 @@ private:
     int   origin_corner = 2;
   };
   struct ToolData {
-    char                                   tool_name[1024];
-    std::unordered_map<std::string, float> params{
-      { "pierce_height", 1.f }, { "pierce_delay", 1.f },
-      { "cut_height", 1.f },    { "kerf_width", DEFAULT_KERF_WIDTH },
-      { "feed_rate", 1.f },     { "thc", 0.f }
-    };
+    std::string tool_name;
+    float       pierce_height = 1.0f;
+    float       pierce_delay = 1.0f;
+    float       cut_height = 1.0f;
+    float       kerf_width = DEFAULT_KERF_WIDTH;
+    float       feed_rate = 1.0f;
+    float       thc = 0.0f;
   };
+
+  // JSON serialization for ToolData
+  static void to_json(nlohmann::json& j, const ToolData& tool);
+  static void from_json(const nlohmann::json& j, ToolData& tool);
   enum class OpType {
     Cut,
   };
@@ -68,14 +73,83 @@ private:
     double      lead_out_length = DEFAULT_LEAD_OUT;
     std::string layer;
   };
-  struct action_t {
-    nlohmann::json data;
-    std::string    action_id;
+
+  // Polymorphic Command Pattern for CAM Actions
+  class CamAction {
+  public:
+    virtual ~CamAction() = default;
+    virtual void execute(NcCamView* view) = 0;
   };
-  std::vector<action_t>      m_action_stack;
-  NcRender::NcRenderGui* m_menu_bar;
+
+  class PostProcessAction : public CamAction {
+    std::string m_file;
+
+  public:
+    explicit PostProcessAction(std::string file) : m_file(std::move(file)) {}
+    void execute(NcCamView* view) override;
+  };
+
+  class RebuildToolpathsAction : public CamAction {
+  public:
+    void execute(NcCamView* view) override;
+  };
+
+  class DeleteOperationAction : public CamAction {
+    size_t m_index;
+
+  public:
+    explicit DeleteOperationAction(size_t index) : m_index(index) {}
+    void execute(NcCamView* view) override;
+  };
+
+  class DeleteDuplicatePartsAction : public CamAction {
+    std::string m_part_name;
+
+  public:
+    explicit DeleteDuplicatePartsAction(std::string part_name)
+      : m_part_name(std::move(part_name))
+    {
+    }
+    void execute(NcCamView* view) override;
+  };
+
+  class DeletePartsAction : public CamAction {
+    std::string m_part_name;
+
+  public:
+    explicit DeletePartsAction(std::string part_name)
+      : m_part_name(std::move(part_name))
+    {
+    }
+    void execute(NcCamView* view) override;
+  };
+
+  class DeletePartAction : public CamAction {
+    std::string m_part_name;
+
+  public:
+    explicit DeletePartAction(std::string part_name)
+      : m_part_name(std::move(part_name))
+    {
+    }
+    void execute(NcCamView* view) override;
+  };
+
+  class DuplicatePartAction : public CamAction {
+    std::string m_part_name;
+
+  public:
+    explicit DuplicatePartAction(std::string part_name)
+      : m_part_name(std::move(part_name))
+    {
+    }
+    void execute(NcCamView* view) override;
+  };
+
+  std::vector<std::unique_ptr<CamAction>> m_action_stack;
+  NcRender::NcRenderGui*                  m_menu_bar;
   void zoomEventCallback(const ScrollEvent& e, const InputState& input);
-  void mouseEventCallback(Primitive* c, const nlohmann::json& e);
+  void mouseEventCallback(Primitive* c, const Primitive::MouseEventData& e);
   void RenderUI();
 
   // UI rendering helpers
@@ -93,17 +167,9 @@ private:
                       int&   show_edit_tool_operation,
                       Part*& selected_part);
   void renderPartsViewer(Part*& selected_part);
-  void renderOperationsViewer(bool& show_create_operation, int& show_edit_tool_operation);
+  void renderOperationsViewer(bool& show_create_operation,
+                              int&  show_edit_tool_operation);
   void renderLayersViewer();
-
-  // Action handlers
-  void handlePostProcessAction(const action_t& action);
-  void handleRebuildToolpathsAction(const action_t& action);
-  void handleDeleteOperationAction(const action_t& action);
-  void handleDeleteDuplicatePartsAction(const action_t& action);
-  void handleDeletePartsAction(const action_t& action);
-  void handleDeletePartAction(const action_t& action);
-  void handleDuplicatePartAction(const action_t& action);
 
   // Iteration helpers for Part management
   template <typename Func> void forEachPart(Func&& func);
@@ -115,7 +181,9 @@ private:
   Point2d m_show_viewer_context_menu;
   Point2d m_last_mouse_click_position;
   bool    m_left_click_pressed;
+
   enum class JetCamTool : int { Contour, Nesting, Point };
+
   JetCamTool                           m_current_tool;
   std::unique_ptr<FILE, FileDeleter>   m_dxf_fp;
   std::unique_ptr<DL_Dxf>              m_dl_dxf;
@@ -127,10 +195,10 @@ private:
                                                    float       import_scale);
   static bool                          dxfFileParseTimer(void* p);
 
-  float                      m_progress_window_progress;
+  float                  m_progress_window_progress;
   NcRender::NcRenderGui* m_progress_window_handle;
-  void                       showProgressWindow(bool v);
-  static void                renderProgressWindow(void* p);
+  void                   showProgressWindow(bool v);
+  static void            renderProgressWindow(void* p);
 
 public:
   Part*  m_mouse_over_part;
@@ -138,10 +206,10 @@ public:
   size_t m_mouse_over_path;
   size_t m_edit_contour_path;
 
-  std::string m_mouse_over_color;
-  std::string m_outside_contour_color;
-  std::string m_inside_contour_color;
-  std::string m_open_contour_color;
+  Color m_mouse_over_color;
+  Color m_outside_contour_color;
+  Color m_inside_contour_color;
+  Color m_open_contour_color;
 
   Preferences                m_preferences;
   JobOptions                 m_job_options;
@@ -162,12 +230,12 @@ public:
   NcCamView& operator=(const NcCamView&) = delete;
   NcCamView(NcCamView&&) = default;
   NcCamView& operator=(NcCamView&&) = default;
-  void        deletePart(std::string part_name);
-  void        preInit();
-  void        init();
-  void        tick() override;
-  void        makeActive();
-  void        close();
+  void       deletePart(std::string part_name);
+  void       preInit();
+  void       init();
+  void       tick() override;
+  void       makeActive();
+  void       close();
 
   // View interface implementation
   void handleScrollEvent(const ScrollEvent& e,

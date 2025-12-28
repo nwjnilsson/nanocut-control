@@ -410,10 +410,10 @@ public:
  * Default constructor.
  */
 DXFParsePathAdaptor::DXFParsePathAdaptor(
-  NcRender*                                              nc_render_instance,
-  std::function<void(Primitive*)>                        view_callback,
-  std::function<void(Primitive*, const nlohmann::json&)> mouse_callback,
-  NcCamView*                                             cam_view)
+  NcRender*                                                     nc_render_instance,
+  std::function<void(Primitive*)>                               view_callback,
+  std::function<void(Primitive*, const Primitive::MouseEventData&)> mouse_callback,
+  NcCamView*                                                    cam_view)
 {
   m_current_layer = "default";
   m_filename = "";
@@ -555,7 +555,6 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
     return {};
   }
 
-  Geometry                          g;
   std::vector<std::vector<Point2d>> contours;
 
   // Spatial hash grid size based on tolerance
@@ -604,7 +603,7 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
         if (it_start != start_map.end()) {
           for (size_t idx : it_start->second) {
             if (idx != exclude_idx && !used[idx] &&
-                g.distance(p, haystack[idx].start) < tolerance) {
+                geo::distance(p, haystack[idx].start) < tolerance) {
               return true;
             }
           }
@@ -615,7 +614,7 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
         if (it_end != end_map.end()) {
           for (size_t idx : it_end->second) {
             if (idx != exclude_idx && !used[idx] &&
-                g.distance(p, haystack[idx].end) < tolerance) {
+                geo::distance(p, haystack[idx].end) < tolerance) {
               return true;
             }
           }
@@ -663,14 +662,14 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
 
     // Find the CLOSEST match within tolerance, not just the first
     Point2d p2;
-    int best_idx = -1;
-    double best_dist = tolerance;
+    int     best_idx = -1;
+    double  best_dist = tolerance;
 
     for (size_t idx : candidates) {
       // Check start point
       p2.x = haystack[idx].start.x;
       p2.y = haystack[idx].start.y;
-      double dist_start = g.distance(p1, p2);
+      double dist_start = geo::distance(p1, p2);
       if (dist_start < best_dist) {
         best_dist = dist_start;
         best_idx = idx;
@@ -679,7 +678,7 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
       // Check end point
       p2.x = haystack[idx].end.x;
       p2.y = haystack[idx].end.y;
-      double dist_end = g.distance(p1, p2);
+      double dist_end = geo::distance(p1, p2);
       if (dist_end < best_dist) {
         best_dist = dist_end;
         best_idx = idx;
@@ -744,7 +743,7 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
         p2.x = haystack[next_idx].start.x;
         p2.y = haystack[next_idx].start.y;
 
-        if (g.distance(p1, p2) < tolerance) {
+        if (geo::distance(p1, p2) < tolerance) {
           // Start matches, add end
           point.x = haystack[next_idx].end.x;
           point.y = haystack[next_idx].end.y;
@@ -789,7 +788,8 @@ void DXFParsePathAdaptor::scaleAllPoints(double scale)
       p.x *= scale;
       p.y *= scale;
     }
-    // Note: knots are parameter values, not spatial coordinates - don't scale them
+    // Note: knots are parameter values, not spatial coordinates - don't scale
+    // them
   }
   for (auto& l : m_line_stack) {
     l.start.x *= scale;
@@ -801,7 +801,6 @@ void DXFParsePathAdaptor::scaleAllPoints(double scale)
 
 void DXFParsePathAdaptor::finish()
 {
-  Geometry g = Geometry();
 
   // Finalize any pending polyline
   if (m_current_polyline.points.size() > 0) {
@@ -884,28 +883,28 @@ void DXFParsePathAdaptor::finish()
     }
 
     if (sampled_points.size() > 1) {
-      std::vector<Point> pointList;
+      std::vector<Point2d> pointList;
       for (const auto& pt : sampled_points) {
-        pointList.push_back(Point(pt.x, pt.y));
+        pointList.push_back(Point2d{ pt.x, pt.y });
       }
 
       // Create line segments from simplified points
       for (size_t i = 1; i < pointList.size(); i++) {
-        addLine(DL_LineData((double) pointList[i - 1].first,
-                            (double) pointList[i - 1].second,
+        addLine(DL_LineData((double) pointList[i - 1].x,
+                            (double) pointList[i - 1].y,
                             0,
-                            (double) pointList[i].first,
-                            (double) pointList[i].second,
+                            (double) pointList[i].x,
+                            (double) pointList[i].y,
                             0));
       }
 
       // Close the spline if needed
       if (m_splines[x].is_closed && pointList.size() > 2) {
-        addLine(DL_LineData((double) pointList.back().first,
-                            (double) pointList.back().second,
+        addLine(DL_LineData((double) pointList.back().x,
+                            (double) pointList.back().y,
                             0,
-                            (double) pointList[0].first,
-                            (double) pointList[0].second,
+                            (double) pointList[0].x,
+                            (double) pointList[0].y,
                             0));
       }
     }
@@ -928,29 +927,31 @@ void DXFParsePathAdaptor::finish()
         bulgeEnd.x = m_polylines[x].points[y + 1].point.x;
         bulgeEnd.y = m_polylines[x].points[y + 1].point.y;
 
-        Point2d midpoint = g.midpoint(bulgeStart, bulgeEnd);
-        double  distance = g.distance(bulgeStart, midpoint);
+        Point2d midpoint = geo::midpoint(bulgeStart, bulgeEnd);
+        double  distance = geo::distance(bulgeStart, midpoint);
         double  sagitta = m_polylines[x].points[y].bulge * distance;
 
-        double_line_t bulgeLine = g.createPolarLine(
-          midpoint, g.measurePolarAngle(bulgeStart, bulgeEnd) + 270, sagitta);
+        geo::Line bulgeLine = geo::createPolarLine(
+          midpoint,
+          geo::measurePolarAngle(bulgeStart, bulgeEnd) + 270,
+          sagitta);
         Point2d arc_center =
-          g.threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
+          geo::threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
 
         double arc_endAngle, arc_startAngle = 0;
         if (sagitta > 0) {
-          arc_endAngle = g.measurePolarAngle(arc_center, bulgeEnd);
-          arc_startAngle = g.measurePolarAngle(arc_center, bulgeStart);
+          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
+          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeStart);
         }
         else {
-          arc_endAngle = g.measurePolarAngle(arc_center, bulgeStart);
-          arc_startAngle = g.measurePolarAngle(arc_center, bulgeEnd);
+          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeStart);
+          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
         }
 
         addArc(DL_ArcData((double) arc_center.x,
                           (double) arc_center.y,
                           0,
-                          g.distance(arc_center, bulgeStart),
+                          geo::distance(arc_center, bulgeStart),
                           arc_startAngle,
                           arc_endAngle));
       }
@@ -975,16 +976,16 @@ void DXFParsePathAdaptor::finish()
     for (std::vector<double_line_t>::iterator it = m_line_stack.begin();
          it != m_line_stack.end();
          ++it) {
-      if (g.distance(it->start, our_endpoint) < m_chain_tolerance) {
+      if (geo::distance(it->start, our_endpoint) < m_chain_tolerance) {
         shared++;
       }
-      if (g.distance(it->start, our_startpoint) < m_chain_tolerance) {
+      if (geo::distance(it->start, our_startpoint) < m_chain_tolerance) {
         shared++;
       }
-      if (g.distance(it->end, our_startpoint) < m_chain_tolerance) {
+      if (geo::distance(it->end, our_startpoint) < m_chain_tolerance) {
         shared++;
       }
-      if (g.distance(it->end, our_endpoint) < m_chain_tolerance) {
+      if (geo::distance(it->end, our_endpoint) < m_chain_tolerance) {
         shared++;
       }
     }
@@ -1009,29 +1010,31 @@ void DXFParsePathAdaptor::finish()
         bulgeEnd.x = m_polylines[x].points.front().point.x;
         bulgeEnd.y = m_polylines[x].points.front().point.y;
 
-        Point2d midpoint = g.midpoint(bulgeStart, bulgeEnd);
-        double  distance = g.distance(bulgeStart, midpoint);
+        Point2d midpoint = geo::midpoint(bulgeStart, bulgeEnd);
+        double  distance = geo::distance(bulgeStart, midpoint);
         double  sagitta = m_polylines[x].points.back().bulge * distance;
 
-        double_line_t bulgeLine = g.createPolarLine(
-          midpoint, g.measurePolarAngle(bulgeStart, bulgeEnd) + 270, sagitta);
+        geo::Line bulgeLine = geo::createPolarLine(
+          midpoint,
+          geo::measurePolarAngle(bulgeStart, bulgeEnd) + 270,
+          sagitta);
         Point2d arc_center =
-          g.threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
+          geo::threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
 
         double arc_endAngle, arc_startAngle = 0;
         if (sagitta > 0) {
-          arc_endAngle = g.measurePolarAngle(arc_center, bulgeEnd);
-          arc_startAngle = g.measurePolarAngle(arc_center, bulgeStart);
+          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
+          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeStart);
         }
         else {
-          arc_endAngle = g.measurePolarAngle(arc_center, bulgeStart);
-          arc_startAngle = g.measurePolarAngle(arc_center, bulgeEnd);
+          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeStart);
+          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
         }
 
         addArc(DL_ArcData((double) arc_center.x,
                           (double) arc_center.y,
                           0,
-                          g.distance(arc_center, bulgeStart),
+                          geo::distance(arc_center, bulgeStart),
                           arc_startAngle,
                           arc_endAngle));
       }
@@ -1051,15 +1054,15 @@ void DXFParsePathAdaptor::finish()
     Part::path_t path;
     path.is_inside_contour = false;
 
-    if (g.distance(chains[i].front(), chains[i].back()) > m_chain_tolerance) {
+    if (geo::distance(chains[i].front(), chains[i].back()) >
+        m_chain_tolerance) {
       path.is_closed = false;
     }
     else {
       path.is_closed = true;
     }
 
-    m_nc_render_instance->setColorByName(path.color,
-                                         m_cam_view->m_outside_contour_color);
+    path.color = getColor(m_cam_view->m_outside_contour_color);
 
     for (size_t j = 0; j < chains[i].size(); j++) {
       const double px = chains[i][j].x - bb_min.x;
@@ -1080,12 +1083,10 @@ void DXFParsePathAdaptor::finish()
         if (checkIfPathIsInsidePath(paths[x].points, paths[i].points)) {
           paths[x].is_inside_contour = true;
           if (paths[x].is_closed == true) {
-            m_nc_render_instance->setColorByName(
-              paths[x].color, m_cam_view->m_inside_contour_color);
+            paths[x].color = getColor(m_cam_view->m_inside_contour_color);
           }
           else {
-            m_nc_render_instance->setColorByName(
-              paths[x].color, m_cam_view->m_open_contour_color);
+            paths[x].color = getColor(m_cam_view->m_open_contour_color);
           }
           break;
         }
@@ -1108,18 +1109,17 @@ void DXFParsePathAdaptor::explodeArcToLines(double cx,
                                             double end_angle,
                                             double num_segments)
 {
-  Geometry           g;
-  std::vector<Point> pointList;
-  Point2d            start;
-  Point2d            sweeper;
-  Point2d            end;
+  std::vector<Point2d> pointList;
+  Point2d              start;
+  Point2d              sweeper;
+  Point2d              end;
 
   start.x = cx + (r * cosf((start_angle) *M_PI / 180.0f));
   start.y = cy + (r * sinf((start_angle) *M_PI / 180.0f));
   end.x = cx + (r * cosf((end_angle) *M_PI / 180.0f));
   end.y = cy + (r * sinf((end_angle) *M_PI / 180.0f));
 
-  pointList.push_back(Point(start.x, start.y));
+  pointList.push_back(Point2d{ start.x, start.y });
 
   // DXF arcs are always counter-clockwise from start_angle to end_angle
   double angle_span = end_angle - start_angle;
@@ -1129,23 +1129,24 @@ void DXFParsePathAdaptor::explodeArcToLines(double cx,
   double angle_increment = angle_span / num_segments;
   double angle_pointer = start_angle + angle_increment;
 
-  // Generate num_segments-1 intermediate points (the last iteration would equal end_angle)
+  // Generate num_segments-1 intermediate points (the last iteration would equal
+  // end_angle)
   for (int i = 0; i < num_segments - 1; i++) {
     sweeper.x = cx + (r * cosf((angle_pointer) *M_PI / 180.0f));
     sweeper.y = cy + (r * sinf((angle_pointer) *M_PI / 180.0f));
     angle_pointer += angle_increment;
-    pointList.push_back(Point(sweeper.x, sweeper.y));
+    pointList.push_back(Point2d{ sweeper.x, sweeper.y });
   }
 
   // Always add the exact end point
-  pointList.push_back(Point(end.x, end.y));
+  pointList.push_back(Point2d{ end.x, end.y });
 
   for (size_t i = 1; i < pointList.size(); i++) {
-    addLine(DL_LineData((double) pointList[i - 1].first,
-                        (double) pointList[i - 1].second,
+    addLine(DL_LineData((double) pointList[i - 1].x,
+                        (double) pointList[i - 1].y,
                         0,
-                        (double) pointList[i].first,
-                        (double) pointList[i].second,
+                        (double) pointList[i].x,
+                        (double) pointList[i].y,
                         0));
   }
 }

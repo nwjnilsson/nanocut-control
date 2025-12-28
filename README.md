@@ -1,4 +1,5 @@
 # NanoCut Control
+![Build](https://github.com/nwjnilsson/nanocut-control/workflows/Build/badge.svg)
 Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)).
 NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine.
 NanoCut is Native Cross-Platform (Windows, Linux, and MacOS),
@@ -16,14 +17,15 @@ into). Just hold control and click on the contour you would like to start from
 - Built-in Toolpath workbench. Setup job options material size. Lay parts out in any configuration and post Gcode ready to run on the machine. Also has an early Auto-Nesting feature.
 ## Changes made by me
 I've re-written large parts of the codebase to make it somewhat more readable.
-The original codebase was a mess but it did kind of solve my problem so that's
-why I decided to build on top of it.
-- Add support limit pin inversion
-- Add customizable precise jog distance
-- Add support for machine jogging by clicking anywhere on machine plane
-- Add support for click-and-drag movement of the control view (press and hold
-right click)
-- Much more robust DXF importer
+The original codebase was kind of a nightmare. nlohmann::json was used for
+pretty much _everything_ (return values, arguments, events) so it was hard
+to follow what was going on. Most of that has been eliminated but there may
+still be traces left of some pretty bizarre code. NanoCut also supports:
+- limit pin inversion
+- customizable precise jog distance
+- machine jogging by clicking anywhere on machine plane
+- panning control and CAM views (press and hold right click)
+- Much more robust DXF importer supporting variable quality and using proper NURBs
 
 ![deer](assets/deer.png "High quality DXF importing for gcode generation")
 
@@ -35,7 +37,7 @@ Positioning in the negative quadrant is apparently common traditionally for CNC 
 reports positions like this by default.
 
 # Post Processors
-- SheetCAM post processor is included with the NanoCut firmware repository at [nanocut-firmware](https://github.com/Applooza/nanocut-firmware)
+- SheetCAM post processor is included with the NanoCut firmware repository at [nanocut-firmware](https://github.com/nwjnilsson/nanocut-firmware)
 - NanoCut's built-in Toolpath Workbench posts gcode that specifically runs with NanoCut control/firmware setups.
 
 # Simple plasma g-code program for slicing a sheet

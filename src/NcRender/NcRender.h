@@ -5,6 +5,7 @@
 #include "gui/imgui.h"
 #include "primitives/Primitives.h"
 #include "json/json.h"
+#include "input/InputEvents.h"
 #include <algorithm>
 #include <chrono>
 #include <ctime>
@@ -93,20 +94,15 @@ public:
   };
   typedef uint32_t ActionFlags;
 
-  // Primitive-only events (for mouse hover callbacks)
-  enum class EventType {
-    MouseIn,
-    MouseOut,
-    MouseMove,
-  };
+  // Type alias for MouseEventType (defined in InputEvents.h to avoid circular dependency)
+  using EventType = MouseEventType;
 
-  ImGuiIO* imgui_io;
   struct NcRenderGui {
     std::string           view;
     bool                  visible;
     std::function<void()> callback;
   };
-  std::vector<NcRenderGui> m_gui_stack;
+  std::deque<NcRenderGui> m_gui_stack;
 
   // Constructor accepting existing GLFW window (NcApp owns window)
   explicit NcRender(GLFWwindow* window)
@@ -127,7 +123,6 @@ public:
     setShowFPS(false);
     setCurrentView("main");
     m_fps_label = NULL;
-    imgui_io = NULL;
   };
   /* Primitive Creation */
   template <typename T, typename... Ts> T* pushPrimitive(Ts&&... args)
@@ -156,7 +151,6 @@ public:
   void setGuiStyle(std::string s);
   void setClearColor(float r, float g, float b);
   void setShowFPS(bool show_fps);
-  void setColorByName(float* c, std::string color);
   void setCurrentView(std::string v);
 
   /* Time */

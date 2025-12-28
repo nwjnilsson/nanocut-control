@@ -49,7 +49,30 @@ struct ScrollEvent {
 struct WindowResizeEvent {
     int width;      // New window width
     int height;     // New window height
-    
+
     WindowResizeEvent() : width(0), height(0) {}
     WindowResizeEvent(int w, int h) : width(w), height(h) {}
+};
+
+// Mouse event types for primitives (MouseIn/MouseOut/MouseMove)
+// Moved here from NcRender to avoid circular dependency with Primitive.h
+enum class MouseEventType {
+    MouseIn,
+    MouseOut,
+    MouseMove,
+};
+
+/**
+ * MouseHoverEvent - Type-safe mouse hover event data
+ * Replaces JSON-based event data for better performance and type safety
+ */
+struct MouseHoverEvent {
+    MouseEventType event;       // MouseIn, MouseOut, MouseMove
+    double         x;            // Mouse X position
+    double         y;            // Mouse Y position
+    int            path_index;   // Optional: path index for Part primitives (-1 if not applicable)
+
+    MouseHoverEvent() : event(MouseEventType::MouseIn), x(0.0), y(0.0), path_index(-1) {}
+    MouseHoverEvent(MouseEventType e, double mx, double my, int pidx = -1)
+        : event(e), x(mx), y(my), path_index(pidx) {}
 };

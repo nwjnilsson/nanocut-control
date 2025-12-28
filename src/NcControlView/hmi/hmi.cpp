@@ -9,6 +9,44 @@
 #include "NcControlView/NcControlView.h"
 #include <cmath>
 
+// Helper function to parse button ID string into enum
+static HmiButtonId parseButtonId(const std::string& id)
+{
+  if (id == "Wpos")
+    return HmiButtonId::Wpos;
+  if (id == "Park")
+    return HmiButtonId::Park;
+  if (id == "Zero X")
+    return HmiButtonId::ZeroX;
+  if (id == "Zero Y")
+    return HmiButtonId::ZeroY;
+  if (id == "Zero Z")
+    return HmiButtonId::ZeroZ;
+  if (id == "Spindle On")
+    return HmiButtonId::SpindleOn;
+  if (id == "Spindle Off")
+    return HmiButtonId::SpindleOff;
+  if (id == "Retract")
+    return HmiButtonId::Retract;
+  if (id == "Touch")
+    return HmiButtonId::Touch;
+  if (id == "Run")
+    return HmiButtonId::Run;
+  if (id == "Test Run")
+    return HmiButtonId::TestRun;
+  if (id == "Abort")
+    return HmiButtonId::Abort;
+  if (id == "Clean")
+    return HmiButtonId::Clean;
+  if (id == "Fit")
+    return HmiButtonId::Fit;
+  if (id == "THC")
+    return HmiButtonId::THC;
+
+  LOG_F(WARNING, "Unknown HMI button ID: %s", id.c_str());
+  return HmiButtonId::Unknown;
+}
+
 // Constructor
 NcHmi::NcHmi(NcApp* app, NcControlView* view) : m_app(app), m_view(view)
 {
@@ -78,28 +116,33 @@ void NcHmi::handleButton(const std::string& id)
   if (!m_app)
     return;
   auto&          control_view = m_app->getControlView();
-  nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
-  try {
+  const DROData& dro_data = control_view.m_motion_controller->getDRO();
 
-    if (dro_data["IN_MOTION"] == false) {
-      if (id == "Wpos") {
-        LOG_F(INFO, "Clicked Wpos");
-        control_view.m_motion_controller->pushGCode("G0 X0 Y0");
-        control_view.m_motion_controller->pushGCode("M30");
-        control_view.m_motion_controller->runStack();
-      }
-      else if (id == "Park") {
-        LOG_F(INFO, "Clicked Park");
-        control_view.m_motion_controller->pushGCode("G53 G0 Z0");
-        control_view.m_motion_controller->pushGCode("G53 G0 X0 Y0");
-        control_view.m_motion_controller->pushGCode("M30");
-        control_view.m_motion_controller->runStack();
-      }
-      else if (id == "Zero X") {
-        LOG_F(INFO, "Clicked Zero X");
-        try {
-          control_view.m_machine_parameters.work_offset[0] =
-            control_view.m_motion_controller->getDRO()["MCS"]["x"].get<float>();
+  // Parse button ID string to enum for type-safe dispatch
+  HmiButtonId button_id = parseButtonId(id);
+
+  try {
+    // Handle buttons that require machine to be stopped
+    if (dro_data.in_motion == false) {
+      switch (button_id) {
+        case HmiButtonId::Wpos:
+          LOG_F(INFO, "Clicked Wpos");
+          control_view.m_motion_controller->pushGCode("G0 X0 Y0");
+          control_view.m_motion_controller->pushGCode("M30");
+          control_view.m_motion_controller->runStack();
+          break;
+
+        case HmiButtonId::Park:
+          LOG_F(INFO, "Clicked Park");
+          control_view.m_motion_controller->pushGCode("G53 G0 Z0");
+          control_view.m_motion_controller->pushGCode("G53 G0 X0 Y0");
+          control_view.m_motion_controller->pushGCode("M30");
+          control_view.m_motion_controller->runStack();
+          break;
+
+        case HmiButtonId::ZeroX:
+          LOG_F(INFO, "Clicked Zero X");
+          control_view.m_machine_parameters.work_offset[0] = dro_data.mcs.x;
           control_view.m_motion_controller->pushGCode(
             "G10 L2 P0 X" +
             to_string_strip_zeros(
@@ -107,16 +150,11 @@ void NcHmi::handleButton(const std::string& id)
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
           control_view.m_motion_controller->saveParameters();
-        }
-        catch (...) {
-          LOG_F(ERROR, "Could not set x work offset!");
-        }
-      }
-      else if (id == "Zero Y") {
-        LOG_F(INFO, "Clicked Zero Y");
-        try {
-          control_view.m_machine_parameters.work_offset[1] =
-            control_view.m_motion_controller->getDRO()["MCS"]["y"].get<float>();
+          break;
+
+        case HmiButtonId::ZeroY:
+          LOG_F(INFO, "Clicked Zero Y");
+          control_view.m_machine_parameters.work_offset[1] = dro_data.mcs.y;
           control_view.m_motion_controller->pushGCode(
             "G10 L2 P0 Y" +
             to_string_strip_zeros(
@@ -124,237 +162,238 @@ void NcHmi::handleButton(const std::string& id)
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
           control_view.m_motion_controller->saveParameters();
-        }
-        catch (...) {
-          LOG_F(ERROR, "Could not set y work offset!");
-        }
-      }
-      //        else if (id == "Zero Z")
-      //        {
-      //            LOG_F(INFO, "Clicked Zero Z");
-      //            try
-      //            {
-      //                control_view.m_machine_parameters.work_offset[2]
-      //                =
-      //                static_cast<float>(control_view.m_motion_controller->getDRO()["MCS"]["z"]);
-      //                control_view.m_motion_controller->pushGCode("G10 L2
-      //                P0 Z" +
-      //                std::to_string(control_view.m_machine_parameters.work_offset[2]));
-      //                control_view.m_motion_controller->pushGCode("M30");
-      //                control_view.m_motion_controller->runStack();
-      //                control_view.m_motion_controller->saveParameters();
-      //            }
-      //            catch (...)
-      //            {
-      //                LOG_F(ERROR, "Could not set z work offset!");
-      //            }
-      //        }
-      else if (id == "Spindle On") {
-        // Not used
-        LOG_F(INFO, "Spindle On");
-        control_view.m_motion_controller->pushGCode("M3 S1000");
-        control_view.m_motion_controller->pushGCode("M30");
-        control_view.m_motion_controller->runStack();
-      }
-      else if (id == "Spindle Off") {
-        // Not used
-        LOG_F(INFO, "Spindle Off");
-        control_view.m_motion_controller->pushGCode("M5");
-        control_view.m_motion_controller->pushGCode("M30");
-        control_view.m_motion_controller->runStack();
-      }
-      else if (id == "Retract") {
-        LOG_F(INFO, "Clicked Retract");
-        control_view.m_motion_controller->pushGCode("G0 Z0");
-        control_view.m_motion_controller->pushGCode("M30");
-        control_view.m_motion_controller->runStack();
-      }
-      else if (id == "Touch") {
-        LOG_F(INFO, "Clicked Touch");
-        control_view.m_motion_controller->pushGCode("touch_torch");
-        control_view.m_motion_controller->pushGCode("M30");
-        control_view.m_motion_controller->runStack();
-      }
-      else if (id == "Run") {
-        LOG_F(INFO, "Clicked Run");
-        if (checkPathBounds()) {
-          try {
-            std::string filename = control_view.getGCode().getFilename();
-            if (filename != "") {
-              std::ifstream gcode_file(filename);
-              if (gcode_file.is_open()) {
-                std::string line;
-                while (std::getline(gcode_file, line)) {
-                  control_view.m_motion_controller->pushGCode(line);
-                }
-                gcode_file.close();
-                control_view.m_motion_controller->runStack();
-              }
-              else {
-                m_view->getDialogs().setInfoValue("Could not open file!");
-              }
-            }
-          }
-          catch (...) {
-            m_view->getDialogs().setInfoValue(
-              "Caught exception while trying to read file!");
-          }
-        }
-        else {
-          m_view->getDialogs().setInfoValue(
-            "Program is outside of machines cuttable extents!");
-        }
-      }
-      else if (id == "Test Run") {
-        LOG_F(INFO, "Clicked Test Run");
-        if (checkPathBounds()) {
-          try {
-            std::string filename = control_view.getGCode().getFilename();
-            if (filename != "") {
-              std::ifstream gcode_file(filename);
-              if (gcode_file.is_open()) {
-                std::string line;
-                while (std::getline(gcode_file, line)) {
-                  if (line.find("fire_torch") != std::string::npos) {
-                    removeSubstrs(line, "fire_torch");
-                    control_view.m_motion_controller->pushGCode("touch_torch" +
-                                                                line);
-                  }
-                  else {
+          break;
+
+        case HmiButtonId::SpindleOn:
+          // Not used
+          LOG_F(INFO, "Spindle On");
+          control_view.m_motion_controller->pushGCode("M3 S1000");
+          control_view.m_motion_controller->pushGCode("M30");
+          control_view.m_motion_controller->runStack();
+          break;
+
+        case HmiButtonId::SpindleOff:
+          // Not used
+          LOG_F(INFO, "Spindle Off");
+          control_view.m_motion_controller->pushGCode("M5");
+          control_view.m_motion_controller->pushGCode("M30");
+          control_view.m_motion_controller->runStack();
+          break;
+
+        case HmiButtonId::Retract:
+          LOG_F(INFO, "Clicked Retract");
+          control_view.m_motion_controller->pushGCode("G0 Z0");
+          control_view.m_motion_controller->pushGCode("M30");
+          control_view.m_motion_controller->runStack();
+          break;
+
+        case HmiButtonId::Touch:
+          LOG_F(INFO, "Clicked Touch");
+          control_view.m_motion_controller->pushGCode("touch_torch");
+          control_view.m_motion_controller->pushGCode("M30");
+          control_view.m_motion_controller->runStack();
+          break;
+
+        case HmiButtonId::Run: {
+          LOG_F(INFO, "Clicked Run");
+          if (checkPathBounds()) {
+            try {
+              std::string filename = control_view.getGCode().getFilename();
+              if (filename != "") {
+                std::ifstream gcode_file(filename);
+                if (gcode_file.is_open()) {
+                  std::string line;
+                  while (std::getline(gcode_file, line)) {
                     control_view.m_motion_controller->pushGCode(line);
                   }
+                  gcode_file.close();
+                  control_view.m_motion_controller->runStack();
                 }
-                gcode_file.close();
-                control_view.m_motion_controller->runStack();
-              }
-              else {
-                m_view->getDialogs().setInfoValue("Could not open file!");
+                else {
+                  m_view->getDialogs().setInfoValue("Could not open file!");
+                }
               }
             }
+            catch (...) {
+              m_view->getDialogs().setInfoValue(
+                "Caught exception while trying to read file!");
+            }
           }
-          catch (...) {
+          else {
             m_view->getDialogs().setInfoValue(
-              "Caught exception while trying to read file!");
+              "Program is outside of machines cuttable extents!");
           }
+        } break;
+
+        case HmiButtonId::TestRun: {
+          LOG_F(INFO, "Clicked Test Run");
+          if (checkPathBounds()) {
+            try {
+              std::string filename = control_view.getGCode().getFilename();
+              if (filename != "") {
+                std::ifstream gcode_file(filename);
+                if (gcode_file.is_open()) {
+                  std::string line;
+                  while (std::getline(gcode_file, line)) {
+                    if (line.find("fire_torch") != std::string::npos) {
+                      removeSubstrs(line, "fire_torch");
+                      control_view.m_motion_controller->pushGCode(
+                        "touch_torch" + line);
+                    }
+                    else {
+                      control_view.m_motion_controller->pushGCode(line);
+                    }
+                  }
+                  gcode_file.close();
+                  control_view.m_motion_controller->runStack();
+                }
+                else {
+                  m_view->getDialogs().setInfoValue("Could not open file!");
+                }
+              }
+            }
+            catch (...) {
+              m_view->getDialogs().setInfoValue(
+                "Caught exception while trying to read file!");
+            }
+          }
+          else {
+            m_view->getDialogs().setInfoValue(
+              "Program is outside of machines cuttable extents!");
+          }
+        } break;
+
+        default:
+          // Other buttons are handled below
+          break;
+      }
+    }
+
+    // Handle buttons that can be pressed regardless of motion state
+    switch (button_id) {
+      case HmiButtonId::Abort:
+        LOG_F(INFO, "Clicked Abort");
+        control_view.m_motion_controller->abort();
+        break;
+
+      case HmiButtonId::Clean:
+        LOG_F(INFO, "Clicked Clean");
+        clearHighlights();
+        break;
+
+      case HmiButtonId::Fit: {
+        LOG_F(INFO, "Clicked Fit");
+        auto minmax = [](double a, double b) -> std::pair<double, double> {
+          return a < b ? std::make_pair(a, b) : std::make_pair(b, a);
+        };
+        Point2d bbox_min, bbox_max;
+        getBoundingBox(&bbox_min, &bbox_max);
+        if (bbox_max.x == std::numeric_limits<int>::min() &&
+            bbox_max.y == std::numeric_limits<int>::min() &&
+            bbox_min.x == std::numeric_limits<int>::max() &&
+            bbox_min.y == std::numeric_limits<int>::max()) {
+          // Focus origin at center of view
+          LOG_F(INFO, "No paths, fitting to machine extents!");
+          m_view->setZoom(1);
+          Point2d pan;
+          pan.x =
+            -((control_view.m_machine_parameters.machine_extents[0]) / 2.0);
+          pan.y =
+            -((control_view.m_machine_parameters.machine_extents[1]) / 2.0);
+          m_view->setPan(pan);
+          auto y_pair =
+            minmax(m_app->getRenderer().getWindowSize().y,
+                   control_view.m_machine_parameters.machine_extents[1]);
+          auto x_pair =
+            minmax(m_app->getRenderer().getWindowSize().x - m_backplane_width,
+                   control_view.m_machine_parameters.machine_extents[0]);
+          if (y_pair.second - y_pair.first < x_pair.second - x_pair.first) {
+            double machine_y =
+              control_view.m_machine_parameters.machine_extents[1];
+            double window_y = m_app->getRenderer().getWindowSize().y;
+            double new_zoom = window_y / (window_y + machine_y);
+            m_view->setZoom(new_zoom);
+          }
+          else // Fit X
+          {
+            double machine_x =
+              control_view.m_machine_parameters.machine_extents[0];
+            double window_x = m_app->getRenderer().getWindowSize().x;
+            double new_zoom =
+              (window_x - (m_backplane_width / 2.0)) / (machine_x + window_x);
+            m_view->setZoom(new_zoom);
+          }
+          // Update pan based on machine extents and zoom
+          Point2d current_pan = m_view->getPan();
+          double  current_zoom = m_view->getZoom();
+          current_pan.x +=
+            ((double) control_view.m_machine_parameters.machine_extents[0] /
+             2.0) *
+            current_zoom;
+          current_pan.y +=
+            ((double) control_view.m_machine_parameters.machine_extents[1] /
+             2.0) *
+            current_zoom;
+          m_view->setPan(current_pan);
         }
         else {
-          m_view->getDialogs().setInfoValue(
-            "Program is outside of machines cuttable extents!");
+          LOG_F(INFO,
+                "Calculated bounding box: => bbox_min = (%.4f, %.4f) and "
+                "bbox_max = (%.4f, %.4f)",
+                bbox_min.x,
+                bbox_min.y,
+                bbox_max.x,
+                bbox_max.y);
+          const double x_diff = bbox_max.x - bbox_min.x;
+          const double y_diff = bbox_max.y - bbox_min.y;
+          m_view->setZoom(1.0);
+          Point2d new_pan;
+          new_pan.x = -bbox_min.x + (x_diff / 2);
+          new_pan.y =
+            -(bbox_min.y + (y_diff / 2) + 10); // 10 is for the menu bar
+          m_view->setPan(new_pan);
+          auto y_pair = minmax(m_app->getRenderer().getWindowSize().y, y_diff);
+          auto x_pair = minmax(
+            m_app->getRenderer().getWindowSize().x - m_backplane_width, x_diff);
+          if (y_pair.second - y_pair.first < x_pair.second - x_pair.first) {
+            LOG_F(INFO, "Fitting to Y");
+            double fit_zoom =
+              ((double) m_app->getRenderer().getWindowSize().y) / (2 * y_diff);
+            m_view->setZoom(fit_zoom);
+          }
+          else // Fit X
+          {
+            LOG_F(INFO, "Fitting to X");
+            double fit_zoom = ((double) m_app->getRenderer().getWindowSize().x -
+                               (m_backplane_width / 2)) /
+                              (2 * x_diff);
+            m_view->setZoom(fit_zoom);
+          }
+          // Update pan based on zoom and offsets
+          Point2d fit_pan = m_view->getPan();
+          double  current_zoom = m_view->getZoom();
+          fit_pan.x += (x_diff / 2.0) * current_zoom;
+          fit_pan.y += (y_diff / 2.0) * current_zoom;
+          fit_pan.x -=
+            control_view.m_machine_parameters.work_offset[0] * current_zoom;
+          fit_pan.y -=
+            control_view.m_machine_parameters.work_offset[1] * current_zoom;
+          m_view->setPan(fit_pan);
         }
-      }
-    }
-    if (id == "Abort") {
-      LOG_F(INFO, "Clicked Abort");
-      control_view.m_motion_controller->abort();
-    }
-    if (id == "Clean") {
-      LOG_F(INFO, "Clicked Clean");
-      clearHighlights();
-    }
-    else if (id == "Fit") {
-      LOG_F(INFO, "Clicked Fit");
-      auto minmax = [](double a, double b) -> std::pair<double, double> {
-        return a < b ? std::make_pair(a, b) : std::make_pair(b, a);
-      };
-      Point2d bbox_min, bbox_max;
-      getBoundingBox(&bbox_min, &bbox_max);
-      if (bbox_max.x == std::numeric_limits<int>::min() &&
-          bbox_max.y == std::numeric_limits<int>::min() &&
-          bbox_min.x == std::numeric_limits<int>::max() &&
-          bbox_min.y == std::numeric_limits<int>::max()) {
-        // Focus origin at center of view
-        LOG_F(INFO, "No paths, fitting to machine extents!");
-        m_view->setZoom(1);
-        Point2d pan;
-        pan.x = -((control_view.m_machine_parameters.machine_extents[0]) / 2.0);
-        pan.y = -((control_view.m_machine_parameters.machine_extents[1]) / 2.0);
-        m_view->setPan(pan);
-        auto y_pair =
-          minmax(m_app->getRenderer().getWindowSize().y,
-                 control_view.m_machine_parameters.machine_extents[1]);
-        auto x_pair =
-          minmax(m_app->getRenderer().getWindowSize().x - m_backplane_width,
-                 control_view.m_machine_parameters.machine_extents[0]);
-        if (y_pair.second - y_pair.first < x_pair.second - x_pair.first) {
-          double machine_y =
-            control_view.m_machine_parameters.machine_extents[1];
-          double window_y = m_app->getRenderer().getWindowSize().y;
-          double new_zoom = window_y / (window_y + machine_y);
-          m_view->setZoom(new_zoom);
-        }
-        else // Fit X
-        {
-          double machine_x =
-            control_view.m_machine_parameters.machine_extents[0];
-          double window_x = m_app->getRenderer().getWindowSize().x;
-          double new_zoom =
-            (window_x - (m_backplane_width / 2.0)) / (machine_x + window_x);
-          m_view->setZoom(new_zoom);
-        }
-        // Update pan based on machine extents and zoom
-        Point2d current_pan = m_view->getPan();
-        double  current_zoom = m_view->getZoom();
-        current_pan.x +=
-          ((double) control_view.m_machine_parameters.machine_extents[0] /
-           2.0) *
-          current_zoom;
-        current_pan.y +=
-          ((double) control_view.m_machine_parameters.machine_extents[1] /
-           2.0) *
-          current_zoom;
-        m_view->setPan(current_pan);
-      }
-      else {
-        LOG_F(INFO,
-              "Calculated bounding box: => bbox_min = (%.4f, %.4f) and "
-              "bbox_max = (%.4f, %.4f)",
-              bbox_min.x,
-              bbox_min.y,
-              bbox_max.x,
-              bbox_max.y);
-        const double x_diff = bbox_max.x - bbox_min.x;
-        const double y_diff = bbox_max.y - bbox_min.y;
-        m_view->setZoom(1.0);
-        Point2d new_pan;
-        new_pan.x = -bbox_min.x + (x_diff / 2);
-        new_pan.y = -(bbox_min.y + (y_diff / 2) + 10); // 10 is for the menu bar
-        m_view->setPan(new_pan);
-        auto y_pair = minmax(m_app->getRenderer().getWindowSize().y, y_diff);
-        auto x_pair = minmax(
-          m_app->getRenderer().getWindowSize().x - m_backplane_width, x_diff);
-        if (y_pair.second - y_pair.first < x_pair.second - x_pair.first) {
-          LOG_F(INFO, "Fitting to Y");
-          double fit_zoom =
-            ((double) m_app->getRenderer().getWindowSize().y) / (2 * y_diff);
-          m_view->setZoom(fit_zoom);
-        }
-        else // Fit X
-        {
-          LOG_F(INFO, "Fitting to X");
-          double fit_zoom = ((double) m_app->getRenderer().getWindowSize().x -
-                             (m_backplane_width / 2)) /
-                            (2 * x_diff);
-          m_view->setZoom(fit_zoom);
-        }
-        // Update pan based on zoom and offsets
-        Point2d fit_pan = m_view->getPan();
-        double  current_zoom = m_view->getZoom();
-        fit_pan.x += (x_diff / 2.0) * current_zoom;
-        fit_pan.y += (y_diff / 2.0) * current_zoom;
-        fit_pan.x -=
-          control_view.m_machine_parameters.work_offset[0] * current_zoom;
-        fit_pan.y -=
-          control_view.m_machine_parameters.work_offset[1] * current_zoom;
-        m_view->setPan(fit_pan);
-      }
-    }
-    else if (id == "THC") {
-      LOG_F(INFO, "Clicked THC");
-      m_view->getDialogs().showThcWindow(true);
+      } break;
+
+      case HmiButtonId::THC:
+        LOG_F(INFO, "Clicked THC");
+        m_view->getDialogs().showThcWindow(true);
+        break;
+
+      default:
+        // Unknown button ID - already logged in parseButtonId
+        break;
     }
   }
   catch (...) {
-    LOG_F(ERROR, "JSON Parsing ERROR!");
+    LOG_F(ERROR, "Error handling button event!");
   }
 }
 
@@ -371,8 +410,9 @@ void NcHmi::jumpin(Primitive* p)
         if (gcode_file.is_open()) {
           std::string   line;
           unsigned long count = 0;
+          int           rapid_line = std::get<int>(p->user_data);
           while (std::getline(gcode_file, line)) {
-            if (count > (unsigned long) p->data["rapid_line"] - 1)
+            if (count > (unsigned long) rapid_line - 1)
               control_view.m_motion_controller->pushGCode(line);
             count++;
           }
@@ -411,11 +451,12 @@ void NcHmi::reverse(Primitive* p)
       if (gcode_file.is_open()) {
         std::string   line;
         unsigned long count = 0;
+        int           rapid_line = std::get<int>(p->user_data);
         while (std::getline(gcode_file, line)) {
-          if (count <= (unsigned long) p->data["rapid_line"] + 1) {
+          if (count <= (unsigned long) rapid_line + 1) {
             gcode_lines_before_reverse.push_back(line);
           }
-          else if (count > (unsigned long) p->data["rapid_line"] + 1) {
+          else if (count > (unsigned long) rapid_line + 1) {
             if (line.find("torch_off") != std::string::npos) {
               found_path_end = true;
             }
@@ -467,77 +508,83 @@ void NcHmi::reverse(Primitive* p)
   }
 }
 
-void NcHmi::mouseCallback(Primitive* c, const nlohmann::json& e)
+void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
 {
   if (!m_app)
     return;
-  auto&             control_view = m_app->getControlView();
-  const std::string type = c->getTypeName();
-  if (type == "path" && c->id == "gcode") {
-    if (e.contains("event")) {
-      auto event = e.at("event").get<NcRender::EventType>();
-      if (event == NcRender::EventType::MouseIn and
+  auto& control_view = m_app->getControlView();
+  auto* path = dynamic_cast<Path*>(c);
+  auto* box = dynamic_cast<Box*>(c);
+  if (path && hasFlag(c->flags, PrimitiveFlags::GCode) &&
+      !hasFlag(c->flags, PrimitiveFlags::GCodeArrow)) {
+    if (std::holds_alternative<MouseHoverEvent>(e)) {
+      const auto& hover = std::get<MouseHoverEvent>(e);
+      if (hover.event == NcRender::EventType::MouseIn &&
           m_app->isModifierPressed(GLFW_MOD_CONTROL)) {
-        // LOG_F(INFO, "Start Line => %lu", (unsigned
-        // long)o->data["rapid_line"]);
-        m_app->getRenderer().setColorByName(c->color, "light-green");
+        c->color = getColor(Color::LightGreen);
       }
-      else if (event == NcRender::EventType::MouseOut) {
-        // LOG_F(INFO, "Mouse Out - %s\n", e.dump().c_str());
-        m_app->getRenderer().setColorByName(c->color, "white");
+      else if (hover.event == NcRender::EventType::MouseOut) {
+        c->color = getColor(Color::White);
       }
     }
-    else if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_1) {
-      if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
-        if (e["action"] & NcRender::ActionFlagBits::Press) {
-          m_app->getRenderer().setColorByName(c->color, "green");
-        }
-        else if (e["action"] & NcRender::ActionFlagBits::Release) {
-          m_app->getRenderer().setColorByName(c->color, "light-green");
-          m_view->getDialogs().askYesNo(
-            "Are you sure you want to start the program at this path?",
-            [this, c]() { jumpin(c); });
+    else if (std::holds_alternative<MouseButtonEvent>(e)) {
+      const auto& button = std::get<MouseButtonEvent>(e);
+      if (button.button == GLFW_MOUSE_BUTTON_1) {
+        if (button.mods & GLFW_MOD_CONTROL) {
+          if (button.action & NcRender::ActionFlagBits::Press) {
+            c->color = getColor(Color::Green);
+          }
+          else if (button.action & NcRender::ActionFlagBits::Release) {
+            c->color = getColor(Color::LightGreen);
+            m_view->getDialogs().askYesNo(
+              "Are you sure you want to start the program at this path?",
+              [this, c]() { jumpin(c); });
+          }
         }
       }
-    }
-    else if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_2) {
-      if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
-        if (e["action"].get<int>() & NcRender::ActionFlagBits::Release) {
-          m_app->getRenderer().setColorByName(c->color, "light-green");
-          m_view->getDialogs().askYesNo(
-            "Are you sure you want to reverse this paths direction?",
-            [this, c]() { reverse(c); });
-        }
-        else if (e["action"].get<int>() & NcRender::ActionFlagBits::Press) {
-          m_app->getRenderer().setColorByName(c->color, "green");
+      else if (button.button == GLFW_MOUSE_BUTTON_2) {
+        if (button.mods & GLFW_MOD_CONTROL) {
+          if (button.action & NcRender::ActionFlagBits::Release) {
+            c->color = getColor(Color::LightGreen);
+            m_view->getDialogs().askYesNo(
+              "Are you sure you want to reverse this paths direction?",
+              [this, c]() { reverse(c); });
+          }
+          else if (button.action & NcRender::ActionFlagBits::Press) {
+            c->color = getColor(Color::Green);
+          }
         }
       }
     }
   }
-  else if (type == "box" && c->id != "cuttable_plane" &&
-           c->id != "machine_plane") {
-    if (e.contains("event")) {
-      auto event = e.at("event").get<NcRender::EventType>();
-      if (event == NcRender::EventType::MouseIn) {
-        m_app->getRenderer().setColorByName(c->color, "light-green");
+  else if (box && !hasFlag(c->flags, PrimitiveFlags::CuttablePlane) &&
+           !hasFlag(c->flags, PrimitiveFlags::MachinePlane)) {
+    if (std::holds_alternative<MouseHoverEvent>(e)) {
+      const auto& hover = std::get<MouseHoverEvent>(e);
+      if (hover.event == NcRender::EventType::MouseIn) {
+        c->color = getColor(Color::LightGreen);
       }
-      else if (event == NcRender::EventType::MouseOut) {
-        m_app->getRenderer().setColorByName(c->color, "black");
+      else if (hover.event == NcRender::EventType::MouseOut) {
+        c->color = getColor(Color::Black);
       }
     }
-    else if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_1) {
-      if (e["action"].get<int>() & NcRender::ActionFlagBits::Press) {
-        m_app->getRenderer().setColorByName(c->color, "green");
-      }
-      if (e["action"].get<int>() & NcRender::ActionFlagBits::Release) {
-        m_app->getRenderer().setColorByName(c->color, "light-green");
-        handleButton(c->id);
+    else if (std::holds_alternative<MouseButtonEvent>(e)) {
+      const auto& button = std::get<MouseButtonEvent>(e);
+      if (button.button == GLFW_MOUSE_BUTTON_1) {
+        if (button.action & NcRender::ActionFlagBits::Press) {
+          c->color = getColor(Color::Green);
+        }
+        if (button.action & NcRender::ActionFlagBits::Release) {
+          c->color = getColor(Color::LightGreen);
+          handleButton(c->id);
+        }
       }
     }
   }
-  else if ((c->id == "cuttable_plane" or c->id == "machine_plane") and
-           e.contains("button")) {
-    // Get mouse position in matrix coordinates from NcApp
+  else if ((hasFlag(c->flags, PrimitiveFlags::CuttablePlane) ||
+            hasFlag(c->flags, PrimitiveFlags::MachinePlane)) &&
+           std::holds_alternative<MouseButtonEvent>(e)) {
+    const auto& button = std::get<MouseButtonEvent>(e);
     // Get mouse position in matrix coordinates using view transformation
     Point2d     screen_pos = m_app->getInputState().getMousePosition();
     Point2d     p = m_view->screenToMatrix(screen_pos);
@@ -545,34 +592,29 @@ void NcHmi::mouseCallback(Primitive* c, const nlohmann::json& e)
     const auto  bl = cp->m_bottom_left;
     // double check point against cuttable plane in case it was
     // "machine_plane" that triggered this code path
-    bool is_within = p.x >= bl.x and p.x <= bl.x + cp->m_width and
-                     p.y >= bl.y and p.y <= bl.y + cp->m_height;
-    if (not is_within) {
+    bool is_within = p.x >= bl.x && p.x <= bl.x + cp->m_width && p.y >= bl.y &&
+                     p.y <= bl.y + cp->m_height;
+    if (!is_within) {
       return;
     }
-    if (e["button"].get<int>() == GLFW_MOUSE_BUTTON_1 and
-        e["action"].get<int>() & NcRender::ActionFlagBits::Release) {
-      nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
-      try {
-        if (dro_data["IN_MOTION"] == false) {
-          LOG_F(INFO, "Add waypoint position [%f, %f]", p.x, p.y);
-          control_view.m_way_point_position = p;
+    if (button.button == GLFW_MOUSE_BUTTON_1 &&
+        button.action & NcRender::ActionFlagBits::Release) {
+      const DROData& dro_data = control_view.m_motion_controller->getDRO();
+      if (!dro_data.in_motion) {
+        LOG_F(INFO, "Add waypoint position [%f, %f]", p.x, p.y);
+        control_view.m_way_point_position = p;
 
-          // Show waypoint on machine plane
-          control_view.m_waypoint_pointer->m_center = p;
-          control_view.m_waypoint_pointer->visible = true;
+        // Show waypoint on machine plane
+        control_view.m_waypoint_pointer->m_center = p;
+        control_view.m_waypoint_pointer->visible = true;
 
-          // Show popup asking user if they want to go to this location
-          m_view->getDialogs().askYesNo(
-            "Go to waypoint position?",
-            [this]() { goToWaypoint(nullptr); },
-            [&control_view]() {
-              control_view.m_waypoint_pointer->visible = false;
-            });
-        }
-      }
-      catch (...) {
-        LOG_F(ERROR, "Error parsing DRO Data!");
+        // Show popup asking user if they want to go to this location
+        m_view->getDialogs().askYesNo(
+          "Go to waypoint position?",
+          [this]() { goToWaypoint(nullptr); },
+          [&control_view]() {
+            control_view.m_waypoint_pointer->visible = false;
+          });
       }
     }
   }
@@ -583,54 +625,55 @@ bool NcHmi::updateTimer()
   if (!m_app)
     return false;
   auto&          control_view = m_app->getControlView();
-  nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
+  const DROData& dro_data = control_view.m_motion_controller->getDRO();
   try {
-    if (dro_data.contains("STATUS")) {
-      // { "STATUS": "Idle", "MCS": { "x": 0.000,"y": 0.000,"z": 0.000 },
-      // "WCS": { "x": -4.594,"y": -3.260,"z": 0.000 }, "FEED": 0, "V": 0,
-      // "IN_MOTION": false, "ARC_OK": true }
-      const float wcx = dro_data["WCS"]["x"].get<float>();
-      const float wcy = dro_data["WCS"]["y"].get<float>();
-      const float wcz = dro_data["WCS"]["z"].get<float>();
+    if (dro_data.status != MachineStatus::Unknown) {
+      // DROData contains: status, mcs{x,y,z}, wcs{x,y,z}, feed, voltage,
+      // in_motion, arc_ok, torch_on
+      const float wcx = dro_data.wcs.x;
+      const float wcy = dro_data.wcs.y;
+      const float wcz = dro_data.wcs.z;
       m_dro.x.work_readout->m_textval = to_fixed_string(abs(wcx), 4);
       m_dro.y.work_readout->m_textval = to_fixed_string(abs(wcy), 4);
       m_dro.z.work_readout->m_textval = to_fixed_string(abs(wcz), 4);
-      const float mcx = dro_data["MCS"]["x"].get<float>();
-      const float mcy = dro_data["MCS"]["y"].get<float>();
-      const float mcz = dro_data["MCS"]["z"].get<float>();
+      const float mcx = dro_data.mcs.x;
+      const float mcy = dro_data.mcs.y;
+      const float mcz = dro_data.mcs.z;
       m_dro.x.absolute_readout->m_textval = to_fixed_string(abs(mcx), 4);
       m_dro.y.absolute_readout->m_textval = to_fixed_string(abs(mcy), 4);
       m_dro.z.absolute_readout->m_textval = to_fixed_string(abs(mcz), 4);
       m_dro.feed->m_textval =
-        "FEED: " + to_fixed_string(dro_data["FEED"].get<float>(), 1);
+        "FEED: " + to_fixed_string(static_cast<float>(dro_data.feed), 1);
       m_dro.arc_readout->m_textval =
         "ARC: " +
-        to_fixed_string(dro_data.at("V").get<int>() *
+        to_fixed_string(dro_data.voltage *
                           control_view.m_machine_parameters.arc_voltage_divider,
                         1) +
         "V";
       m_dro.arc_set->m_textval =
         "SET: " +
         to_fixed_string(control_view.m_machine_parameters.thc_set_value, 1);
-      nlohmann::json runtime = control_view.m_motion_controller->getRunTime();
-      if (runtime != NULL)
+      RuntimeData runtime = control_view.m_motion_controller->getRunTime();
+      if (runtime.hours != 0 || runtime.minutes != 0 || runtime.seconds != 0)
         m_dro.run_time->m_textval =
-          "RUN: " + to_string_strip_zeros((int) runtime["hours"]) + ":" +
-          to_string_strip_zeros((int) runtime["minutes"]) + ":" +
-          to_string_strip_zeros((int) runtime["seconds"]);
+          "RUN: " + to_string_strip_zeros((int) runtime.hours) + ":" +
+          to_string_strip_zeros((int) runtime.minutes) + ":" +
+          to_string_strip_zeros((int) runtime.seconds);
       control_view.m_torch_pointer->m_center = { abs(mcx), abs(mcy) };
       if (control_view.m_motion_controller->isTorchOn()) {
-        m_dro_backpane->color[0] = 100;
-        m_dro_backpane->color[1] = 32;
-        m_dro_backpane->color[2] = 48;
+        // Dark reddish
+        m_dro_backpane->color.r = 100;
+        m_dro_backpane->color.g = 32;
+        m_dro_backpane->color.b = 48;
       }
       else {
-        m_dro_backpane->color[0] = 29;
-        m_dro_backpane->color[1] = 32;
-        m_dro_backpane->color[2] = 48;
+        // Whatever this color is
+        m_dro_backpane->color.r = 29;
+        m_dro_backpane->color.g = 32;
+        m_dro_backpane->color.b = 48;
       }
-      if ((bool) dro_data["ARC_OK"] == false) {
-        m_app->getRenderer().setColorByName(m_dro.arc_readout->color, "red");
+      if (dro_data.arc_ok == false) {
+        m_dro.arc_readout->color = getColor(Color::Red);
         // Keep adding m_points to current highlight path
         // Negated because this is how gcode is interpreted to be consistent
         // with grbl's machine coordinates
@@ -640,10 +683,10 @@ bool NcHmi::updateTimer()
           m_arc_okay_highlight_path =
             m_app->getRenderer().pushPrimitive<Path>(path);
           m_arc_okay_highlight_path->id = "gcode_highlights";
+          m_arc_okay_highlight_path->flags = PrimitiveFlags::GCodeHighlight;
           m_arc_okay_highlight_path->m_is_closed = false;
           m_arc_okay_highlight_path->m_width = 3;
-          m_app->getRenderer().setColorByName(m_arc_okay_highlight_path->color,
-                                              "green");
+          m_arc_okay_highlight_path->color = getColor(Color::Green);
           m_arc_okay_highlight_path->matrix_callback =
             m_view->getTransformCallback();
         }
@@ -653,9 +696,9 @@ bool NcHmi::updateTimer()
       }
       else {
         m_arc_okay_highlight_path = NULL;
-        m_dro.arc_readout->color[0] = 247;
-        m_dro.arc_readout->color[1] = 104;
-        m_dro.arc_readout->color[2] = 15;
+        m_dro.arc_readout->color.r = 247;
+        m_dro.arc_readout->color.g = 104;
+        m_dro.arc_readout->color.b = 15;
       }
     }
   }
@@ -665,9 +708,9 @@ bool NcHmi::updateTimer()
   return true;
 }
 
-void NcHmi::resizeCallback(const nlohmann::json& e)
+void NcHmi::resizeCallback(const WindowResizeEvent& e)
 {
-  // LOG_F(INFO, "(resizeCallback) %s", e.dump().c_str());
+  // LOG_F(INFO, "(resizeCallback) width=%d height=%d", e.width, e.height);
   m_backpane->m_bottom_left.x =
     (m_app->getRenderer().getWindowSize().x / 2) - m_backplane_width;
   m_backpane->m_bottom_left.y = -(m_app->getRenderer().getWindowSize().y / 2);
@@ -795,27 +838,31 @@ void NcHmi::pushButtonGroup(const std::string& b1, const std::string& b2)
   group.button_one.object =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
   group.button_one.object->mouse_callback =
-    [this](Primitive* c, const nlohmann::json& e) { mouseCallback(c, e); };
-  m_app->getRenderer().setColorByName(group.button_one.object->color, "black");
+    [this](Primitive* c, const Primitive::MouseEventData& e) {
+      mouseCallback(c, e);
+    };
+  group.button_one.object->color = getColor(Color::Black);
   group.button_one.object->zindex = 200;
   group.button_one.object->id = b1;
   group.button_one.label = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), group.button_one.name, 20);
   group.button_one.label->zindex = 210;
-  m_app->getRenderer().setColorByName(group.button_one.label->color, "white");
+  group.button_one.label->color = getColor(Color::White);
 
   group.button_two.name = b2;
   group.button_two.object =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
   group.button_two.object->mouse_callback =
-    [this](Primitive* c, const nlohmann::json& e) { mouseCallback(c, e); };
-  m_app->getRenderer().setColorByName(group.button_two.object->color, "black");
+    [this](Primitive* c, const Primitive::MouseEventData& e) {
+      mouseCallback(c, e);
+    };
+  group.button_two.object->color = getColor(Color::Black);
   group.button_two.object->zindex = 200;
   group.button_two.object->id = b2;
   group.button_two.label = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), group.button_two.name, 20);
   group.button_two.label->zindex = 210;
-  m_app->getRenderer().setColorByName(group.button_two.label->color, "white");
+  group.button_two.label->color = getColor(Color::White);
 
   m_button_groups.push_back(group);
 }
@@ -828,7 +875,7 @@ void NcHmi::clearHighlights()
   m_arc_okay_highlight_path = nullptr;
 }
 
-void NcHmi::tabKeyUpCallback(const nlohmann::json& e)
+void NcHmi::tabKeyUpCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
@@ -874,7 +921,7 @@ void NcHmi::goToWaypoint(Primitive* args)
     control_view.m_way_point_position.y = std::numeric_limits<int>::min();
   }
 }
-void NcHmi::escapeKeyCallback(const nlohmann::json& e)
+void NcHmi::escapeKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
@@ -883,17 +930,17 @@ void NcHmi::escapeKeyCallback(const nlohmann::json& e)
   control_view.m_way_point_position = { std::numeric_limits<double>::min(),
                                         std::numeric_limits<double>::min() };
 }
-void NcHmi::upKeyCallback(const nlohmann::json& e)
+void NcHmi::upKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
   try {
-    nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
-    if (dro_data["STATUS"] == "IDLE") {
-      if ((e["action"].get<int>() & NcRender::ActionFlagBits::Press) ||
-          e["action"].get<int>() == GLFW_REPEAT) {
-        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
+    const DROData& dro_data = control_view.m_motion_controller->getDRO();
+    if (dro_data.status == MachineStatus::Idle) {
+      if ((e.action & NcRender::ActionFlagBits::Press) ||
+          e.action == GLFW_REPEAT) {
+        if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y positive %s", dist.c_str());
@@ -913,8 +960,8 @@ void NcHmi::upKeyCallback(const nlohmann::json& e)
         }
       }
     }
-    if ((e["action"].get<int>() & NcRender::ActionFlagBits::Release) and
-        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
+    if ((e.action & NcRender::ActionFlagBits::Release) &&
+        !(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y positive jog!");
       handleButton("Abort");
@@ -925,17 +972,17 @@ void NcHmi::upKeyCallback(const nlohmann::json& e)
   }
 }
 
-void NcHmi::downKeyCallback(const nlohmann::json& e)
+void NcHmi::downKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
   try {
-    nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
-    if (dro_data["STATUS"] == "IDLE") {
-      if ((e["action"].get<int>() & NcRender::ActionFlagBits::Press) ||
-          e["action"].get<int>() == GLFW_REPEAT) {
-        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
+    const DROData& dro_data = control_view.m_motion_controller->getDRO();
+    if (dro_data.status == MachineStatus::Idle) {
+      if ((e.action & NcRender::ActionFlagBits::Press) ||
+          e.action == GLFW_REPEAT) {
+        if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y negative %s!", dist.c_str());
@@ -952,8 +999,8 @@ void NcHmi::downKeyCallback(const nlohmann::json& e)
         }
       }
     }
-    if ((e["action"].get<int>() & NcRender::ActionFlagBits::Release) &&
-        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
+    if ((e.action & NcRender::ActionFlagBits::Release) &&
+        !(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y negative jog!");
       handleButton("Abort");
@@ -964,17 +1011,17 @@ void NcHmi::downKeyCallback(const nlohmann::json& e)
   }
 }
 
-void NcHmi::rightKeyCallback(const nlohmann::json& e)
+void NcHmi::rightKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
   try {
-    nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
-    if (dro_data["STATUS"] == "IDLE") {
-      if ((e["action"].get<int>() & NcRender::ActionFlagBits::Press) ||
-          e["action"].get<int>() == GLFW_REPEAT) {
-        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
+    const DROData& dro_data = control_view.m_motion_controller->getDRO();
+    if (dro_data.status == MachineStatus::Idle) {
+      if ((e.action & NcRender::ActionFlagBits::Press) ||
+          e.action == GLFW_REPEAT) {
+        if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X positive %s!", dist.c_str());
@@ -994,8 +1041,8 @@ void NcHmi::rightKeyCallback(const nlohmann::json& e)
         }
       }
     }
-    if (e["action"].get<int>() & NcRender::ActionFlagBits::Release &&
-        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
+    if (e.action & NcRender::ActionFlagBits::Release &&
+        !(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Positive jog!");
       handleButton("Abort");
@@ -1005,17 +1052,17 @@ void NcHmi::rightKeyCallback(const nlohmann::json& e)
     // DRO data not available
   }
 }
-void NcHmi::leftKeyCallback(const nlohmann::json& e)
+void NcHmi::leftKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
   try {
-    nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
-    if (dro_data["STATUS"] == "IDLE") {
-      if ((e["action"].get<int>() & NcRender::ActionFlagBits::Press) ||
-          e["action"].get<int>() == GLFW_REPEAT) {
-        if (e["mods"].get<int>() & GLFW_MOD_CONTROL) {
+    const DROData& dro_data = control_view.m_motion_controller->getDRO();
+    if (dro_data.status == MachineStatus::Idle) {
+      if ((e.action & NcRender::ActionFlagBits::Press) ||
+          e.action == GLFW_REPEAT) {
+        if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X negative %s!", dist.c_str());
@@ -1032,8 +1079,8 @@ void NcHmi::leftKeyCallback(const nlohmann::json& e)
         }
       }
     }
-    if ((e["action"].get<int>() & NcRender::ActionFlagBits::Release) &&
-        not(e["mods"].get<int>() & GLFW_MOD_CONTROL)) {
+    if ((e.action & NcRender::ActionFlagBits::Release) &&
+        not(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Negative jog!");
       handleButton("Abort");
@@ -1043,12 +1090,12 @@ void NcHmi::leftKeyCallback(const nlohmann::json& e)
     // DRO data not available
   }
 }
-void NcHmi::pageUpKeyCallback(const nlohmann::json& e)
+void NcHmi::pageUpKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
-  if (e["action"].get<int>() & NcRender::ActionFlagBits::Press) {
+  if (e.action & NcRender::ActionFlagBits::Press) {
     if (control_view.m_machine_parameters.homing_dir_invert[2]) {
       control_view.m_motion_controller->sendRealTime('<');
     }
@@ -1056,12 +1103,12 @@ void NcHmi::pageUpKeyCallback(const nlohmann::json& e)
       control_view.m_motion_controller->sendRealTime('>');
     }
   }
-  else if (e["action"].get<int>() & NcRender::ActionFlagBits::Release) {
+  else if (e.action & NcRender::ActionFlagBits::Release) {
     control_view.m_motion_controller->sendRealTime('^');
   }
   /*try
   {
-      nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
+      const DROData& dro_data = control_view.m_motion_controller->getDRO();
       if (dro_data["STATUS"] == "IDLE")
       {
           if ((int)e["action"] == 1 || (int)e["action"] == 2)
@@ -1095,12 +1142,12 @@ void NcHmi::pageUpKeyCallback(const nlohmann::json& e)
       //DRO data not available
   }*/
 }
-void NcHmi::pageDownKeyCallback(const nlohmann::json& e)
+void NcHmi::pageDownKeyCallback(const KeyEvent& e)
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
-  if (e["action"].get<int>() & NcRender::ActionFlagBits::Press) {
+  if (e.action & NcRender::ActionFlagBits::Press) {
     if (control_view.m_machine_parameters.homing_dir_invert[2]) {
       control_view.m_motion_controller->sendRealTime('>');
     }
@@ -1108,12 +1155,12 @@ void NcHmi::pageDownKeyCallback(const nlohmann::json& e)
       control_view.m_motion_controller->sendRealTime('<');
     }
   }
-  else if (e["action"].get<int>() & NcRender::ActionFlagBits::Release) {
+  else if (e.action & NcRender::ActionFlagBits::Release) {
     control_view.m_motion_controller->sendRealTime('^');
   }
   /*try
   {
-      nlohmann::json dro_data = control_view.m_motion_controller->getDRO();
+      const DROData& dro_data = control_view.m_motion_controller->getDRO();
       if (dro_data["STATUS"] == "IDLE")
       {
           if ((int)e["action"] == 1 || (int)e["action"] == 2)
@@ -1148,12 +1195,12 @@ void NcHmi::pageDownKeyCallback(const nlohmann::json& e)
       //DRO data not available
   }*/
 }
-void NcHmi::mouseMotionCallback(const nlohmann::json& e)
+void NcHmi::mouseMotionCallback(const MouseMoveEvent& e)
 {
   if (!m_app)
     return;
 
-  Point2d point = { (double) e["pos"]["x"], (double) e["pos"]["y"] };
+  Point2d point = { e.x, e.y };
 
   // Update global mouse position
   m_app->getInputState().setMousePosition(point);
@@ -1164,8 +1211,7 @@ void NcHmi::mouseMotionCallback(const nlohmann::json& e)
 
   double      zoom = m_view->getZoom();
   const auto& pan = m_view->getPan();
-  Point2d     matrix_coords = { (e["pos"]["x"].get<double>() - pan.x) / zoom,
-                                (e["pos"]["y"].get<double>() - pan.y) / zoom };
+  Point2d     matrix_coords = { (e.x - pan.x) / zoom, (e.y - pan.y) / zoom };
   // Matrix coordinates are calculated on demand via view transformation
 }
 void NcHmi::init()
@@ -1183,17 +1229,20 @@ void NcHmi::init()
     control_view.m_machine_parameters.machine_extents[1],
     0);
   control_view.m_machine_plane->id = "machine_plane";
+  control_view.m_machine_plane->flags = PrimitiveFlags::MachinePlane;
   control_view.m_machine_plane->zindex = -20;
-  control_view.m_machine_plane->color[0] =
+  control_view.m_machine_plane->color.r =
     control_view.m_preferences.machine_plane_color[0] * 255.0f;
-  control_view.m_machine_plane->color[1] =
+  control_view.m_machine_plane->color.g =
     control_view.m_preferences.machine_plane_color[1] * 255.0f;
-  control_view.m_machine_plane->color[2] =
+  control_view.m_machine_plane->color.b =
     control_view.m_preferences.machine_plane_color[2] * 255.0f;
   control_view.m_machine_plane->matrix_callback =
     m_view->getTransformCallback();
   control_view.m_machine_plane->mouse_callback =
-    [this](Primitive* c, const nlohmann::json& e) { mouseCallback(c, e); };
+    [this](Primitive* c, const Primitive::MouseEventData& e) {
+      mouseCallback(c, e);
+    };
 
   control_view.m_cuttable_plane = m_app->getRenderer().pushPrimitive<Box>(
     Point2d{ control_view.m_machine_parameters.cutting_extents[0],
@@ -1206,35 +1255,36 @@ void NcHmi::init()
       control_view.m_machine_parameters.cutting_extents[1],
     0);
   control_view.m_cuttable_plane->id = "cuttable_plane";
+  control_view.m_cuttable_plane->flags = PrimitiveFlags::CuttablePlane;
   control_view.m_cuttable_plane->zindex = -10;
-  control_view.m_cuttable_plane->color[0] =
+  control_view.m_cuttable_plane->color.r =
     control_view.m_preferences.cuttable_plane_color[0] * 255.0f;
-  control_view.m_cuttable_plane->color[1] =
+  control_view.m_cuttable_plane->color.g =
     control_view.m_preferences.cuttable_plane_color[1] * 255.0f;
-  control_view.m_cuttable_plane->color[2] =
+  control_view.m_cuttable_plane->color.b =
     control_view.m_preferences.cuttable_plane_color[2] * 255.0f;
   control_view.m_cuttable_plane->matrix_callback =
     m_view->getTransformCallback();
 
   m_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_backpane->color[0] = 25;
-  m_backpane->color[1] = 44;
-  m_backpane->color[2] = 71;
+  m_backpane->color.r = 25;
+  m_backpane->color.g = 44;
+  m_backpane->color.b = 71;
   m_backpane->zindex = 100;
 
   m_dro_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_dro_backpane->color[0] = 29;
-  m_dro_backpane->color[1] = 32;
-  m_dro_backpane->color[2] = 48;
+  m_dro_backpane->color.r = 29;
+  m_dro_backpane->color.g = 32;
+  m_dro_backpane->color.b = 48;
   m_dro_backpane->zindex = 110;
 
   m_button_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_button_backpane->color[0] = 29;
-  m_button_backpane->color[1] = 32;
-  m_button_backpane->color[2] = 48;
+  m_button_backpane->color.r = 29;
+  m_button_backpane->color.g = 32;
+  m_button_backpane->color.b = 48;
   m_button_backpane->zindex = 115;
 
   pushButtonGroup("Zero X", "Zero Y");
@@ -1247,100 +1297,100 @@ void NcHmi::init()
   m_dro.x.label =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "X", 50);
   m_dro.x.label->zindex = 210;
-  m_app->getRenderer().setColorByName(m_dro.x.label->color, "white");
+  m_dro.x.label->color = getColor(Color::White);
   m_dro.x.work_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
   m_dro.x.work_readout->zindex = 210;
-  m_dro.x.work_readout->color[0] = 10;
-  m_dro.x.work_readout->color[1] = 150;
-  m_dro.x.work_readout->color[2] = 10;
+  m_dro.x.work_readout->color.r = 10;
+  m_dro.x.work_readout->color.g = 150;
+  m_dro.x.work_readout->color.b = 10;
   m_dro.x.absolute_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
   m_dro.x.absolute_readout->zindex = 210;
-  m_dro.x.absolute_readout->color[0] = 247;
-  m_dro.x.absolute_readout->color[1] = 104;
-  m_dro.x.absolute_readout->color[2] = 15;
+  m_dro.x.absolute_readout->color.r = 247;
+  m_dro.x.absolute_readout->color.g = 104;
+  m_dro.x.absolute_readout->color.b = 15;
   m_dro.x.divider =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
   m_dro.x.divider->zindex = 150;
-  m_app->getRenderer().setColorByName(m_dro.x.divider->color, "black");
+  m_dro.x.divider->color = getColor(Color::Black);
 
   m_dro.y.label =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "Y", 50);
   m_dro.y.label->zindex = 210;
-  m_app->getRenderer().setColorByName(m_dro.y.label->color, "white");
+  m_dro.y.label->color = getColor(Color::White);
   m_dro.y.work_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
   m_dro.y.work_readout->zindex = 210;
-  m_dro.y.work_readout->color[0] = 10;
-  m_dro.y.work_readout->color[1] = 150;
-  m_dro.y.work_readout->color[2] = 10;
+  m_dro.y.work_readout->color.r = 10;
+  m_dro.y.work_readout->color.g = 150;
+  m_dro.y.work_readout->color.b = 10;
   m_dro.y.absolute_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
   m_dro.y.absolute_readout->zindex = 210;
-  m_dro.y.absolute_readout->color[0] = 247;
-  m_dro.y.absolute_readout->color[1] = 104;
-  m_dro.y.absolute_readout->color[2] = 15;
+  m_dro.y.absolute_readout->color.r = 247;
+  m_dro.y.absolute_readout->color.g = 104;
+  m_dro.y.absolute_readout->color.b = 15;
   m_dro.y.divider =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
   m_dro.y.divider->zindex = 150;
-  m_app->getRenderer().setColorByName(m_dro.y.divider->color, "black");
+  m_dro.y.divider->color = getColor(Color::Black);
 
   m_dro.z.label =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "Z", 50);
   m_dro.z.label->zindex = 210;
-  m_app->getRenderer().setColorByName(m_dro.z.label->color, "white");
+  m_dro.z.label->color = getColor(Color::White);
   m_dro.z.work_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
   m_dro.z.work_readout->zindex = 210;
-  m_dro.z.work_readout->color[0] = 10;
-  m_dro.z.work_readout->color[1] = 150;
-  m_dro.z.work_readout->color[2] = 10;
+  m_dro.z.work_readout->color.r = 10;
+  m_dro.z.work_readout->color.g = 150;
+  m_dro.z.work_readout->color.b = 10;
   m_dro.z.absolute_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
   m_dro.z.absolute_readout->zindex = 210;
-  m_dro.z.absolute_readout->color[0] = 247;
-  m_dro.z.absolute_readout->color[1] = 104;
-  m_dro.z.absolute_readout->color[2] = 15;
+  m_dro.z.absolute_readout->color.r = 247;
+  m_dro.z.absolute_readout->color.g = 104;
+  m_dro.z.absolute_readout->color.b = 15;
   m_dro.z.divider =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
   m_dro.z.divider->zindex = 150;
-  m_app->getRenderer().setColorByName(m_dro.z.divider->color, "black");
+  m_dro.z.divider->color = getColor(Color::Black);
 
   m_dro.feed =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "FEED: 0", 12);
   m_dro.feed->zindex = 210;
-  m_dro.feed->color[0] = 247;
-  m_dro.feed->color[1] = 104;
-  m_dro.feed->color[2] = 15;
+  m_dro.feed->color.r = 247;
+  m_dro.feed->color.g = 104;
+  m_dro.feed->color.b = 15;
 
   m_dro.arc_readout = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), "ARC: 0.0V", 12);
   m_dro.arc_readout->zindex = 210;
-  m_dro.arc_readout->color[0] = 247;
-  m_dro.arc_readout->color[1] = 104;
-  m_dro.arc_readout->color[2] = 15;
+  m_dro.arc_readout->color.r = 247;
+  m_dro.arc_readout->color.g = 104;
+  m_dro.arc_readout->color.b = 15;
 
   m_dro.arc_set =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "SET: 0", 12);
   m_dro.arc_set->zindex = 210;
-  m_dro.arc_set->color[0] = 247;
-  m_dro.arc_set->color[1] = 104;
-  m_dro.arc_set->color[2] = 15;
+  m_dro.arc_set->color.r = 247;
+  m_dro.arc_set->color.g = 104;
+  m_dro.arc_set->color.b = 15;
 
   m_dro.run_time = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), "RUN: 0:0:0", 12);
   m_dro.run_time->zindex = 210;
-  m_dro.run_time->color[0] = 247;
-  m_dro.run_time->color[1] = 104;
-  m_dro.run_time->color[2] = 15;
+  m_dro.run_time->color.r = 247;
+  m_dro.run_time->color.g = 104;
+  m_dro.run_time->color.b = 15;
 
   control_view.m_torch_pointer =
     m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 5);
   control_view.m_torch_pointer->zindex = 500;
   control_view.m_torch_pointer->id = "torch_pointer";
-  m_app->getRenderer().setColorByName(control_view.m_torch_pointer->color,
-                                      "green");
+  control_view.m_torch_pointer->flags = PrimitiveFlags::TorchPointer;
+  control_view.m_torch_pointer->color = getColor(Color::Green);
   control_view.m_torch_pointer->matrix_callback =
     m_view->getTransformCallback();
 
@@ -1348,8 +1398,8 @@ void NcHmi::init()
     m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 5);
   control_view.m_waypoint_pointer->zindex = 501;
   control_view.m_waypoint_pointer->id = "waypoint_pointer";
-  m_app->getRenderer().setColorByName(control_view.m_waypoint_pointer->color,
-                                      "yellow");
+  control_view.m_waypoint_pointer->flags = PrimitiveFlags::WaypointPointer;
+  control_view.m_waypoint_pointer->color = getColor(Color::Yellow);
   control_view.m_waypoint_pointer->matrix_callback =
     m_view->getTransformCallback();
   control_view.m_waypoint_pointer->visible = false;
@@ -1362,46 +1412,39 @@ void NcHmi::init()
   // This is necessary because buttons are created at Point2d::infNeg() and need
   // to be positioned. With tiling window managers like i3, the resize event may
   // not fire immediately, so we do an initial layout here.
-  nlohmann::json resize_event = {
-    { "width", m_app->getRenderer().getWindowSize().x },
-    { "height", m_app->getRenderer().getWindowSize().y }
-  };
+  WindowResizeEvent resize_event;
+  resize_event.width = m_app->getRenderer().getWindowSize().x;
+  resize_event.height = m_app->getRenderer().getWindowSize().y;
   resizeCallback(resize_event);
 
   handleButton("Fit");
 }
 
-// New typed event handlers that delegate to existing JSON-based handlers
+// Typed event handlers - no JSON conversion needed
 void NcHmi::handleKeyEvent(const KeyEvent& e, const InputState& input)
 {
-  // Convert to JSON format for existing handlers
-  nlohmann::json json_event = { { "key", e.key },
-                                { "scancode", e.scancode },
-                                { "action", e.action },
-                                { "mods", e.mods } };
-
   // Route to appropriate handler based on key
   switch (e.key) {
     case GLFW_KEY_ESCAPE:
-      escapeKeyCallback(json_event);
+      escapeKeyCallback(e);
       break;
     case GLFW_KEY_UP:
-      upKeyCallback(json_event);
+      upKeyCallback(e);
       break;
     case GLFW_KEY_DOWN:
-      downKeyCallback(json_event);
+      downKeyCallback(e);
       break;
     case GLFW_KEY_LEFT:
-      leftKeyCallback(json_event);
+      leftKeyCallback(e);
       break;
     case GLFW_KEY_RIGHT:
-      rightKeyCallback(json_event);
+      rightKeyCallback(e);
       break;
     case GLFW_KEY_PAGE_UP:
-      pageUpKeyCallback(json_event);
+      pageUpKeyCallback(e);
       break;
     case GLFW_KEY_PAGE_DOWN:
-      pageDownKeyCallback(json_event);
+      pageDownKeyCallback(e);
       break;
     default:
       // Key not handled by HMI
@@ -1412,17 +1455,11 @@ void NcHmi::handleKeyEvent(const KeyEvent& e, const InputState& input)
 void NcHmi::handleMouseMoveEvent(const MouseMoveEvent& e,
                                  const InputState&     input)
 {
-  // Convert to JSON format for existing handler
-  nlohmann::json json_event = { { "pos", { { "x", e.x }, { "y", e.y } } } };
-
-  mouseMotionCallback(json_event);
+  mouseMotionCallback(e);
 }
 
 void NcHmi::handleWindowResizeEvent(const WindowResizeEvent& e,
                                     const InputState&        input)
 {
-  // Convert to JSON format for existing handler
-  nlohmann::json json_event = { { "width", e.width }, { "height", e.height } };
-
-  resizeCallback(json_event);
+  resizeCallback(e);
 }

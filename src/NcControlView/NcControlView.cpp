@@ -1,9 +1,9 @@
 #include "NcControlView.h"
 #include "../application/NcApp.h"
 #include "../input/InputState.h"
+#include "NcCamView/NcCamView.h"
 #include "gcode/gcode.h"
 #include "hmi/hmi.h"
-#include "NcCamView/NcCamView.h"
 #include <NcRender/NcRender.h>
 #include <NcRender/gui/ImGuiFileDialog.h>
 #include <NcRender/gui/imgui.h>
@@ -17,12 +17,12 @@ void NcControlView::preInit()
   auto& renderer = m_app->getRenderer();
 
   nlohmann::json preferences = renderer.parseJsonFromFile(
-    renderer.getConfigDirectory() + "m_preferences.json");
+    renderer.getConfigDirectory() + "preferences.json");
   if (preferences != NULL) {
     try {
       LOG_F(INFO,
             "Found %s!",
-            std::string(renderer.getConfigDirectory() + "m_preferences.json")
+            std::string(renderer.getConfigDirectory() + "preferences.json")
               .c_str());
       m_preferences.background_color[0] =
         (double) preferences["background_color"]["r"];
@@ -65,109 +65,36 @@ void NcControlView::preInit()
   }
 
   nlohmann::json parameters = renderer.parseJsonFromFile(
-    renderer.getConfigDirectory() + "m_machine_parameters.json");
+    renderer.getConfigDirectory() + "machine_parameters.json");
   if (parameters != NULL) {
     try {
       LOG_F(
         INFO,
         "Found %s!",
-        std::string(renderer.getConfigDirectory() + "m_machine_parameters.json")
+        std::string(renderer.getConfigDirectory() + "machine_parameters.json")
           .c_str());
-      m_machine_parameters.work_offset[0] =
-        (float) parameters["work_offset"]["x"];
-      m_machine_parameters.work_offset[1] =
-        (float) parameters["work_offset"]["y"];
-      m_machine_parameters.work_offset[2] =
-        (float) parameters["work_offset"]["z"];
-      m_machine_parameters.machine_extents[0] =
-        (float) parameters["machine_extents"]["x"];
-      m_machine_parameters.machine_extents[1] =
-        (float) parameters["machine_extents"]["y"];
-      m_machine_parameters.machine_extents[2] =
-        (float) parameters["machine_extents"]["z"];
-      m_machine_parameters.cutting_extents[0] =
-        (float) parameters["cutting_extents"]["x1"];
-      m_machine_parameters.cutting_extents[1] =
-        (float) parameters["cutting_extents"]["y1"];
-      m_machine_parameters.cutting_extents[2] =
-        (float) parameters["cutting_extents"]["x2"];
-      m_machine_parameters.cutting_extents[3] =
-        (float) parameters["cutting_extents"]["y2"];
-      m_machine_parameters.axis_scale[0] =
-        (float) parameters["axis_scale"]["x"];
-      m_machine_parameters.axis_scale[1] =
-        (float) parameters["axis_scale"]["y"];
-      m_machine_parameters.axis_scale[2] =
-        (float) parameters["axis_scale"]["z"];
-      m_machine_parameters.max_vel[0] = (float) parameters["max_vel"]["x"];
-      m_machine_parameters.max_vel[1] = (float) parameters["max_vel"]["y"];
-      m_machine_parameters.max_vel[2] = (float) parameters["max_vel"]["z"];
-      m_machine_parameters.max_accel[0] = (float) parameters["max_accel"]["x"];
-      m_machine_parameters.max_accel[1] = (float) parameters["max_accel"]["y"];
-      m_machine_parameters.max_accel[2] = (float) parameters["max_accel"]["z"];
-      m_machine_parameters.junction_deviation =
-        (float) parameters["junction_deviation"];
-      m_machine_parameters.arc_stabilization_time =
-        (float) parameters["arc_stabilization_time"];
-      m_machine_parameters.arc_voltage_divider =
-        (float) parameters["arc_voltage_divider"];
-      m_machine_parameters.floating_head_backlash =
-        (float) parameters["floating_head_backlash"];
-      m_machine_parameters.z_probe_feedrate =
-        (float) parameters["z_probe_feedrate"];
-      m_machine_parameters.axis_invert[0] =
-        (bool) parameters["axis_invert"]["x"];
-      m_machine_parameters.axis_invert[1] =
-        (bool) parameters["axis_invert"]["y1"];
-      m_machine_parameters.axis_invert[2] =
-        (bool) parameters["axis_invert"]["y2"];
-      m_machine_parameters.axis_invert[3] =
-        (bool) parameters["axis_invert"]["z"];
-      m_machine_parameters.soft_limits_enabled =
-        (bool) parameters["soft_limits_enabled"];
-      m_machine_parameters.homing_enabled = (bool) parameters["homing_enabled"];
-      m_machine_parameters.homing_dir_invert[0] =
-        (bool) parameters["homing_dir_invert"]["x"];
-      m_machine_parameters.homing_dir_invert[1] =
-        (bool) parameters["homing_dir_invert"]["y"];
-      m_machine_parameters.homing_dir_invert[2] =
-        (bool) parameters["homing_dir_invert"]["z"];
-      m_machine_parameters.homing_feed = (float) parameters["homing_feed"];
-      m_machine_parameters.homing_seek = (float) parameters["homing_seek"];
-      m_machine_parameters.homing_debounce =
-        (float) parameters["homing_debounce"];
-      m_machine_parameters.homing_pull_off =
-        (float) parameters["homing_pull_off"];
-      m_machine_parameters.invert_limit_pins =
-        (bool) parameters["invert_limit_pins"];
-      m_machine_parameters.invert_probe_pin =
-        (bool) parameters["invert_probe_pin"];
-      m_machine_parameters.invert_step_enable =
-        (bool) parameters["invert_step_enable"];
-      m_machine_parameters.precise_jog_units =
-        (float) parameters["precise_jog_units"];
+      // Use automatic deserialization via from_json
+      from_json(parameters, m_machine_parameters);
     }
     catch (std::exception& e) {
-      LOG_F(
-        FATAL,
-        "Error parsing Machine Parameters file! Reason:\n%s\nAborting to "
-        "avoid damaging. Fix your m_machine_parameters.json or delete it to "
-        "generate a new one.",
-        e.what());
+      LOG_F(FATAL,
+            "Error parsing Machine Parameters file! Reason:\n%s\nAborting to "
+            "avoid damaging. Fix your machine_parameters.json or delete it to "
+            "generate a new one.",
+            e.what());
     }
   }
   else {
-    LOG_F(
-      WARNING,
-      "%s does not exist, using default parameters!",
-      std::string(renderer.getConfigDirectory() + "m_machine_parameters.json")
-        .c_str());
+    LOG_F(WARNING,
+          "%s does not exist, using default parameters!",
+          std::string(renderer.getConfigDirectory() + "machine_parameters.json")
+            .c_str());
     m_machine_parameters.work_offset[0] = 0.0f;
     m_machine_parameters.work_offset[1] = 0.0f;
     m_machine_parameters.work_offset[2] = 0.0f;
     m_machine_parameters.machine_extents[0] = SCALE(1400.f);
     m_machine_parameters.machine_extents[1] = SCALE(1400.f);
-    m_machine_parameters.machine_extents[2] = SCALE(-60.f);
+    m_machine_parameters.machine_extents[2] = SCALE(60.f);
     m_machine_parameters.cutting_extents[0] = SCALE(50.f);
     m_machine_parameters.cutting_extents[1] = SCALE(50.f);
     m_machine_parameters.cutting_extents[2] = -SCALE(50.f);

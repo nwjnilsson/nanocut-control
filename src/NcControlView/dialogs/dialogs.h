@@ -59,13 +59,13 @@ public:
   void showThcWindow(bool visible);
 
   // Yes/No question dialog
-  void askYesNo(const std::string& question,
+  void askYesNo(const std::string&    question,
                 std::function<void()> yes_callback,
                 std::function<void()> no_callback = nullptr);
 
 private:
   // Application context
-  NcApp* m_app;
+  NcApp*         m_app;
   NcControlView* m_view;
 
   // GUI window handles
@@ -81,10 +81,10 @@ private:
   NcRender::NcRenderGui* m_ask_window_handle = nullptr;
 
   // Dialog state
-  float m_progress = 0.0f;
-  std::string m_info;
-  std::string m_controller_alarm_text;
-  std::string m_ask_text;
+  float                 m_progress = 0.0f;
+  std::string           m_info;
+  std::string           m_controller_alarm_text;
+  std::string           m_ask_text;
   std::function<void()> m_ask_window_yes_callback;
   std::function<void()> m_ask_window_no_callback;
 
@@ -101,4 +101,4 @@ private:
   void renderAskWindow();
 };
 
-#endif //DIALOGS_
+#endif // DIALOGS_

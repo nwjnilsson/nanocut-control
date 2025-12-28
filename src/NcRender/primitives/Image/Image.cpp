@@ -39,19 +39,13 @@ void        Image::processMouse(float mpos_x, float mpos_y)
       mpos_y > m_position[1] &&
       mpos_y < (m_position[1] + m_height)) {
     if (mouse_over == false) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseIn },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
       mouse_over = true;
     }
   }
   else {
     if (mouse_over == true) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseOut },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
       mouse_over = false;
     }
   }
@@ -108,10 +102,10 @@ void Image::render()
                offset[2]);
   glScalef(
     scale, scale, scale);
-  glColor4f(color[3] / 255,
-            color[3] / 255,
-            color[3] / 255,
-            color[3] / 255);
+  glColor4f(color.a / 255,
+            color.a / 255,
+            color.a / 255,
+            color.a / 255);
   if (m_texture == -1) {
     int    my_image_width = 0;
     int    my_image_height = 0;

@@ -30,25 +30,18 @@ void        Line::processMouse(float mpos_x, float mpos_y)
 {
   mpos_x = (mpos_x - offset[0]) / scale;
   mpos_y = (mpos_y - offset[1]) / scale;
-  Geometry g;
-  if (g.lineIntersectsWithCircle(
+  if (geo::lineIntersectsWithCircle(
         { { m_start.x, m_start.y }, { m_end.x, m_end.y } },
         { mpos_x, mpos_y },
         (mouse_over_padding / scale))) {
     if (mouse_over == false) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseIn },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
       mouse_over = true;
     }
   }
   else {
     if (mouse_over == true) {
-      m_mouse_event = {
-        { "event", NcRender::EventType::MouseOut },
-        { "pos", { { "x", mpos_x }, { "y", mpos_y } } },
-      };
+      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
       mouse_over = false;
     }
   }
@@ -59,7 +52,7 @@ void Line::render()
     glPushMatrix();
     glTranslatef(offset[0], offset[1], offset[2]);
     glScalef(scale, scale, scale);
-    glColor4f(color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255);
+    glColor4f(color.r / 255, color.g / 255, color.b / 255, color.a / 255);
     glLineWidth(m_width);
     if (m_style == "dashed") {
       glPushAttrib(GL_ENABLE_BIT);

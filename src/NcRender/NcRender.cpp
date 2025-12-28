@@ -65,23 +65,21 @@ void NcRender::handleKeyEvent(int key, int scancode, int action, int mods)
 
 void NcRender::handleMouseButtonEvent(int button, int action, int mods)
 {
-  if (imgui_io &&
-      (imgui_io->WantCaptureKeyboard || imgui_io->WantCaptureMouse)) {
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureKeyboard || io.WantCaptureMouse) {
     return; // ImGui is handling input
   }
 
   // Handle primitive mouse events
-  if (!imgui_io->WantCaptureKeyboard && !imgui_io->WantCaptureMouse) {
+  if (!io.WantCaptureKeyboard && !io.WantCaptureMouse) {
     bool ignore_next_mouse_events = false;
     for (auto it = m_primitive_stack.rbegin(); it != m_primitive_stack.rend();
          ++it) {
       if ((*it)->view == m_current_view) {
         if ((*it)->visible == true && (*it)->mouse_over == true) {
           if ((*it)->mouse_callback != NULL) {
-            (*it)->mouse_callback(it->get(),
-                                  { { "button", button },
-                                    { "action", 1 << action },
-                                    { "mods", mods } });
+            MouseButtonEvent btn_event(button, 1 << action, mods);
+            (*it)->mouse_callback(it->get(), btn_event);
             ignore_next_mouse_events = true;
           }
         }
@@ -136,7 +134,7 @@ void NcRender::pushTimer(unsigned long interval, std::function<bool()> c)
 NcRender::NcRenderGui* NcRender::pushGui(bool                  visible,
                                          std::function<void()> callback)
 {
-  m_gui_stack.emplace_back(NcRenderGui{ m_current_view, visible, callback });
+  m_gui_stack.push_back({ m_current_view, visible, callback });
   return &m_gui_stack.back();
 }
 
@@ -179,80 +177,6 @@ void NcRender::setClearColor(float r, float g, float b)
 }
 
 void NcRender::setShowFPS(bool show_fps) { m_show_fps = show_fps; }
-
-void NcRender::setColorByName(float* c, std::string color)
-{
-  if (color == "white") {
-    c[0] = 255;
-    c[1] = 255;
-    c[2] = 255;
-    c[3] = 255;
-  }
-  else if (color == "black") {
-    c[0] = 0;
-    c[1] = 0;
-    c[2] = 0;
-    c[3] = 255;
-  }
-  else if (color == "grey") {
-    c[0] = 100;
-    c[1] = 100;
-    c[2] = 100;
-    c[3] = 255;
-  }
-  else if (color == "light-red") {
-    c[0] = 190;
-    c[1] = 0;
-    c[2] = 0;
-    c[3] = 255;
-  }
-  else if (color == "red") {
-    c[0] = 255;
-    c[1] = 0;
-    c[2] = 0;
-    c[3] = 255;
-  }
-  else if (color == "light-green") {
-    c[0] = 0;
-    c[1] = 190;
-    c[2] = 0;
-    c[3] = 255;
-  }
-  else if (color == "green") {
-    c[0] = 0;
-    c[1] = 255;
-    c[2] = 0;
-    c[3] = 255;
-  }
-  else if (color == "light-blue") {
-    c[0] = 0;
-    c[1] = 0;
-    c[2] = 190;
-    c[3] = 255;
-  }
-  else if (color == "blue") {
-    c[0] = 0;
-    c[1] = 0;
-    c[2] = 255;
-    c[3] = 255;
-  }
-  else if (color == "yellow") {
-    c[0] = 255;
-    c[1] = 255;
-    c[2] = 0;
-    c[3] = 255;
-  }
-  else {
-    LOG_F(WARNING,
-          "(NcRender::setColorByName) Color \"%s\" not found, defaulting to "
-          "white",
-          color.c_str());
-    c[0] = 255;
-    c[1] = 255;
-    c[2] = 255;
-    c[3] = 255;
-  }
-}
 
 void NcRender::setCurrentView(std::string v) { m_current_view = v; }
 
@@ -434,10 +358,9 @@ bool NcRender::init(int argc, char** argv)
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
-  this->imgui_io = &io;
-  this->imgui_io->IniFilename = m_gui_ini_filename;
-  this->imgui_io->LogFilename = m_gui_log_filename;
-  this->imgui_io->ConfigFlags |=
+  io.IniFilename = m_gui_ini_filename;
+  io.LogFilename = m_gui_log_filename;
+  io.ConfigFlags |=
     ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
   if (m_gui_style == "light") {
     ImGui::StyleColorsLight();
@@ -456,6 +379,7 @@ bool NcRender::init(int argc, char** argv)
 
 bool NcRender::poll(bool should_quit)
 {
+  ImGuiIO&      io = ImGui::GetIO();
   unsigned long begin_timestamp = millis();
   float         ratio = m_window_size[0] / (float) m_window_size[1];
   Point2d       window_mouse_pos = getWindowMousePosition();
@@ -471,8 +395,7 @@ bool NcRender::poll(bool should_quit)
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   for (size_t x = 0; x < m_gui_stack.size(); x++) {
-    if (m_gui_stack[x].visible == true &&
-        m_gui_stack[x].view == m_current_view) {
+    if (m_gui_stack[x].visible and m_gui_stack[x].view == m_current_view) {
       if (m_gui_stack[x].callback) {
         m_gui_stack[x].callback();
       }
@@ -505,17 +428,16 @@ bool NcRender::poll(bool should_quit)
         m_primitive_stack[x]->matrix_callback(m_primitive_stack[x].get());
       }
       m_primitive_stack[x]->render();
-      if ((!imgui_io->WantCaptureKeyboard || !imgui_io->WantCaptureMouse) &&
+      if ((!io.WantCaptureKeyboard || !io.WantCaptureMouse) &&
           ignore_next_mouse_events == false) {
         m_primitive_stack[x]->processMouse(window_mouse_pos.x,
                                            window_mouse_pos.y);
         // Dispatch mouse event if one was generated
-        if (m_primitive_stack[x]->m_mouse_event != nullptr &&
+        if (m_primitive_stack[x]->m_mouse_event.has_value() &&
             m_primitive_stack[x]->mouse_callback) {
           m_primitive_stack[x]->mouse_callback(
-            m_primitive_stack[x].get(), m_primitive_stack[x]->m_mouse_event);
-          m_primitive_stack[x]->m_mouse_event =
-            nullptr; // Clear event after dispatch
+            m_primitive_stack[x].get(), m_primitive_stack[x]->m_mouse_event.value());
+          m_primitive_stack[x]->m_mouse_event.reset(); // Clear event after dispatch
         }
       }
     }
@@ -543,7 +465,8 @@ bool NcRender::poll(bool should_quit)
       m_fps_label = pushPrimitive<Text>(Point2d{ 0, 0 }, "0", 30.f);
       m_fps_label->visible = false;
       m_fps_label->id = "FPS";
-      setColorByName(m_fps_label->color, "white");
+      m_fps_label->flags = PrimitiveFlags::SystemUI;
+      m_fps_label->color = getColor(Color::White);
     }
     else {
       m_fps_average.push_back(getFramesPerSecond());
