@@ -1,16 +1,16 @@
 #include "NcCamView.h"
-#include "../application/NcApp.h"
-#include "../input/InputEvents.h"
-#include "../input/InputState.h"
+#include "../NcApp/NcApp.h"
+#include "../Input/InputEvents.h"
+#include "../Input/InputState.h"
 #include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"
 #include "NcControlView/NcControlView.h"
 #include "PolyNest/PolyNest.h"
 #include <NcControlView/util.h>
 #include <NcRender/NcRender.h>
-#include <NcRender/gui/ImGuiFileDialog.h>
-#include <NcRender/gui/imgui.h>
-#include <NcRender/logging/loguru.h>
-#include <dxf/dxflib/dl_dxf.h>
+#include <ImGuiFileDialog.h>
+#include <imgui.h>
+#include <loguru.hpp>
+#include <dxflib/dl_dxf.h>
 
 // JSON serialization for ToolData
 void NcCamView::to_json(nlohmann::json& j, const ToolData& tool)
@@ -308,8 +308,10 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
         if (p != "") {
           path = p;
         }
+        IGFD::FileDialogConfig config;
+        config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
-          "PostNcDialog", "Choose File", ".nc", path.c_str());
+          "PostNcDialog", "Choose File", ".nc", config);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Save Job", "")) {
@@ -326,8 +328,10 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
         if (p != "") {
           path = p;
         }
+        IGFD::FileDialogConfig config;
+        config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
-          "ImportPartDialog", "Choose File", ".dxf", path.c_str());
+          "ImportPartDialog", "Choose File", ".dxf", config);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Close", "")) {
@@ -823,8 +827,10 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
         if (p != "") {
           path = p;
         }
+        IGFD::FileDialogConfig config;
+        config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
-          "ImportPartDialog", "Choose File", ".dxf", path.c_str());
+          "ImportPartDialog", "Choose File", ".dxf", config);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("New Duplicate")) {

@@ -1,6 +1,6 @@
 #include "PolyNest.h"
 #include "NcCamView/NcCamView.h"
-#include "application.h"
+#include "NanoCut.h"
 
 PolyNest::PolyPoint PolyNest::PolyPart::rotatePoint(PolyPoint p, double a)
 {

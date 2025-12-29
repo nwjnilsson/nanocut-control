@@ -2,8 +2,8 @@
 #define MOTION_CONTROLLER_H
 
 #include "../serial/NcSerial.h"
-#include <NcRender/json/json.h>
-#include <application.h>
+#include <nlohmann/json.hpp>
+#include <NanoCut.h>
 #include <chrono>
 #include <deque>
 #include <functional>

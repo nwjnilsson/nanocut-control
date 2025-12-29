@@ -1,9 +1,11 @@
 #ifndef PRIMITIVE_BASE_
 #define PRIMITIVE_BASE_
 
-#include "../json/json.h"
-#include "application.h"
-#include "input/InputEvents.h"
+#include "NanoCut.h"
+#include "Input/InputEvents.h"
+
+#include <nlohmann/json.hpp>
+
 #include <functional>
 #include <optional>
 #include <string>

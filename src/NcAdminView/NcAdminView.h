@@ -3,7 +3,7 @@
 
 // System includes
 #include <NcRender/NcRender.h>
-#include <application/View.h>
+#include <NcApp/View.h>
 
 // Forward declarations
 class NcApp;

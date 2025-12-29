@@ -1,12 +1,12 @@
 #include "NcAdminView.h"
-#include "../application/NcApp.h"
-#include "../input/InputState.h"
+#include "../NcApp/NcApp.h"
+#include "../Input/InputState.h"
 #include "NcCamView/NcCamView.h"
 #include "NcControlView/NcControlView.h"
 #include "WebsocketClient/WebsocketClient.h"
 #include <NcRender/NcRender.h>
-#include <NcRender/gui/imgui.h>
-#include <NcRender/logging/loguru.h>
+#include <imgui.h>
+#include <loguru.hpp>
 
 void NcAdminView::zoomEventCallback(const ScrollEvent& e,
                                     const InputState&  input)

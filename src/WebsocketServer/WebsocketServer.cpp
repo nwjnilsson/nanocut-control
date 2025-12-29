@@ -1,7 +1,7 @@
 #define MG_ENABLE_LOG 0
 #include "WebsocketServer.h"
-#include "NcRender/json/json.h"
-#include "NcRender/logging/loguru.h"
+#include <nlohmann/json.hpp>
+#include <loguru.hpp>
 
 void WebsocketServer::fn(struct mg_connection* c,
                          int                   ev,
@@ -141,7 +141,7 @@ void WebsocketServer::handleWebsocketMessage(websocket_client_t client,
 }
 void WebsocketServer::init()
 {
-  const char* listen_on = "http://162.216.17.199:8000";
+  const char* listen_on = "TODO";
   mg_mgr_init(&m_mgr);
   mg_http_listen(&m_mgr, listen_on, fn, this);
   LOG_F(INFO, "Starting websocket server on: %s", listen_on);

@@ -1,8 +1,10 @@
 #include "Part.h"
 #include "../../geometry/clipper.h"
 #include "../../geometry/geometry.h"
-#include "../../logging/loguru.h"
+
 #include <NcRender/NcRender.h>
+
+#include <loguru.hpp>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 // define something for Windows (32-bit and 64-bit, this part is common)
@@ -32,7 +34,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
   if (visible == true) {
     mpos_x = (mpos_x - offset[0]) / scale;
     mpos_y = (mpos_y - offset[1]) / scale;
-    size_t   path_index = -1;
+    size_t path_index = -1;
     if (m_control.mouse_mode == 0) {
       bool mouse_is_over_path = false;
       for (size_t x = 0; x < m_paths.size(); x++) {
@@ -68,13 +70,15 @@ void        Part::processMouse(float mpos_x, float mpos_y)
       }
       if (mouse_is_over_path == true) {
         if (mouse_over == false) {
-          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
+          m_mouse_event = MouseHoverEvent(
+            NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
           mouse_over = true;
         }
       }
       else {
         if (mouse_over == true) {
-          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
+          m_mouse_event = MouseHoverEvent(
+            NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
           mouse_over = false;
         }
       }
@@ -93,13 +97,15 @@ void        Part::processMouse(float mpos_x, float mpos_y)
       }
       if (mouse_is_inside_perimeter == true) {
         if (mouse_over == false) {
-          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
+          m_mouse_event = MouseHoverEvent(
+            NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
           mouse_over = true;
         }
       }
       else {
         if (mouse_over == true) {
-          m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
+          m_mouse_event = MouseHoverEvent(
+            NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
           mouse_over = false;
         }
       }
@@ -225,10 +231,12 @@ void Part::render()
       try {
         std::vector<Point2d> simplified;
 
-        // For closed paths with very few points, skip simplification to preserve geometry
+        // For closed paths with very few points, skip simplification to
+        // preserve geometry
         if (it->is_closed && it->points.size() <= 6) {
           simplified = it->points;
-        } else {
+        }
+        else {
           simplify(it->points, simplified, m_control.smoothing);
         }
 
@@ -430,7 +438,8 @@ std::vector<std::vector<Point2d>> Part::getOrderedToolpaths()
     while (toolpaths.size() > 0) {
       for (size_t x = 0; x < toolpaths.size(); x++) {
         if (toolpaths[x].size() > 0) {
-          if (geo::distance(toolpaths[x][0], ret.back()[0]) < smallest_distance) {
+          if (geo::distance(toolpaths[x][0], ret.back()[0]) <
+              smallest_distance) {
             smallest_distance = geo::distance(toolpaths[x][0], ret.back()[0]);
             winner_index = x;
           }
@@ -482,8 +491,8 @@ Point2d* Part::getClosestPoint(size_t*               index,
                                Point2d               point,
                                std::vector<Point2d>* points)
 {
-  double   smallest_distance = 1000000;
-  int      smallest_index = 0;
+  double smallest_distance = 1000000;
+  int    smallest_index = 0;
   for (size_t x = 0; x < points->size(); x++) {
     double dist = geo::distance(point, (*points)[x]);
     if (dist < smallest_distance) {

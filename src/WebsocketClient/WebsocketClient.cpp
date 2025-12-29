@@ -1,7 +1,7 @@
 #define MG_ENABLE_LOG 0
 #include "WebsocketClient.h"
 #include "NcRender/NcRender.h"
-#include "NcRender/logging/loguru.h"
+#include <loguru.hpp>
 
 bool WebsocketClient::reconnectTimer(void* self_pointer)
 {
@@ -137,7 +137,7 @@ void WebsocketClient::init()
 void WebsocketClient::connect()
 {
   mg_mgr_init(&m_mgr);
-  static const char* s_url = "ws://jetcad.io:8000/websocket";
+  static const char* s_url = "TODO";
   m_client = mg_ws_connect(&m_mgr, s_url, fn, this, NULL);
 }
 void WebsocketClient::poll() { mg_mgr_poll(&m_mgr, 1); }

@@ -1,9 +1,8 @@
 #include "DXFParsePathAdaptor.h"
 #include "NcCamView/NcCamView.h"
-#include "application.h"
-#include <NcRender/logging/loguru.h>
+#include "NanoCut.h"
 #include <cmath>
-#include <dxf/spline/Bezier.h>
+#include <loguru.hpp>
 
 // ============================================================================
 // NURBS Implementation for proper DXF spline handling
@@ -56,16 +55,16 @@ private:
 public:
   NURBSCurve() : degree(3), closed(false) {}
 
-  void set_degree(int d) { degree = d; }
-  void set_closed(bool c) { closed = c; }
+  void setDegree(int d) { degree = d; }
+  void setClosed(bool c) { closed = c; }
 
-  void add_control_point(Point2d p, double weight = 1.0)
+  void addControlPoint(Point2d p, double weight = 1.0)
   {
     control_points.push_back(p);
     weights.push_back(weight);
   }
 
-  void add_knot(double k) { knots.push_back(k); }
+  void addKnot(double k) { knots.push_back(k); }
 
   void clear()
   {
@@ -198,7 +197,7 @@ public:
   }
 
   // Adaptive sampling based on curvature
-  std::vector<Point2d> sample_adaptive(double max_error, int max_depth)
+  std::vector<Point2d> sampleAdaptive(double max_error, int max_depth)
   {
     std::vector<Point2d> points;
 
@@ -214,19 +213,19 @@ public:
     double u_end = knots[control_points.size()];
 
     points.push_back(evaluate(u_start));
-    adaptive_sample_segment(u_start, u_end, max_error, 0, max_depth, points);
+    adaptiveSampleSegment(u_start, u_end, max_error, 0, max_depth, points);
     points.push_back(evaluate(u_end));
 
     return points;
   }
 
 private:
-  void adaptive_sample_segment(double                u1,
-                               double                u2,
-                               double                max_error,
-                               int                   depth,
-                               int                   max_depth,
-                               std::vector<Point2d>& points)
+  void adaptiveSampleSegment(double                u1,
+                             double                u2,
+                             double                max_error,
+                             int                   depth,
+                             int                   max_depth,
+                             std::vector<Point2d>& points)
   {
     double u_mid = (u1 + u2) * 0.5;
 
@@ -252,16 +251,14 @@ private:
     if ((error > max_error || curvature > curvature_threshold) &&
         depth < max_depth) {
       // Subdivide
-      adaptive_sample_segment(
-        u1, u_mid, max_error, depth + 1, max_depth, points);
+      adaptiveSampleSegment(u1, u_mid, max_error, depth + 1, max_depth, points);
       points.push_back(p_mid);
-      adaptive_sample_segment(
-        u_mid, u2, max_error, depth + 1, max_depth, points);
+      adaptiveSampleSegment(u_mid, u2, max_error, depth + 1, max_depth, points);
     }
   }
 
 public:
-  size_t get_control_point_count() const { return control_points.size(); }
+  size_t getControlPointCount() const { return control_points.size(); }
 };
 
 // ============================================================================
@@ -361,12 +358,12 @@ private:
 public:
   FitPointSpline() : degree(3) {}
 
-  void add_fit_point(Point2d p) { fit_points.push_back(p); }
+  void addFitPoint(Point2d p) { fit_points.push_back(p); }
 
   void clear() { fit_points.clear(); }
 
   // Adaptive Catmull-Rom spline interpolation
-  std::vector<Point2d> interpolate_adaptive(double max_error, int max_depth)
+  std::vector<Point2d> interpolateAdaptive(double max_error, int max_depth)
   {
     if (fit_points.size() < 2)
       return fit_points;
@@ -410,10 +407,11 @@ public:
  * Default constructor.
  */
 DXFParsePathAdaptor::DXFParsePathAdaptor(
-  NcRender*                                                     nc_render_instance,
-  std::function<void(Primitive*)>                               view_callback,
-  std::function<void(Primitive*, const Primitive::MouseEventData&)> mouse_callback,
-  NcCamView*                                                    cam_view)
+  NcRender*                       nc_render_instance,
+  std::function<void(Primitive*)> view_callback,
+  std::function<void(Primitive*, const Primitive::MouseEventData&)>
+             mouse_callback,
+  NcCamView* cam_view)
 {
   m_current_layer = "default";
   m_filename = "";
@@ -850,10 +848,10 @@ void DXFParsePathAdaptor::finish()
 
       FitPointSpline fit_spline;
       for (const auto& pt : m_splines[x].fit_points) {
-        fit_spline.add_fit_point(pt);
+        fit_spline.addFitPoint(pt);
       }
       sampled_points =
-        fit_spline.interpolate_adaptive(SCALE(0.75), m_import_quality);
+        fit_spline.interpolateAdaptive(SCALE(0.75), m_import_quality);
     }
     // Use NURBS with control points
     else if (m_splines[x].control_points.size() > 0) {
@@ -863,23 +861,23 @@ void DXFParsePathAdaptor::finish()
       //       m_splines[x].degree);
 
       NURBSCurve nurbs;
-      nurbs.set_degree(m_splines[x].degree);
-      nurbs.set_closed(m_splines[x].is_closed);
+      nurbs.setDegree(m_splines[x].degree);
+      nurbs.setClosed(m_splines[x].is_closed);
 
       // Add control points with weights
       for (size_t i = 0; i < m_splines[x].control_points.size(); i++) {
         double weight =
           (i < m_splines[x].weights.size()) ? m_splines[x].weights[i] : 1.0;
-        nurbs.add_control_point(m_splines[x].control_points[i], weight);
+        nurbs.addControlPoint(m_splines[x].control_points[i], weight);
       }
 
       // Add knot vector if available
       if (m_splines[x].has_knots && m_splines[x].knots.size() > 0) {
         for (double knot : m_splines[x].knots) {
-          nurbs.add_knot(knot);
+          nurbs.addKnot(knot);
         }
       }
-      sampled_points = nurbs.sample_adaptive(SCALE(0.75), m_import_quality);
+      sampled_points = nurbs.sampleAdaptive(SCALE(0.75), m_import_quality);
     }
 
     if (sampled_points.size() > 1) {

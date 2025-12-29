@@ -26,7 +26,7 @@
 #define DXFParsePathAdaptor_
 
 #include <NcRender/NcRender.h>
-#include <dxf/dxflib/dl_creationadapter.h>
+#include <dxflib/dl_creationadapter.h>
 
 // Forward declarations
 class NcCamView;

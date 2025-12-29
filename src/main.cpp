@@ -1,11 +1,11 @@
 #include "NcRender/NcRender.h"
-#include "NcRender/gui/imgui.h"
-#include "NcRender/logging/loguru.h"
+#include <imgui.h>
+#include <loguru.hpp>
 #include "WebsocketClient/WebsocketClient.h"
 #include "WebsocketServer/WebsocketServer.h"
 #include "NcAdminView/NcAdminView.h"
-#include "application.h"
-#include "application/NcApp.h"
+#include "NanoCut.h"
+#include "NcApp/NcApp.h"
 #include "NcCamView/NcCamView.h"
 #include "NcControlView/NcControlView.h"
 #include <memory>

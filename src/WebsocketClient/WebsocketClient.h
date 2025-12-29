@@ -1,8 +1,10 @@
 #ifndef WEBSOCKET_CLIENT_
 #define WEBSOCKET_CLIENT_
 
-#include "../mongoose/mongoose.h"
-#include <NcRender/json/json.h>
+extern "C" {
+#include <mongoose.h>
+}
+#include <nlohmann/json.hpp>
 
 // Forward declaration
 class NcApp;
@@ -19,7 +21,7 @@ public:
 
 private:
   NcRender* m_renderer{ nullptr }; // Reference to renderer for timer
-                                     // functionality
+                                   // functionality
 
 public:
   static void fn(struct mg_connection* c, int ev, void* ev_data, void* fn_data);

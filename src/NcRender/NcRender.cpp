@@ -1,12 +1,8 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
-#include <dirent.h>
 #include <fstream>
 #include <ftw.h>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,10 +13,11 @@
 #include <vector>
 
 #include "NcRender.h"
-#include "gui/imgui.h"
-#include "gui/imgui_impl_glfw.h"
-#include "gui/imgui_impl_opengl2.h"
-#include "logging/loguru.h"
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl2.h>
+#include <loguru.hpp>
 
 #ifdef __APPLE__
 #  define GL_SILENCE_DEPRECATION
@@ -436,8 +433,10 @@ bool NcRender::poll(bool should_quit)
         if (m_primitive_stack[x]->m_mouse_event.has_value() &&
             m_primitive_stack[x]->mouse_callback) {
           m_primitive_stack[x]->mouse_callback(
-            m_primitive_stack[x].get(), m_primitive_stack[x]->m_mouse_event.value());
-          m_primitive_stack[x]->m_mouse_event.reset(); // Clear event after dispatch
+            m_primitive_stack[x].get(),
+            m_primitive_stack[x]->m_mouse_event.value());
+          m_primitive_stack[x]->m_mouse_event.reset(); // Clear event after
+                                                       // dispatch
         }
       }
     }

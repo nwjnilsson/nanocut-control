@@ -10,8 +10,8 @@
 #include <NcRender/NcRender.h>
 
 // Project includes
-#include <application.h>
-#include <application/View.h>
+#include <NanoCut.h>
+#include <NcApp/View.h>
 
 // Local includes
 #include "dialogs/dialogs.h"

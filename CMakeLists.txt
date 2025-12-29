@@ -1,5 +1,10 @@
-cmake_minimum_required(VERSION 3.16)
-project(NanoCut LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.21)  # FetchContent improvements in 3.21+
+project(NanoCut LANGUAGES CXX C)
+
+# Allow FetchContent_Populate for manual dependency configuration
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
 
 #
 # ------------------------------------------------------------
@@ -34,14 +39,152 @@ set(CMAKE_CXX_FLAGS_RELEASE "${BASE_COMPILE_FLAGS} -DNDEBUG -O3")
 
 #
 # ------------------------------------------------------------
+# Third-Party Dependencies via FetchContent
+# ------------------------------------------------------------
+#
+include(FetchContent)
+
+# nlohmann/json - Header-only JSON library
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    FIND_PACKAGE_ARGS NAMES nlohmann_json
+)
+
+# Loguru - Logging library
+FetchContent_Declare(
+    loguru
+    GIT_REPOSITORY https://github.com/emilk/loguru.git
+    GIT_TAG v2.1.0
+)
+
+# ImGui - Immediate mode GUI library
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.91.7
+)
+
+# ImGuiFileDialog - File dialog extension for ImGui
+FetchContent_Declare(
+    imguifiledialog
+    GIT_REPOSITORY https://github.com/aiekick/ImGuiFileDialog.git
+    GIT_TAG v0.6.7
+)
+
+# Mongoose - Embedded web server and networking library
+FetchContent_Declare(
+    mongoose
+    GIT_REPOSITORY https://github.com/cesanta/mongoose.git
+    GIT_TAG 7.2
+)
+
+# stb - Single-file public domain libraries (stb_truetype, stb_image, etc.)
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+)
+
+# Make nlohmann/json available (has proper CMakeLists.txt)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# Loguru - fetch and manually create library target
+FetchContent_GetProperties(loguru)
+if(NOT loguru_POPULATED)
+    FetchContent_Populate(loguru)
+    add_library(loguru STATIC ${loguru_SOURCE_DIR}/loguru.cpp)
+    target_include_directories(loguru PUBLIC ${loguru_SOURCE_DIR})
+    target_compile_options(loguru PRIVATE -w)  # Suppress warnings
+    if(NOT WIN32)
+        target_link_libraries(loguru PUBLIC dl pthread)
+    endif()
+endif()
+
+# ImGui - fetch and manually create library target (no CMakeLists.txt)
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+    add_library(imgui STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl2.cpp
+    )
+    target_include_directories(imgui PUBLIC
+        ${imgui_SOURCE_DIR}
+        ${imgui_SOURCE_DIR}/backends
+    )
+    target_compile_options(imgui PRIVATE -w)  # Suppress warnings
+endif()
+
+# ImGuiFileDialog - fetch and manually create library target
+FetchContent_GetProperties(imguifiledialog)
+if(NOT imguifiledialog_POPULATED)
+    FetchContent_Populate(imguifiledialog)
+    add_library(imguifiledialog STATIC ${imguifiledialog_SOURCE_DIR}/ImGuiFileDialog.cpp)
+    target_include_directories(imguifiledialog PUBLIC ${imguifiledialog_SOURCE_DIR})
+    target_link_libraries(imguifiledialog PUBLIC imgui)
+    target_compile_options(imguifiledialog PRIVATE -w)  # Suppress warnings
+endif()
+
+# Mongoose - fetch and manually create library target
+FetchContent_GetProperties(mongoose)
+if(NOT mongoose_POPULATED)
+    FetchContent_Populate(mongoose)
+    add_library(mongoose STATIC ${mongoose_SOURCE_DIR}/mongoose.c)
+    target_include_directories(mongoose PUBLIC ${mongoose_SOURCE_DIR})
+    target_compile_definitions(mongoose PUBLIC MG_ENABLE_PACKED_FS=1)
+    target_compile_options(mongoose PRIVATE -w)  # Suppress warnings
+    if(WIN32)
+        target_compile_definitions(mongoose PRIVATE _WIN32_WINNT=0x0600)
+        target_link_libraries(mongoose PUBLIC ws2_32)
+    endif()
+endif()
+
+# stb - header-only library, just make headers available
+FetchContent_GetProperties(stb)
+if(NOT stb_POPULATED)
+    FetchContent_Populate(stb)
+    # stb is header-only, no library target needed
+    # Will add include directory to NanoCut target later
+endif()
+
+#
+# ------------------------------------------------------------
+# dxflib - DXF file parsing library (local in ext/)
+# ------------------------------------------------------------
+#
+add_library(dxflib STATIC
+    ${CMAKE_SOURCE_DIR}/ext/dxflib/dl_dxf.cpp
+    ${CMAKE_SOURCE_DIR}/ext/dxflib/dl_writer_ascii.cpp
+)
+target_include_directories(dxflib PUBLIC ${CMAKE_SOURCE_DIR}/ext)
+target_compile_options(dxflib PRIVATE -w)  # Suppress warnings
+
+#
+# ------------------------------------------------------------
 # Source files
 # ------------------------------------------------------------
 #
 file(GLOB_RECURSE SRC_FILES src/*.cpp)
 
+# Exclude old vendored dependency sources from build
+list(FILTER SRC_FILES EXCLUDE REGEX "src/mongoose/.*")
+list(FILTER SRC_FILES EXCLUDE REGEX "src/NcRender/logging/.*")
+list(FILTER SRC_FILES EXCLUDE REGEX "src/NcRender/gui/.*")
+list(FILTER SRC_FILES EXCLUDE REGEX "src/dxf/dxflib/.*")
+
 add_executable(NanoCut ${SRC_FILES})
 
-target_include_directories(NanoCut PRIVATE src)
+target_include_directories(NanoCut PRIVATE
+    src
+    ${stb_SOURCE_DIR}  # stb header-only libraries
+)
 
 #
 # ------------------------------------------------------------
@@ -96,6 +239,20 @@ endif()
 
 #
 # ------------------------------------------------------------
+# Link Dependencies
+# ------------------------------------------------------------
+#
+target_link_libraries(NanoCut PRIVATE
+    nlohmann_json::nlohmann_json
+    loguru
+    imgui
+    imguifiledialog
+    mongoose
+    dxflib
+)
+
+#
+# ------------------------------------------------------------
 # OpenMP
 # ------------------------------------------------------------
 #
@@ -110,12 +267,15 @@ target_link_libraries(NanoCut PRIVATE OpenMP::OpenMP_CXX)
 find_package(glfw3 QUIET CONFIG)
 if(glfw3_FOUND)
     target_link_libraries(NanoCut PRIVATE glfw)
+    target_link_libraries(imgui PUBLIC glfw)  # ImGui backends need GLFW
 else()
     # fallback to pkg-config
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GLFW REQUIRED glfw3)
     target_include_directories(NanoCut PRIVATE ${GLFW_INCLUDE_DIRS})
     target_link_libraries(NanoCut PRIVATE ${GLFW_LIBRARIES})
+    target_include_directories(imgui PUBLIC ${GLFW_INCLUDE_DIRS})
+    target_link_libraries(imgui PUBLIC ${GLFW_LIBRARIES})
 endif()
 
 #

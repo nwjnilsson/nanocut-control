@@ -1,9 +1,9 @@
 #ifndef TEXT_
 #define TEXT_
 
-#include "../../gui/stb_truetype.h"
+#include <stb_truetype.h>
 #include "../Primitive.h"
-#include "application.h"
+#include "NanoCut.h"
 #include <string>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

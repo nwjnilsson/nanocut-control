@@ -4,8 +4,8 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "../json/json.h"
-#include "application.h"
+#include <nlohmann/json.hpp>
+#include "NanoCut.h"
 #include "clipper.h"
 #include <stddef.h>
 #include <string>

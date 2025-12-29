@@ -1,8 +1,8 @@
 #ifndef GCODE__
 #define GCODE__
 
-#include <NcRender/json/json.h>
-#include <application.h>
+#include <nlohmann/json.hpp>
+#include <NanoCut.h>
 #include <fstream>
 #include <string>
 #include <vector>

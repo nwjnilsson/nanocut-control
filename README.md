@@ -1,5 +1,6 @@
 # NanoCut Control
 ![Build](https://github.com/nwjnilsson/nanocut-control/workflows/Build/badge.svg)
+
 Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)).
 NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine.
 NanoCut is Native Cross-Platform (Windows, Linux, and MacOS),
@@ -14,7 +15,17 @@ but I have currently only tested it on Linux.
 into). Just hold control and click on the contour you would like to start from
 - User configurable Layout
 - Built in torch touchoff routine. Instead of a gcode, use fire_torch [pierce_height] [pierce_delay] [cut_height]. torch_off to shut torch off
-- Built-in Toolpath workbench. Setup job options material size. Lay parts out in any configuration and post Gcode ready to run on the machine. Also has an early Auto-Nesting feature.
+- Built-in Toolpath workbench. Setup job options material size. Lay parts out in
+any configuration and post GCode ready to run on the machine. Also has an early
+Auto-Nesting feature.
+
+The `--admin` and `--daemon` modes were never quite finished. I'm guessing the idea
+was to manage multiple machines over a local network. If you'd have for example
+one RPi controlling each machine, each of them could run the app as a daemon
+and connect to a central instance that would distribute commands and upload
+gcode etc. The plumbing is there but I don't have multiple machines myself so
+I'm not motivated enough to finish it.
+
 ## Changes made by me
 I've re-written large parts of the codebase to make it somewhat more readable.
 The original codebase was kind of a nightmare. nlohmann::json was used for

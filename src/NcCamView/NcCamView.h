@@ -9,9 +9,9 @@
 #include <NcRender/NcRender.h>
 
 // Project includes
-#include <application.h>
-#include <application/View.h>
-#include <dxf/dxflib/dl_dxf.h>
+#include <NanoCut.h>
+#include <NcApp/View.h>
+#include <dxflib/dl_dxf.h>
 
 // Local includes
 #include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"

@@ -3,10 +3,12 @@
 #include <stdio.h>
 #include <string>
 #define STB_TRUETYPE_IMPLEMENTATION
+#include <stb_truetype.h>
+
 #include "../../geometry/geometry.h"
-#include "../../gui/stb_truetype.h"
-#include "../../logging/loguru.h"
+
 #include <NcRender/NcRender.h>
+#include <loguru.hpp>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 // define something for Windows (32-bit and 64-bit, this part is common)
@@ -38,19 +40,20 @@ void        Text::processMouse(float mpos_x, float mpos_y)
   if (mpos_x > m_position.x && mpos_x < (m_position.x + m_width) &&
       mpos_y > m_position.y && mpos_y < (m_position.y + m_height)) {
     if (mouse_over == false) {
-      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
+      m_mouse_event =
+        MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
       mouse_over = true;
     }
   }
   else {
     if (mouse_over == true) {
-      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
+      m_mouse_event =
+        MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
       mouse_over = false;
     }
   }
 }
-bool Text::InitFontFromFile(const char* filename,
-                                           float       font_size)
+bool Text::InitFontFromFile(const char* filename, float font_size)
 {
   unsigned char  temp_bitmap[512 * 512];
   size_t         ttf_buffer_size = 0;
@@ -146,15 +149,9 @@ void Text::RenderFont(float pos_x, float pos_y, std::string text)
 void Text::render()
 {
   glPushMatrix();
-  glTranslatef(offset[0],
-               offset[1],
-               offset[2]);
-  glScalef(
-    scale, scale, scale);
-  glColor4f(color.r / 255,
-            color.g / 255,
-            color.b / 255,
-            color.a / 255);
+  glTranslatef(offset[0], offset[1], offset[2]);
+  glScalef(scale, scale, scale);
+  glColor4f(color.r / 255, color.g / 255, color.b / 255, color.a / 255);
   if (m_texture == -1) {
     bool ret = InitFontFromFile(m_font_file.c_str(), m_font_size);
     if (ret == false) {

@@ -3,8 +3,8 @@
 
 #include "serial/serial.h"
 #include <NcRender/NcRender.h>
-#include <NcRender/json/json.h>
-#include <NcRender/logging/loguru.h>
+#include <nlohmann/json.hpp>
+#include <loguru.hpp>
 #include <functional>
 #include <iostream>
 #include <stdio.h>

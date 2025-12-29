@@ -2,10 +2,10 @@
 #define EASYRENDER_
 
 #include "geometry/geometry.h"
-#include "gui/imgui.h"
+#include <imgui.h>
 #include "primitives/Primitives.h"
-#include "json/json.h"
-#include "input/InputEvents.h"
+#include <nlohmann/json.hpp>
+#include "Input/InputEvents.h"
 #include <algorithm>
 #include <chrono>
 #include <ctime>

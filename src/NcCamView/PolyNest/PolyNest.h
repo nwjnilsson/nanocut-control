@@ -2,8 +2,8 @@
 #define POLY_NEST_
 
 #include <NcRender/geometry/clipper.h>
-#include <NcRender/logging/loguru.h>
-#include <application.h>
+#include <loguru.hpp>
+#include <NanoCut.h>
 
 #include <algorithm>
 #include <cmath>

@@ -2,7 +2,7 @@
 #define ARC_
 
 #include "../Primitive.h"
-#include "application.h"
+#include "NanoCut.h"
 #include <string>
 
 class Arc : public Primitive {

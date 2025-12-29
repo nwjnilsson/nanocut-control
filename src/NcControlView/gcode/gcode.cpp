@@ -1,9 +1,9 @@
 #include "gcode.h"
-#include "../../application/NcApp.h"
+#include "../../NcApp/NcApp.h"
 #include "../hmi/hmi.h"
 #include <NcControlView/NcControlView.h>
 #include <NcRender/geometry/geometry.h>
-#include <NcRender/logging/loguru.h>
+#include <loguru.hpp>
 
 // Helper function for splitting strings (can remain as a free function)
 std::vector<std::string> gcode_split(std::string str, char delimiter)

@@ -1,10 +1,10 @@
 #include "dialogs.h"
-#include "../../application/NcApp.h"
+#include "../../NcApp/NcApp.h"
 #include "../gcode/gcode.h"
 #include "../motion_control/motion_controller.h"
 #include "../util.h"
 #include "NcControlView/NcControlView.h"
-#include <NcRender/gui/ImGuiFileDialog.h>
+#include <ImGuiFileDialog.h>
 #include <algorithm>
 
 // Constructor

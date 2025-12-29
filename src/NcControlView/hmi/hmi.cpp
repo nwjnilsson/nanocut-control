@@ -1,8 +1,8 @@
 #include "hmi.h"
 #include "../../NcRender/primitives/Primitives.h"
-#include "../../application/NcApp.h"
-#include "../../input/InputEvents.h"
-#include "../../input/InputState.h"
+#include "../../NcApp/NcApp.h"
+#include "../../Input/InputEvents.h"
+#include "../../Input/InputState.h"
 #include "../gcode/gcode.h"
 #include "../motion_control/motion_controller.h"
 #include "../util.h"
@@ -633,15 +633,15 @@ bool NcHmi::updateTimer()
       const float wcx = dro_data.wcs.x;
       const float wcy = dro_data.wcs.y;
       const float wcz = dro_data.wcs.z;
-      m_dro.x.work_readout->m_textval = to_fixed_string(abs(wcx), 4);
-      m_dro.y.work_readout->m_textval = to_fixed_string(abs(wcy), 4);
-      m_dro.z.work_readout->m_textval = to_fixed_string(abs(wcz), 4);
+      m_dro.x.work_readout->m_textval = to_fixed_string(fabs(wcx), 4);
+      m_dro.y.work_readout->m_textval = to_fixed_string(fabs(wcy), 4);
+      m_dro.z.work_readout->m_textval = to_fixed_string(fabs(wcz), 4);
       const float mcx = dro_data.mcs.x;
       const float mcy = dro_data.mcs.y;
       const float mcz = dro_data.mcs.z;
-      m_dro.x.absolute_readout->m_textval = to_fixed_string(abs(mcx), 4);
-      m_dro.y.absolute_readout->m_textval = to_fixed_string(abs(mcy), 4);
-      m_dro.z.absolute_readout->m_textval = to_fixed_string(abs(mcz), 4);
+      m_dro.x.absolute_readout->m_textval = to_fixed_string(fabs(mcx), 4);
+      m_dro.y.absolute_readout->m_textval = to_fixed_string(fabs(mcy), 4);
+      m_dro.z.absolute_readout->m_textval = to_fixed_string(fabs(mcz), 4);
       m_dro.feed->m_textval =
         "FEED: " + to_fixed_string(static_cast<float>(dro_data.feed), 1);
       m_dro.arc_readout->m_textval =
@@ -659,7 +659,7 @@ bool NcHmi::updateTimer()
           "RUN: " + to_string_strip_zeros((int) runtime.hours) + ":" +
           to_string_strip_zeros((int) runtime.minutes) + ":" +
           to_string_strip_zeros((int) runtime.seconds);
-      control_view.m_torch_pointer->m_center = { abs(mcx), abs(mcy) };
+      control_view.m_torch_pointer->m_center = { fabs(mcx), fabs(mcy) };
       if (control_view.m_motion_controller->isTorchOn()) {
         // Dark reddish
         m_dro_backpane->color.r = 100;

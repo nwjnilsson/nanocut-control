@@ -2,7 +2,7 @@
 #define HMI_
 
 #include <NcRender/NcRender.h>
-#include <application.h>
+#include <NanoCut.h>
 #include <vector>
 
 // Forward declarations

@@ -3,7 +3,7 @@
 
 #include "../../geometry/geometry.h"
 #include "../Primitive.h"
-#include <NcRender/logging/loguru.h>
+#include <loguru.hpp>
 #include <string>
 
 class Circle : public Primitive {

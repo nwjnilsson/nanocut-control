@@ -1,8 +1,10 @@
 #ifndef WEBSOCKET_SERVER_
 #define WEBSOCKET_SERVER_
 
-#include "../mongoose/mongoose.h"
-#include <application.h>
+extern "C" {
+#include <mongoose.h>
+}
+#include <NanoCut.h>
 
 class WebsocketServer {
 public:

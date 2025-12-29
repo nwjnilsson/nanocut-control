@@ -1,13 +1,13 @@
 #include "NcControlView.h"
-#include "../application/NcApp.h"
-#include "../input/InputState.h"
+#include "../NcApp/NcApp.h"
+#include "../Input/InputState.h"
 #include "NcCamView/NcCamView.h"
 #include "gcode/gcode.h"
 #include "hmi/hmi.h"
 #include <NcRender/NcRender.h>
-#include <NcRender/gui/ImGuiFileDialog.h>
-#include <NcRender/gui/imgui.h>
-#include <NcRender/logging/loguru.h>
+#include <ImGuiFileDialog.h>
+#include <imgui.h>
+#include <loguru.hpp>
 #include <fstream>
 
 void NcControlView::preInit()
@@ -173,8 +173,10 @@ void NcControlView::renderUI()
                         std::istreambuf_iterator<char>());
           path = p;
         }
+        IGFD::FileDialogConfig config;
+        config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
-          "ChooseFileDlgKey", "Choose File", ".nc", path.c_str());
+          "ChooseFileDlgKey", "Choose File", ".nc", config);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Close", "")) {
