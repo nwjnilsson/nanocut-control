@@ -1,7 +1,7 @@
 #ifndef NC_SERIAL_
 #define NC_SERIAL_
 
-#include "serial/serial.h"
+#include <serial/serial.h>
 #include <NcRender/NcRender.h>
 #include <nlohmann/json.hpp>
 #include <loguru.hpp>

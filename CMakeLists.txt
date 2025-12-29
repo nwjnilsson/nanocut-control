@@ -44,6 +44,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "${BASE_COMPILE_FLAGS} -DNDEBUG -O3")
 #
 include(FetchContent)
 
+message(STATUS "Fetching third-party dependencies...")
+
 # nlohmann/json - Header-only JSON library
 FetchContent_Declare(
     nlohmann_json
@@ -87,10 +89,19 @@ FetchContent_Declare(
     GIT_TAG master
 )
 
+# Serial - Cross-platform serial port library by wjwwood
+FetchContent_Declare(
+    serial
+    GIT_REPOSITORY https://github.com/wjwwood/serial.git
+    GIT_TAG 1.2.1
+)
+
 # Make nlohmann/json available (has proper CMakeLists.txt)
+message(STATUS "Setting up nlohmann/json...")
 FetchContent_MakeAvailable(nlohmann_json)
 
 # Loguru - fetch and manually create library target
+message(STATUS "Setting up Loguru...")
 FetchContent_GetProperties(loguru)
 if(NOT loguru_POPULATED)
     FetchContent_Populate(loguru)
@@ -103,6 +114,7 @@ if(NOT loguru_POPULATED)
 endif()
 
 # ImGui - fetch and manually create library target (no CMakeLists.txt)
+message(STATUS "Setting up ImGui...")
 FetchContent_GetProperties(imgui)
 if(NOT imgui_POPULATED)
     FetchContent_Populate(imgui)
@@ -123,6 +135,7 @@ if(NOT imgui_POPULATED)
 endif()
 
 # ImGuiFileDialog - fetch and manually create library target
+message(STATUS "Setting up ImGuiFileDialog...")
 FetchContent_GetProperties(imguifiledialog)
 if(NOT imguifiledialog_POPULATED)
     FetchContent_Populate(imguifiledialog)
@@ -133,6 +146,7 @@ if(NOT imguifiledialog_POPULATED)
 endif()
 
 # Mongoose - fetch and manually create library target
+message(STATUS "Setting up Mongoose...")
 FetchContent_GetProperties(mongoose)
 if(NOT mongoose_POPULATED)
     FetchContent_Populate(mongoose)
@@ -147,12 +161,55 @@ if(NOT mongoose_POPULATED)
 endif()
 
 # stb - header-only library, just make headers available
+message(STATUS "Setting up stb...")
 FetchContent_GetProperties(stb)
 if(NOT stb_POPULATED)
     FetchContent_Populate(stb)
     # stb is header-only, no library target needed
     # Will add include directory to NanoCut target later
 endif()
+
+# Serial - Cross-platform serial port library (manual build due to old CMake)
+message(STATUS "Setting up Serial...")
+FetchContent_GetProperties(serial)
+if(NOT serial_POPULATED)
+    FetchContent_Populate(serial)
+
+    # Platform-specific source files
+    set(SERIAL_SRCS ${serial_SOURCE_DIR}/src/serial.cc)
+
+    if(APPLE)
+        list(APPEND SERIAL_SRCS
+            ${serial_SOURCE_DIR}/src/impl/unix.cc
+            ${serial_SOURCE_DIR}/src/impl/list_ports/list_ports_osx.cc
+        )
+    elseif(UNIX)
+        list(APPEND SERIAL_SRCS
+            ${serial_SOURCE_DIR}/src/impl/unix.cc
+            ${serial_SOURCE_DIR}/src/impl/list_ports/list_ports_linux.cc
+        )
+    elseif(WIN32)
+        list(APPEND SERIAL_SRCS
+            ${serial_SOURCE_DIR}/src/impl/win.cc
+            ${serial_SOURCE_DIR}/src/impl/list_ports/list_ports_win.cc
+        )
+    endif()
+
+    add_library(serial STATIC ${SERIAL_SRCS})
+    target_include_directories(serial PUBLIC ${serial_SOURCE_DIR}/include)
+    target_compile_options(serial PRIVATE -w)  # Suppress warnings
+
+    # Platform-specific libraries
+    if(APPLE)
+        target_link_libraries(serial PUBLIC "-framework IOKit" "-framework Foundation")
+    elseif(UNIX)
+        target_link_libraries(serial PUBLIC rt pthread)
+    elseif(WIN32)
+        target_link_libraries(serial PUBLIC setupapi)
+    endif()
+endif()
+
+message(STATUS "All third-party dependencies configured successfully")
 
 #
 # ------------------------------------------------------------
@@ -172,12 +229,6 @@ target_compile_options(dxflib PRIVATE -w)  # Suppress warnings
 # ------------------------------------------------------------
 #
 file(GLOB_RECURSE SRC_FILES src/*.cpp)
-
-# Exclude old vendored dependency sources from build
-list(FILTER SRC_FILES EXCLUDE REGEX "src/mongoose/.*")
-list(FILTER SRC_FILES EXCLUDE REGEX "src/NcRender/logging/.*")
-list(FILTER SRC_FILES EXCLUDE REGEX "src/NcRender/gui/.*")
-list(FILTER SRC_FILES EXCLUDE REGEX "src/dxf/dxflib/.*")
 
 add_executable(NanoCut ${SRC_FILES})
 
@@ -249,6 +300,7 @@ target_link_libraries(NanoCut PRIVATE
     imguifiledialog
     mongoose
     dxflib
+    serial
 )
 
 #
