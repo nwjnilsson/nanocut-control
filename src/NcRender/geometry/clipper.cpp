@@ -316,24 +316,13 @@ bool Poly2ContainsPoly1(OutPt* OutPt1, OutPt* OutPt2)
 }
 //----------------------------------------------------------------------
 
-bool IsAlmostEqual(double a, double b, int64_t maxUlps = 10000)
+bool IsAlmostEqual(double a, double b)
 {
-  // Special cases
-  if (std::isnan(a) || std::isnan(b))
-    return false;
-  if (std::isinf(a) || std::isinf(b))
-    return a == b;
-
-  int64_t aInt = std::bit_cast<int64_t>(a);
-  int64_t bInt = std::bit_cast<int64_t>(b);
-
-  if (aInt < 0)
-    aInt = 0x8000000000000000LL - aInt;
-  if (bInt < 0)
-    bInt = 0x8000000000000000LL - bInt;
-
-  int64_t diff = std::llabs(aInt - bInt);
-  return diff <= maxUlps;
+  long long aInt = reinterpret_cast<long long&>(a);
+  if (aInt < 0) aInt = -9223372036854775808LL - aInt;
+  long long bInt = reinterpret_cast<long long&>(b);
+  if (bInt < 0) bInt = -9223372036854775808LL - bInt;
+  return (std::abs(aInt - bInt) <= 10000);
 }
 //----------------------------------------------------------------------
 
