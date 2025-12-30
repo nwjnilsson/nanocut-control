@@ -1,8 +1,8 @@
 #include "hmi.h"
-#include "../../NcRender/primitives/Primitives.h"
-#include "../../NcApp/NcApp.h"
 #include "../../Input/InputEvents.h"
 #include "../../Input/InputState.h"
+#include "../../NcApp/NcApp.h"
+#include "../../NcRender/primitives/Primitives.h"
 #include "../gcode/gcode.h"
 #include "../motion_control/motion_controller.h"
 #include "../util.h"
@@ -528,13 +528,13 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
       }
     }
     else if (std::holds_alternative<MouseButtonEvent>(e)) {
-      const auto& button = std::get<MouseButtonEvent>(e);
-      if (button.button == GLFW_MOUSE_BUTTON_1) {
-        if (button.mods & GLFW_MOD_CONTROL) {
-          if (button.action & NcRender::ActionFlagBits::Press) {
+      const auto& be = std::get<MouseButtonEvent>(e);
+      if (be.button == GLFW_MOUSE_BUTTON_1) {
+        if (be.mods & GLFW_MOD_CONTROL) {
+          if (be.action == GLFW_PRESS) {
             c->color = getColor(Color::Green);
           }
-          else if (button.action & NcRender::ActionFlagBits::Release) {
+          else if (be.action == GLFW_RELEASE) {
             c->color = getColor(Color::LightGreen);
             m_view->getDialogs().askYesNo(
               "Are you sure you want to start the program at this path?",
@@ -542,15 +542,15 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
           }
         }
       }
-      else if (button.button == GLFW_MOUSE_BUTTON_2) {
-        if (button.mods & GLFW_MOD_CONTROL) {
-          if (button.action & NcRender::ActionFlagBits::Release) {
+      else if (be.button == GLFW_MOUSE_BUTTON_2) {
+        if (be.mods & GLFW_MOD_CONTROL) {
+          if (be.action == GLFW_RELEASE) {
             c->color = getColor(Color::LightGreen);
             m_view->getDialogs().askYesNo(
               "Are you sure you want to reverse this paths direction?",
               [this, c]() { reverse(c); });
           }
-          else if (button.action & NcRender::ActionFlagBits::Press) {
+          else if (be.action == GLFW_PRESS) {
             c->color = getColor(Color::Green);
           }
         }
@@ -569,12 +569,12 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
       }
     }
     else if (std::holds_alternative<MouseButtonEvent>(e)) {
-      const auto& button = std::get<MouseButtonEvent>(e);
-      if (button.button == GLFW_MOUSE_BUTTON_1) {
-        if (button.action & NcRender::ActionFlagBits::Press) {
+      const auto& be = std::get<MouseButtonEvent>(e);
+      if (be.button == GLFW_MOUSE_BUTTON_1) {
+        if (be.action == GLFW_PRESS) {
           c->color = getColor(Color::Green);
         }
-        if (button.action & NcRender::ActionFlagBits::Release) {
+        else if (be.action == GLFW_RELEASE) {
           c->color = getColor(Color::LightGreen);
           handleButton(c->id);
         }
@@ -597,8 +597,7 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
     if (!is_within) {
       return;
     }
-    if (button.button == GLFW_MOUSE_BUTTON_1 &&
-        button.action & NcRender::ActionFlagBits::Release) {
+    if (button.button == GLFW_MOUSE_BUTTON_1 && button.action == GLFW_RELEASE) {
       const DROData& dro_data = control_view.m_motion_controller->getDRO();
       if (!dro_data.in_motion) {
         LOG_F(INFO, "Add waypoint position [%f, %f]", p.x, p.y);
@@ -938,8 +937,7 @@ void NcHmi::upKeyCallback(const KeyEvent& e)
   try {
     const DROData& dro_data = control_view.m_motion_controller->getDRO();
     if (dro_data.status == MachineStatus::Idle) {
-      if ((e.action & NcRender::ActionFlagBits::Press) ||
-          e.action == GLFW_REPEAT) {
+      if (e.action == GLFW_PRESS) {
         if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
@@ -960,8 +958,7 @@ void NcHmi::upKeyCallback(const KeyEvent& e)
         }
       }
     }
-    if ((e.action & NcRender::ActionFlagBits::Release) &&
-        !(e.mods & GLFW_MOD_CONTROL)) {
+    if (e.action == GLFW_RELEASE && !(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y positive jog!");
       handleButton("Abort");
@@ -980,8 +977,7 @@ void NcHmi::downKeyCallback(const KeyEvent& e)
   try {
     const DROData& dro_data = control_view.m_motion_controller->getDRO();
     if (dro_data.status == MachineStatus::Idle) {
-      if ((e.action & NcRender::ActionFlagBits::Press) ||
-          e.action == GLFW_REPEAT) {
+      if (e.action == GLFW_PRESS) {
         if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
@@ -999,8 +995,7 @@ void NcHmi::downKeyCallback(const KeyEvent& e)
         }
       }
     }
-    if ((e.action & NcRender::ActionFlagBits::Release) &&
-        !(e.mods & GLFW_MOD_CONTROL)) {
+    if (e.action == GLFW_RELEASE && !(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling Y negative jog!");
       handleButton("Abort");
@@ -1019,8 +1014,7 @@ void NcHmi::rightKeyCallback(const KeyEvent& e)
   try {
     const DROData& dro_data = control_view.m_motion_controller->getDRO();
     if (dro_data.status == MachineStatus::Idle) {
-      if ((e.action & NcRender::ActionFlagBits::Press) ||
-          e.action == GLFW_REPEAT) {
+      if (e.action == GLFW_PRESS) {
         if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
@@ -1041,8 +1035,7 @@ void NcHmi::rightKeyCallback(const KeyEvent& e)
         }
       }
     }
-    if (e.action & NcRender::ActionFlagBits::Release &&
-        !(e.mods & GLFW_MOD_CONTROL)) {
+    if (e.action == GLFW_RELEASE && !(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Positive jog!");
       handleButton("Abort");
@@ -1060,8 +1053,7 @@ void NcHmi::leftKeyCallback(const KeyEvent& e)
   try {
     const DROData& dro_data = control_view.m_motion_controller->getDRO();
     if (dro_data.status == MachineStatus::Idle) {
-      if ((e.action & NcRender::ActionFlagBits::Press) ||
-          e.action == GLFW_REPEAT) {
+      if (e.action == GLFW_PRESS) {
         if (e.mods & GLFW_MOD_CONTROL) {
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
@@ -1079,8 +1071,7 @@ void NcHmi::leftKeyCallback(const KeyEvent& e)
         }
       }
     }
-    if ((e.action & NcRender::ActionFlagBits::Release) &&
-        not(e.mods & GLFW_MOD_CONTROL)) {
+    if (e.action == GLFW_RELEASE && not(e.mods & GLFW_MOD_CONTROL)) {
       // key up
       LOG_F(INFO, "Cancelling X Negative jog!");
       handleButton("Abort");
@@ -1095,7 +1086,7 @@ void NcHmi::pageUpKeyCallback(const KeyEvent& e)
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
-  if (e.action & NcRender::ActionFlagBits::Press) {
+  if (e.action == GLFW_PRESS) {
     if (control_view.m_machine_parameters.homing_dir_invert[2]) {
       control_view.m_motion_controller->sendRealTime('<');
     }
@@ -1103,7 +1094,7 @@ void NcHmi::pageUpKeyCallback(const KeyEvent& e)
       control_view.m_motion_controller->sendRealTime('>');
     }
   }
-  else if (e.action & NcRender::ActionFlagBits::Release) {
+  else if (e.action == GLFW_RELEASE) {
     control_view.m_motion_controller->sendRealTime('^');
   }
   /*try
@@ -1147,7 +1138,7 @@ void NcHmi::pageDownKeyCallback(const KeyEvent& e)
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
-  if (e.action & NcRender::ActionFlagBits::Press) {
+  if (e.action == GLFW_PRESS) {
     if (control_view.m_machine_parameters.homing_dir_invert[2]) {
       control_view.m_motion_controller->sendRealTime('>');
     }
@@ -1155,7 +1146,7 @@ void NcHmi::pageDownKeyCallback(const KeyEvent& e)
       control_view.m_motion_controller->sendRealTime('<');
     }
   }
-  else if (e.action & NcRender::ActionFlagBits::Release) {
+  else if (e.action == GLFW_RELEASE) {
     control_view.m_motion_controller->sendRealTime('^');
   }
   /*try

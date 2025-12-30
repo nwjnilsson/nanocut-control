@@ -1,17 +1,17 @@
 #ifndef EASYRENDER_
 #define EASYRENDER_
 
-#include "geometry/geometry.h"
-#include <imgui.h>
-#include "primitives/Primitives.h"
-#include <nlohmann/json.hpp>
 #include "Input/InputEvents.h"
+#include "geometry/geometry.h"
+#include "primitives/Primitives.h"
 #include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <deque>
 #include <functional>
+#include <imgui.h>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <sys/time.h>
 #include <variant>
@@ -86,15 +86,8 @@ private:
   static void windowSizeCallback(GLFWwindow* window, int width, int height);
 
 public:
-  enum class ActionFlagBits {
-    Release = 1 << GLFW_RELEASE,
-    Press = 1 << GLFW_PRESS,
-    Repeat = 1 << GLFW_REPEAT,
-    Any = Release | Press | Repeat
-  };
-  typedef uint32_t ActionFlags;
-
-  // Type alias for MouseEventType (defined in InputEvents.h to avoid circular dependency)
+  // Type alias for MouseEventType (defined in InputEvents.h to avoid circular
+  // dependency)
   using EventType = MouseEventType;
 
   struct NcRenderGui {
@@ -182,7 +175,7 @@ public:
   void deletePrimitivesById(std::string id);
 
   /* Event Delegation (called by NcApp) */
-  void handleKeyEvent(int key, int scancode, int action, int mods);
+  void handleKeyEvent(const KeyEvent& ev);
   void handleMouseButtonEvent(int button, int action, int mods);
   void handleScrollEvent(double xoffset, double yoffset);
   void handleCursorPositionEvent(double xpos, double ypos);
@@ -193,11 +186,5 @@ public:
   bool poll(bool should_quit);
   void close();
 };
-
-NcRender::ActionFlags operator&(NcRender::ActionFlags    a,
-                                NcRender::ActionFlagBits b);
-NcRender::ActionFlags operator|(NcRender::ActionFlagBits a,
-                                NcRender::ActionFlagBits b);
-NcRender::ActionFlags operator+(NcRender::ActionFlagBits a);
 
 #endif // EASYREANDER_

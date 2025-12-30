@@ -1,14 +1,14 @@
 #include "NcApp.h"
+#include "../Input/InputEvents.h"
+#include "../Input/InputState.h"
 #include "../NcAdminView/NcAdminView.h"
 #include "../NcCamView/NcCamView.h"
 #include "../NcControlView/NcControlView.h"
 #include "../NcRender/NcRender.h"
-#include <imgui.h>
-#include <nlohmann/json.hpp>
-#include <loguru.hpp>
 #include "../WebsocketClient/WebsocketClient.h"
-#include "../Input/InputEvents.h"
-#include "../Input/InputState.h"
+#include <imgui.h>
+#include <loguru.hpp>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <sys/stat.h>
 
@@ -172,10 +172,9 @@ void NcApp::setModifierPressed(int modifier_bit, bool pressed)
 
 void NcApp::modifierKeyCallback(const nlohmann::json& e)
 {
-  using Action = NcRender::ActionFlagBits;
   int  key = e.at("key").get<int>();
   int  action = e.at("action").get<int>();
-  bool pressed = (action & Action::Press) != 0;
+  bool pressed = action == GLFW_PRESS;
 
   switch (key) {
     case GLFW_KEY_LEFT_CONTROL:
@@ -267,14 +266,14 @@ void NcApp::keyCallback(
   }
 
   // Delegate to current active view if available
+  KeyEvent event(key, scancode, action, mods);
   if (app->m_current_active_view) {
-    KeyEvent event(key, scancode, action, mods);
     app->m_current_active_view->handleKeyEvent(event, *app->m_input_state);
   }
 
   // Also delegate to NcRender for legacy compatibility and GUI events
   if (app->m_renderer) {
-    app->m_renderer->handleKeyEvent(key, scancode, action, mods);
+    app->m_renderer->handleKeyEvent(event);
   }
 }
 

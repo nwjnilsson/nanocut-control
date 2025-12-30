@@ -54,7 +54,7 @@
 const auto NcRenderProgramStartTime = std::chrono::steady_clock::now();
 
 // Event delegation methods (called by NcApp)
-void NcRender::handleKeyEvent(int key, int scancode, int action, int mods)
+void NcRender::handleKeyEvent(const KeyEvent& ev)
 {
   // Only check if ImGui wants to capture input
   // NcApp now handles all key events directly through view delegation
@@ -75,7 +75,7 @@ void NcRender::handleMouseButtonEvent(int button, int action, int mods)
       if ((*it)->view == m_current_view) {
         if ((*it)->visible == true && (*it)->mouse_over == true) {
           if ((*it)->mouse_callback != NULL) {
-            MouseButtonEvent btn_event(button, 1 << action, mods);
+            MouseButtonEvent btn_event(button, action, mods);
             (*it)->mouse_callback(it->get(), btn_event);
             ignore_next_mouse_events = true;
           }
@@ -497,28 +497,6 @@ void NcRender::close()
   glfwTerminate();
   free(m_gui_ini_filename);
   free(m_gui_log_filename);
-}
-
-uint32_t operator&(NcRender::ActionFlags a, NcRender::ActionFlagBits b)
-{
-  return static_cast<uint32_t>(a) & (+b);
-}
-
-NcRender::ActionFlags operator&(NcRender::ActionFlagBits a,
-                                NcRender::ActionFlagBits b)
-{
-  return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
-}
-
-NcRender::ActionFlags operator|(NcRender::ActionFlagBits a,
-                                NcRender::ActionFlagBits b)
-{
-  return static_cast<uint32_t>(a) | static_cast<uint32_t>(b);
-}
-
-NcRender::ActionFlags operator+(NcRender::ActionFlagBits a)
-{
-  return static_cast<NcRender::ActionFlags>(a);
 }
 
 void NcRender::setupFonts()
