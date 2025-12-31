@@ -641,12 +641,9 @@ bool NcHmi::updateTimer()
       m_dro.x.absolute_readout->m_textval = to_fixed_string(fabs(mcx), 4);
       m_dro.y.absolute_readout->m_textval = to_fixed_string(fabs(mcy), 4);
       m_dro.z.absolute_readout->m_textval = to_fixed_string(fabs(mcz), 4);
-      m_dro.feed->m_textval =
-        "FEED: " + to_fixed_string(dro_data.feed, 1);
+      m_dro.feed->m_textval = "FEED: " + to_fixed_string(dro_data.feed, 1);
       m_dro.arc_readout->m_textval =
-        "ARC: " +
-        to_fixed_string(dro_data.voltage, 1) +
-        "V";
+        "ARC: " + to_fixed_string(dro_data.voltage, 1) + "V";
       m_dro.arc_set->m_textval =
         "SET: " +
         to_fixed_string(control_view.m_machine_parameters.thc_set_value, 1);
@@ -940,7 +937,7 @@ void NcHmi::upKeyCallback(const KeyEvent& e)
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y positive %s", dist.c_str());
-          control_view.m_motion_controller->pushGCode("G91 Y" + dist);
+          control_view.m_motion_controller->pushGCode("G91 Y-" + dist);
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
         }
@@ -980,7 +977,7 @@ void NcHmi::downKeyCallback(const KeyEvent& e)
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging Y negative %s!", dist.c_str());
-          control_view.m_motion_controller->pushGCode("G91 Y-" + dist);
+          control_view.m_motion_controller->pushGCode("G91 Y" + dist);
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
         }
@@ -1017,7 +1014,7 @@ void NcHmi::rightKeyCallback(const KeyEvent& e)
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X positive %s!", dist.c_str());
-          control_view.m_motion_controller->pushGCode("G91 X" + dist);
+          control_view.m_motion_controller->pushGCode("G91 X-" + dist);
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
         }
@@ -1056,7 +1053,7 @@ void NcHmi::leftKeyCallback(const KeyEvent& e)
           std::string dist =
             std::to_string(control_view.m_machine_parameters.precise_jog_units);
           LOG_F(INFO, "Jogging X negative %s!", dist.c_str());
-          control_view.m_motion_controller->pushGCode("G91 X-" + dist);
+          control_view.m_motion_controller->pushGCode("G91 X" + dist);
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
         }
