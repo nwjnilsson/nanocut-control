@@ -642,12 +642,10 @@ bool NcHmi::updateTimer()
       m_dro.y.absolute_readout->m_textval = to_fixed_string(fabs(mcy), 4);
       m_dro.z.absolute_readout->m_textval = to_fixed_string(fabs(mcz), 4);
       m_dro.feed->m_textval =
-        "FEED: " + to_fixed_string(static_cast<float>(dro_data.feed), 1);
+        "FEED: " + to_fixed_string(dro_data.feed, 1);
       m_dro.arc_readout->m_textval =
         "ARC: " +
-        to_fixed_string(dro_data.voltage *
-                          control_view.m_machine_parameters.arc_voltage_divider,
-                        1) +
+        to_fixed_string(dro_data.voltage, 1) +
         "V";
       m_dro.arc_set->m_textval =
         "SET: " +

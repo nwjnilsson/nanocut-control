@@ -32,8 +32,8 @@ struct DROData {
   MachineStatus  status{ MachineStatus::Unknown };
   MCSCoordinates mcs;
   MCSCoordinates wcs;
-  int            feed{ 0 };
-  int            voltage{ 0 };
+  float          feed{ 0 };
+  float          voltage{ 0 };
   bool           in_motion{ false };
   // arc_ok just reflects the pin value on the MCU currently and the assumption
   // is made that arc_ok == false when we do have arc ok. TODO: fix?

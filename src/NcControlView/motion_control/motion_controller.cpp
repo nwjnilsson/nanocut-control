@@ -299,11 +299,13 @@ void MotionController::lineHandler(std::string line)
           m_dro_data.wcs.x = j.at("WCS").at("x").get<float>();
           m_dro_data.wcs.y = j.at("WCS").at("y").get<float>();
           m_dro_data.wcs.z = j.at("WCS").at("z").get<float>();
-          m_dro_data.feed = j.at("FEED").get<int>();
-          m_dro_data.voltage = j.at("V").get<int>();
+          m_dro_data.feed = j.at("FEED").get<float>();
+          m_dro_data.voltage = j.at("V").get<float>();
           m_dro_data.in_motion = j.at("IN_MOTION").get<bool>();
           m_dro_data.arc_ok = j.at("ARC_OK").get<bool>();
           m_dro_data.torch_on = m_torch_on;
+
+          //LOG_F(INFO, "ARC VOLTAGE = %f", m_dro_data.voltage);
 
           if (m_dro_data.arc_ok == false) {
             if (m_arc_okay_callback) {
