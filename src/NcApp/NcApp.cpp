@@ -260,6 +260,12 @@ void NcApp::keyCallback(
     app->setModifierPressed(GLFW_MOD_SUPER, action != GLFW_RELEASE);
   }
 
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureKeyboard) {
+    // Let ImGui handle the rest of this event
+    return;
+  }
+
   // Check for global shortcuts first
   if (app->handleGlobalKeyEvent(key, action, mods)) {
     return; // Global shortcut handled, don't propagate further
