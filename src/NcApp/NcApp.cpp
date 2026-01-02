@@ -300,9 +300,15 @@ void NcApp::mouseButtonCallback(GLFWwindow* window,
     app->m_input_state->setMouseButtonPressed(button, false);
   }
 
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureMouse) {
+    // Let ImGui handle the rest of this event
+    return;
+  }
+
   // Check for global mouse shortcuts first
   if (app->handleGlobalMouseEvent(button, action, mods)) {
-    return; // Global mouse event handled, don't propagate further
+    return;
   }
 
   // Delegate to current active view if available
@@ -322,6 +328,12 @@ void NcApp::scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
   NcApp* app = reinterpret_cast<NcApp*>(glfwGetWindowUserPointer(window));
   if (!app)
     return;
+
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureMouse) {
+    // Let ImGui handle the rest of this event
+    return;
+  }
 
   // Delegate to current active view if available
   if (app->m_current_active_view) {
