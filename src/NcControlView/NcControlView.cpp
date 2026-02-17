@@ -1,14 +1,14 @@
 #include "NcControlView.h"
-#include "../NcApp/NcApp.h"
 #include "../Input/InputState.h"
+#include "../NcApp/NcApp.h"
 #include "NcCamView/NcCamView.h"
 #include "gcode/gcode.h"
 #include "hmi/hmi.h"
-#include <NcRender/NcRender.h>
 #include <ImGuiFileDialog.h>
+#include <NcRender/NcRender.h>
+#include <fstream>
 #include <imgui.h>
 #include <loguru.hpp>
-#include <fstream>
 
 void NcControlView::preInit()
 {
@@ -295,6 +295,7 @@ void NcControlView::handleKeyEvent(const KeyEvent& e, const InputState& input)
   // Handle TAB key to switch to NcCamView
   if (e.key == GLFW_KEY_TAB && e.action == GLFW_PRESS) {
     m_app->getCamView().makeActive();
+    return;
   }
 
   // Delegate all key events to HMI

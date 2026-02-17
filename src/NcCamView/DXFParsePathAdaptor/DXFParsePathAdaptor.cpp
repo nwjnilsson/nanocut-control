@@ -1,6 +1,8 @@
 #include "DXFParsePathAdaptor.h"
-#include "NcCamView/NcCamView.h"
 #include "NanoCut.h"
+#include "NcCamView/NcCamView.h"
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <loguru.hpp>
 
@@ -413,7 +415,6 @@ DXFParsePathAdaptor::DXFParsePathAdaptor(
              mouse_callback,
   NcCamView* cam_view)
 {
-  m_current_layer = "default";
   m_filename = "";
   m_nc_render_instance = nc_render_instance;
   m_view_callback = view_callback;
@@ -1149,13 +1150,117 @@ void DXFParsePathAdaptor::explodeArcToLines(double cx,
   }
 }
 
+void DXFParsePathAdaptor::explodeEllipseToLines(double cx,
+                                                double cy,
+                                                double mx,
+                                                double my,
+                                                double ratio,
+                                                double start_angle,
+                                                double end_angle,
+                                                int    num_segments)
+{
+  std::vector<Point2d> pointList;
+
+  // Calculate major and minor axis lengths
+  double major_axis = sqrt(mx * mx + my * my);
+  double minor_axis = major_axis * ratio;
+
+  // Calculate rotation angle of the ellipse (angle of major axis)
+  double rotation = atan2(my, mx);
+
+  // Handle angle wrapping for partial ellipses
+  // DXF ellipse angles are already in radians
+  double angle_span = end_angle - start_angle;
+  if (angle_span < 0.0)
+    angle_span += 2.0 * M_PI;
+
+  double angle_increment = angle_span / num_segments;
+
+  // Generate points using parametric ellipse equations
+  for (int i = 0; i <= num_segments; i++) {
+    double t = start_angle + i * angle_increment;
+
+    // Parametric point on ellipse (before rotation)
+    double x_local = major_axis * cos(t);
+    double y_local = minor_axis * sin(t);
+
+    // Rotate and translate to world coordinates
+    Point2d pt;
+    pt.x = cx + x_local * cos(rotation) - y_local * sin(rotation);
+    pt.y = cy + x_local * sin(rotation) + y_local * cos(rotation);
+
+    pointList.push_back(pt);
+  }
+
+  // Convert to line segments
+  for (size_t i = 1; i < pointList.size(); i++) {
+    addLine(DL_LineData((double) pointList[i - 1].x,
+                        (double) pointList[i - 1].y,
+                        0,
+                        (double) pointList[i].x,
+                        (double) pointList[i].y,
+                        0));
+  }
+}
+
 // ============================================================================
 // DXF Entity Handlers
 // ============================================================================
 
+bool DXFParsePathAdaptor::shouldSkipCurrentEntity()
+{
+  // Get current entity attributes (includes layer and linetype)
+  DL_Attributes attribs = getAttributes();
+
+  // Get layer name (before lowercase transform for flag lookup)
+  std::string layer_name = attribs.getLayer();
+
+  // Check layer flags (frozen, off, etc.)
+  auto it = m_layer_props.find(layer_name);
+  if (it != m_layer_props.end()) {
+    int flags = it->second.flags;
+    if (flags & 0x01) { // Check if frozen
+      return true;
+    }
+  }
+
+  // Skip construction layer entities
+  std::string layer_name_lower = layer_name;
+  std::transform(layer_name_lower.begin(),
+                 layer_name_lower.end(),
+                 layer_name_lower.begin(),
+                 ::tolower);
+  if (layer_name_lower.find("constr") != std::string::npos) {
+    return true;
+  }
+
+  std::string linetype = attribs.getLinetype();
+
+  // Convert linetype to uppercase for case-insensitive comparison
+  std::string linetype_upper = linetype;
+  std::transform(linetype_upper.begin(),
+                 linetype_upper.end(),
+                 linetype_upper.begin(),
+                 ::toupper);
+
+  // For cutting applications, only process continuous lines
+  // Accept CONTINUOUS and BYLAYER (which inherits from layer definition)
+  // Skip everything else (DASHED, DOTTED, etc.)
+  bool is_continuous =
+    (linetype_upper == "CONTINUOUS" || linetype_upper == "BYLAYER");
+
+  return !is_continuous;
+}
+
 void DXFParsePathAdaptor::addLayer(const DL_LayerData& data)
 {
-  m_current_layer = data.name;
+  LOG_F(INFO,
+        "(DXFParsePathAdaptor::addLayer) Layer: %s (flags=%d)",
+        data.name.c_str(),
+        data.flags);
+
+  // Store layer flags for later lookup
+  m_layer_props[data.name] = { .flags = data.flags, .visible = true };
 }
 
 void DXFParsePathAdaptor::addPoint(const DL_PointData& data)
@@ -1168,6 +1273,11 @@ void DXFParsePathAdaptor::addPoint(const DL_PointData& data)
 
 void DXFParsePathAdaptor::addLine(const DL_LineData& data)
 {
+  DL_Attributes attribs = getAttributes();
+  if (shouldSkipCurrentEntity()) {
+    return;
+  }
+
   double_line_t l;
   l.start.x = data.x1;
   l.start.y = data.y1;
@@ -1189,45 +1299,75 @@ void DXFParsePathAdaptor::addXLine(const DL_XLineData& data)
 
 void DXFParsePathAdaptor::addArc(const DL_ArcData& data)
 {
+  if (shouldSkipCurrentEntity()) {
+    return;
+  }
+
   explodeArcToLines(
     data.cx, data.cy, data.radius, data.angle1, data.angle2, 100);
 }
 
 void DXFParsePathAdaptor::addCircle(const DL_CircleData& data)
 {
+  DL_Attributes attribs = getAttributes();
+  if (shouldSkipCurrentEntity()) {
+    return;
+  }
+
   explodeArcToLines(data.cx, data.cy, data.radius, 0, 180, 100);
   explodeArcToLines(data.cx, data.cy, data.radius, 180, 360, 100);
 }
 
 void DXFParsePathAdaptor::addEllipse(const DL_EllipseData& data)
 {
-  LOG_F(INFO,
-        "(DXFParsePathAdaptor::addEllipse) Ellipse at (%.2f, %.2f) - "
-        "approximating as circle",
-        data.cx,
-        data.cy);
-  // Approximate ellipse as a circle with radius = major axis length
-  double r = sqrt(data.mx * data.mx + data.my * data.my);
-  addCircle(DL_CircleData(data.cx, data.cy, 0, r));
+  if (shouldSkipCurrentEntity()) {
+    return;
+  }
+
+  // Use proper ellipse rendering with major axis, minor axis ratio, and
+  // rotation
+  explodeEllipseToLines(data.cx,
+                        data.cy,
+                        data.mx,
+                        data.my,
+                        data.ratio,
+                        data.angle1,
+                        data.angle2,
+                        100);
 }
 
 void DXFParsePathAdaptor::addPolyline(const DL_PolylineData& data)
 {
+  // Finalize any previous polyline first (only if not skipped)
+  if (m_current_polyline.points.size() > 0 && !m_skip_current_polyline) {
+    m_polylines.push_back(m_current_polyline);
+  }
+  m_current_polyline.points.clear();
+  m_current_polyline.is_closed = false;
+
+  // Check if we should skip this polyline
+  if (shouldSkipCurrentEntity()) {
+    m_skip_current_polyline = true;
+    return;
+  }
+
+  m_skip_current_polyline = false;
+
   if ((data.flags & (1 << 0))) {
     m_current_polyline.is_closed = true;
   }
   else {
     m_current_polyline.is_closed = false;
   }
-
-  if (m_current_polyline.points.size() > 0) {
-    m_polylines.push_back(m_current_polyline);
-    m_current_polyline.points.clear();
-  }
 }
 
 void DXFParsePathAdaptor::addVertex(const DL_VertexData& data)
 {
+  // Skip vertices if the current polyline is being skipped
+  if (m_skip_current_polyline) {
+    return;
+  }
+
   polyline_vertex_t vertex;
   vertex.point.x = data.x;
   vertex.point.y = data.y;
@@ -1237,12 +1377,21 @@ void DXFParsePathAdaptor::addVertex(const DL_VertexData& data)
 
 void DXFParsePathAdaptor::addSpline(const DL_SplineData& data)
 {
-  // Start a new spline
-  if (m_current_spline.control_points.size() > 0 ||
-      m_current_spline.fit_points.size() > 0) {
+  // Finalize any previous spline first (only if not skipped)
+  if ((m_current_spline.control_points.size() > 0 ||
+       m_current_spline.fit_points.size() > 0) &&
+      !m_skip_current_spline) {
     m_splines.push_back(m_current_spline);
-    m_current_spline = spline_t();
   }
+  m_current_spline = spline_t();
+
+  // Check if we should skip this spline
+  if (shouldSkipCurrentEntity()) {
+    m_skip_current_spline = true;
+    return;
+  }
+
+  m_skip_current_spline = false;
 
   // Set spline properties
   m_current_spline.degree = data.degree;
@@ -1260,6 +1409,11 @@ void DXFParsePathAdaptor::addSpline(const DL_SplineData& data)
 
 void DXFParsePathAdaptor::addControlPoint(const DL_ControlPointData& data)
 {
+  // Skip control points if the current spline is being skipped
+  if (m_skip_current_spline) {
+    return;
+  }
+
   Point2d p;
   p.x = data.x;
   p.y = data.y;
@@ -1276,6 +1430,11 @@ void DXFParsePathAdaptor::addControlPoint(const DL_ControlPointData& data)
 
 void DXFParsePathAdaptor::addFitPoint(const DL_FitPointData& data)
 {
+  // Skip fit points if the current spline is being skipped
+  if (m_skip_current_spline) {
+    return;
+  }
+
   Point2d p;
   p.x = data.x;
   p.y = data.y;
@@ -1291,6 +1450,11 @@ void DXFParsePathAdaptor::addFitPoint(const DL_FitPointData& data)
 
 void DXFParsePathAdaptor::addKnot(const DL_KnotData& data)
 {
+  // Skip knots if the current spline is being skipped
+  if (m_skip_current_spline) {
+    return;
+  }
+
   m_current_spline.knots.push_back(data.k);
   m_current_spline.has_knots = true;
 

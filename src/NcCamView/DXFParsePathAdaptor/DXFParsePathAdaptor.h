@@ -69,10 +69,11 @@ struct spline_t {
 class DXFParsePathAdaptor : public DL_CreationAdapter {
 public:
   DXFParsePathAdaptor(
-    NcRender*                                                     nc_render_instance,
-    std::function<void(Primitive*)>                               view_callback,
-    std::function<void(Primitive*, const Primitive::MouseEventData&)> mouse_callback,
-    NcCamView*                                                    cam_view);
+    NcRender*                       nc_render_instance,
+    std::function<void(Primitive*)> view_callback,
+    std::function<void(Primitive*, const Primitive::MouseEventData&)>
+               mouse_callback,
+    NcCamView* cam_view);
 
   enum class Units : int {
     None = 0,
@@ -80,6 +81,12 @@ public:
     Millimeter = 4,
     Centimeter = 5,
     Meter = 6,
+  };
+
+  struct LayerProps {
+    int flags;
+    // TODO: disabling layers (this might not be the right place for this)
+    bool visible;
   };
 
   virtual void addLayer(const DL_LayerData& data);
@@ -100,10 +107,11 @@ public:
   virtual void addKnot(const DL_KnotData& data);
   virtual void setVariableInt(const std::string&, int, int);
 
-  NcRender*                                                     m_nc_render_instance;
-  std::function<void(Primitive*)>                               m_view_callback;
-  std::function<void(Primitive*, const Primitive::MouseEventData&)> m_mouse_callback;
-  NcCamView*                                                    m_cam_view;
+  NcRender*                       m_nc_render_instance;
+  std::function<void(Primitive*)> m_view_callback;
+  std::function<void(Primitive*, const Primitive::MouseEventData&)>
+             m_mouse_callback;
+  NcCamView* m_cam_view;
 
   void printAttributes();
   void setFilename(std::string f);
@@ -127,14 +135,29 @@ public:
                          double start_angle,
                          double end_angle,
                          double num_segments);
+  void explodeEllipseToLines(double cx,
+                             double cy,
+                             double mx,
+                             double my,
+                             double ratio,
+                             double start_angle,
+                             double end_angle,
+                             int    num_segments);
 
 private:
   void getBoundingBox(const std::vector<std::vector<Point2d>>& path_stack,
                       Point2d&                                 bbox_min,
                       Point2d&                                 bbox_max);
 
+  /**
+   * Check if current entity should be skipped based on:
+   * 1. Layer name (skip "Construction" layer)
+   * 2. Linetype (skip non-continuous lines like DASHED, DOTTED, etc.)
+   * For a cutting application, only continuous lines should be processed.
+   */
+  bool shouldSkipCurrentEntity();
+
 public:
-  std::string m_current_layer;
   std::string m_filename;
   float       m_smoothing;
   double      m_import_scale;
@@ -146,9 +169,13 @@ public:
 
   std::vector<polyline_t> m_polylines;
   polyline_t              m_current_polyline;
+  bool                    m_skip_current_polyline = false;
 
   std::vector<spline_t> m_splines;
   spline_t              m_current_spline;
+  bool                  m_skip_current_spline = false;
+
+  std::unordered_map<std::string, LayerProps> m_layer_props;
 };
 
 #endif

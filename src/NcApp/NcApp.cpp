@@ -261,8 +261,13 @@ void NcApp::keyCallback(
   }
 
   ImGuiIO& io = ImGui::GetIO();
-  if (io.WantCaptureKeyboard) {
+  if (io.WantCaptureKeyboard and io.WantCaptureMouse) {
     // Let ImGui handle the rest of this event
+    // Maybe not ideal to require both but otherwise control->CAM via TAB
+    // did not work. Opening the settings editor is the most sketchy part
+    // about this since un-focusing the parameters and hitting arrow keys
+    // can jog the machine. FIXME: full-screen the parameters or disable
+    // motion when UI elements are showing
     return;
   }
 
