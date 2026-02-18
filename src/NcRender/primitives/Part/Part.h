@@ -5,6 +5,7 @@
 #include "../Primitive.h"
 #include <NanoCut.h>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Part : public Primitive {
@@ -12,12 +13,16 @@ public:
   struct path_t {
     std::vector<Point2d> points;
     std::vector<Point2d> built_points;
-    std::string          layer;
-    double               toolpath_offset;
-    bool                 toolpath_visible;
     bool                 is_closed;
     bool                 is_inside_contour;
     Color4f              color;
+  };
+
+  struct Layer {
+    std::vector<path_t> paths;
+    double              toolpath_offset = 0.0;
+    bool                toolpath_visible = false;
+    bool                visible = true;
   };
   struct part_control_data_t {
     Point2d offset;
@@ -38,20 +43,20 @@ public:
     }
   };
 
-  std::vector<path_t>               m_paths;
-  std::vector<std::vector<Point2d>> m_tool_paths;
-  float                             m_width = 1.0f;
-  std::string                       m_style = "solid"; // solid, dashed
-  std::string                       m_part_name;
-  part_control_data_t               m_control;
-  part_control_data_t               m_last_control;
-  bool                              m_is_part_selected = false;
-  Point2d                           m_bb_min{ 0.0, 0.0 };
-  Point2d                           m_bb_max{ 0.0, 0.0 };
-  size_t                            m_number_of_verticies = 0;
+  std::unordered_map<std::string, Layer> m_layers;
+  std::vector<std::vector<Point2d>>      m_tool_paths;
+  float                                  m_width = 1.0f;
+  std::string                            m_style = "solid"; // solid, dashed
+  std::string                            m_part_name;
+  part_control_data_t                    m_control;
+  part_control_data_t                    m_last_control;
+  bool                                   m_is_part_selected = false;
+  Point2d                                m_bb_min{ 0.0, 0.0 };
+  Point2d                                m_bb_max{ 0.0, 0.0 };
+  size_t                                 m_number_of_verticies = 0;
 
-  Part(std::string name, std::vector<path_t> p)
-    : m_paths(std::move(p)), m_part_name(std::move(name))
+  Part(std::string_view name, std::unordered_map<std::string, Layer>&& layers)
+    : m_layers(std::move(layers)), m_part_name(name)
   {
     m_control.lead_in_length = 0;
     m_control.lead_out_length = 0;

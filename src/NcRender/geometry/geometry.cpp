@@ -265,6 +265,34 @@ Extents getExtents(const std::vector<GeometryPrimitive>& geometry_stack)
   return extents;
 }
 
+Extents calculateBoundingBox(const Path& path)
+{
+  Extents bbox;
+  if (path.empty()) {
+    bbox.min = {0.0, 0.0};
+    bbox.max = {0.0, 0.0};
+    return bbox;
+  }
+
+  bbox.min = path[0];
+  bbox.max = path[0];
+
+  for (const auto& pt : path) {
+    bbox.min.x = std::min(bbox.min.x, pt.x);
+    bbox.min.y = std::min(bbox.min.y, pt.y);
+    bbox.max.x = std::max(bbox.max.x, pt.x);
+    bbox.max.y = std::max(bbox.max.y, pt.y);
+  }
+
+  return bbox;
+}
+
+bool extentsContain(const Extents& outer, const Extents& inner)
+{
+  return inner.min.x >= outer.min.x && inner.max.x <= outer.max.x &&
+         inner.min.y >= outer.min.y && inner.max.y <= outer.max.y;
+}
+
 /**********************
  * PATH OPERATIONS
  **********************/

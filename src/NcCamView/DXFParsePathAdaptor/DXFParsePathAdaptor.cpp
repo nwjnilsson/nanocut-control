@@ -465,23 +465,26 @@ void DXFParsePathAdaptor::getApproxBoundingBox(Point2d& bbox_min,
     vertex_count++;
   };
 
-  for (const auto& line : m_line_stack) {
-    visit(line.start);
-    visit(line.end);
-  }
-
-  for (const auto& polyline : m_polylines) {
-    for (const auto& vertex : polyline.points) {
-      visit(vertex.point);
+  // Visit all geometry across all layers
+  for (const auto& [layer_name, layer_data] : m_layers) {
+    for (const auto& line : layer_data.lines) {
+      visit(line.start);
+      visit(line.end);
     }
-  }
 
-  for (const auto& spline : m_splines) {
-    for (const auto& point : spline.control_points) {
-      visit(point);
+    for (const auto& polyline : layer_data.polylines) {
+      for (const auto& vertex : polyline.points) {
+        visit(vertex.point);
+      }
     }
-    for (const auto& point : spline.fit_points) {
-      visit(point);
+
+    for (const auto& spline : layer_data.splines) {
+      for (const auto& point : spline.control_points) {
+        visit(point);
+      }
+      for (const auto& point : spline.fit_points) {
+        visit(point);
+      }
     }
   }
 }
@@ -509,29 +512,17 @@ void DXFParsePathAdaptor::getBoundingBox(
 bool DXFParsePathAdaptor::checkIfPointIsInsidePath(std::vector<Point2d> path,
                                                    Point2d              point)
 {
-  size_t polyCorners = path.size();
-  size_t j = polyCorners - 1;
-  bool   oddNodes = false;
-
-  for (size_t i = 0; i < polyCorners; i++) {
-    if (((path[i].y < point.y && path[j].y >= point.y) ||
-         (path[j].y < point.y && path[i].y >= point.y)) &&
-        (path[i].x <= point.x || path[j].x <= point.x)) {
-      oddNodes ^= (path[i].x + (point.y - path[i].y) / (path[j].y - path[i].y) *
-                                 (path[j].x - path[i].x) <
-                   point.x);
-    }
-    j = i;
-  }
-  return oddNodes;
+  // Delegate to geo namespace
+  return geo::pointIsInsidePolygon(path, point);
 }
 
 bool DXFParsePathAdaptor::checkIfPathIsInsidePath(std::vector<Point2d> path1,
                                                   std::vector<Point2d> path2)
 {
-  for (std::vector<Point2d>::iterator it = path1.begin(); it != path1.end();
-       ++it) {
-    if (checkIfPointIsInsidePath(path2, (*it))) {
+  // Check if ANY point of path1 is inside path2 (partial containment)
+  // Note: For full containment, use geo::polygonIsInsidePolygon
+  for (const auto& pt : path1) {
+    if (geo::pointIsInsidePolygon(path2, pt)) {
       return true;
     }
   }
@@ -547,8 +538,8 @@ struct PointHash {
 };
 
 std::vector<std::vector<Point2d>>
-DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
-                              double                     tolerance)
+DXFParsePathAdaptor::chainify(const std::vector<DxfLine>& haystack,
+                              double                      tolerance)
 {
   if (haystack.empty()) {
     return {};
@@ -702,7 +693,7 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
     std::vector<Point2d> chain;
     Point2d              point;
 
-    double_line_t first = haystack[start_idx];
+    const DxfLine& first = haystack[start_idx];
 
     // Check if end is shared BEFORE marking this line as used
     if (is_point_shared(first.end, start_idx)) {
@@ -771,30 +762,39 @@ DXFParsePathAdaptor::chainify(std::vector<double_line_t> haystack,
 void DXFParsePathAdaptor::scaleAllPoints(double scale)
 {
   LOG_F(INFO, "Scaling input by %.4f", scale);
-  for (auto& pl : m_polylines) {
-    for (auto& v : pl.points) {
-      v.point.x *= scale;
-      v.point.y *= scale;
-      // Note: bulge is a dimensionless ratio (tan(angle/4)), not scaled
+
+  // Scale all geometry in all layers
+  for (auto& [layer_name, layer_data] : m_layers) {
+    // Scale lines
+    for (auto& line : layer_data.lines) {
+      line.start.x *= scale;
+      line.start.y *= scale;
+      line.end.x *= scale;
+      line.end.y *= scale;
     }
-  }
-  for (auto& s : m_splines) {
-    for (auto& p : s.control_points) {
-      p.x *= scale;
-      p.y *= scale;
+
+    // Scale polylines
+    for (auto& polyline : layer_data.polylines) {
+      for (auto& vertex : polyline.points) {
+        vertex.point.x *= scale;
+        vertex.point.y *= scale;
+        // Note: bulge is a dimensionless ratio (tan(angle/4)), not scaled
+      }
     }
-    for (auto& p : s.fit_points) {
-      p.x *= scale;
-      p.y *= scale;
+
+    // Scale splines
+    for (auto& spline : layer_data.splines) {
+      for (auto& p : spline.control_points) {
+        p.x *= scale;
+        p.y *= scale;
+      }
+      for (auto& p : spline.fit_points) {
+        p.x *= scale;
+        p.y *= scale;
+      }
+      // Note: knots are parameter values, not spatial coordinates - don't scale
+      // them
     }
-    // Note: knots are parameter values, not spatial coordinates - don't scale
-    // them
-  }
-  for (auto& l : m_line_stack) {
-    l.start.x *= scale;
-    l.start.y *= scale;
-    l.end.x *= scale;
-    l.end.y *= scale;
   }
 }
 
@@ -802,16 +802,17 @@ void DXFParsePathAdaptor::finish()
 {
 
   // Finalize any pending polyline
-  if (m_current_polyline.points.size() > 0) {
-    m_polylines.push_back(m_current_polyline);
+  if (m_current_polyline.points.size() > 0 && !m_skip_current_polyline) {
+    m_layers[m_current_entity_layer].polylines.push_back(m_current_polyline);
     m_current_polyline.points.clear();
   }
 
   // Finalize any pending spline
-  if (m_current_spline.control_points.size() > 0 ||
-      m_current_spline.fit_points.size() > 0) {
-    m_splines.push_back(m_current_spline);
-    m_current_spline = spline_t();
+  if ((m_current_spline.control_points.size() > 0 ||
+       m_current_spline.fit_points.size() > 0) &&
+      !m_skip_current_spline) {
+    m_layers[m_current_entity_layer].splines.push_back(m_current_spline);
+    m_current_spline = DxfSpline();
   }
 
   double scale = m_import_scale;
@@ -833,227 +834,284 @@ void DXFParsePathAdaptor::finish()
   }
   scaleAllPoints(scale);
 
-  LOG_F(INFO,
-        "(DXFParsePathAdaptor::Finish) Processing %lu splines",
-        m_splines.size());
+  // Process each layer's geometry independently
+  for (auto& [layer_name, layer_data] : m_layers) {
+    LOG_F(INFO,
+          "(DXFParsePathAdaptor::Finish) Processing layer '%s': %lu splines, "
+          "%lu polylines",
+          layer_name.c_str(),
+          layer_data.splines.size(),
+          layer_data.polylines.size());
 
-  // Process m_splines with proper NURBS/fit point handling
-  for (size_t x = 0; x < m_splines.size(); x++) {
-    std::vector<Point2d> sampled_points;
-    // ImGui::ProgressBar(x / (double) m_splines.size());
+    // Process splines: convert to line segments and add to this layer's lines
+    for (const auto& spline : layer_data.splines) {
+      std::vector<Point2d> sampled_points;
 
-    // Prioritize fit points if available
-    if (m_splines[x].has_fit_points && m_splines[x].fit_points.size() > 0) {
-      // LOG_F(INFO, "Spline %lu: Using %lu fit points", x,
-      // m_splines[x].fit_points.size());
-
-      FitPointSpline fit_spline;
-      for (const auto& pt : m_splines[x].fit_points) {
-        fit_spline.addFitPoint(pt);
+      // Prioritize fit points if available
+      if (spline.has_fit_points && spline.fit_points.size() > 0) {
+        FitPointSpline fit_spline;
+        for (const auto& pt : spline.fit_points) {
+          fit_spline.addFitPoint(pt);
+        }
+        sampled_points =
+          fit_spline.interpolateAdaptive(SCALE(0.75), m_import_quality);
       }
-      sampled_points =
-        fit_spline.interpolateAdaptive(SCALE(0.75), m_import_quality);
-    }
-    // Use NURBS with control points
-    else if (m_splines[x].control_points.size() > 0) {
-      // LOG_F(INFO, "Spline %lu: Using %lu control points, %lu knots,
-      // degree=%d",
-      //       x, m_splines[x].control_points.size(), m_splines[x].knots.size(),
-      //       m_splines[x].degree);
+      // Use NURBS with control points
+      else if (spline.control_points.size() > 0) {
+        NURBSCurve nurbs;
+        nurbs.setDegree(spline.degree);
+        nurbs.setClosed(spline.is_closed);
 
-      NURBSCurve nurbs;
-      nurbs.setDegree(m_splines[x].degree);
-      nurbs.setClosed(m_splines[x].is_closed);
+        // Add control points with weights
+        for (size_t i = 0; i < spline.control_points.size(); i++) {
+          double weight = (i < spline.weights.size()) ? spline.weights[i] : 1.0;
+          nurbs.addControlPoint(spline.control_points[i], weight);
+        }
 
-      // Add control points with weights
-      for (size_t i = 0; i < m_splines[x].control_points.size(); i++) {
-        double weight =
-          (i < m_splines[x].weights.size()) ? m_splines[x].weights[i] : 1.0;
-        nurbs.addControlPoint(m_splines[x].control_points[i], weight);
+        // Add knot vector if available
+        if (spline.has_knots && spline.knots.size() > 0) {
+          for (double knot : spline.knots) {
+            nurbs.addKnot(knot);
+          }
+        }
+        sampled_points = nurbs.sampleAdaptive(SCALE(0.75), m_import_quality);
       }
 
-      // Add knot vector if available
-      if (m_splines[x].has_knots && m_splines[x].knots.size() > 0) {
-        for (double knot : m_splines[x].knots) {
-          nurbs.addKnot(knot);
+      if (sampled_points.size() > 1) {
+        // Create line segments and add directly to this layer
+        for (size_t i = 1; i < sampled_points.size(); i++) {
+          DxfLine line;
+          line.start = sampled_points[i - 1];
+          line.end = sampled_points[i];
+          layer_data.lines.push_back(line);
+        }
+
+        // Close the spline if needed
+        if (spline.is_closed && sampled_points.size() > 2) {
+          DxfLine line;
+          line.start = sampled_points.back();
+          line.end = sampled_points.front();
+          layer_data.lines.push_back(line);
         }
       }
-      sampled_points = nurbs.sampleAdaptive(SCALE(0.75), m_import_quality);
     }
 
-    if (sampled_points.size() > 1) {
-      std::vector<Point2d> pointList;
-      for (const auto& pt : sampled_points) {
-        pointList.push_back(Point2d{ pt.x, pt.y });
+    // Process polylines: convert bulges to arcs/lines and add to this layer's
+    // lines
+    for (const auto& polyline : layer_data.polylines) {
+      for (size_t y = 0; y < polyline.points.size() - 1; y++) {
+        if (polyline.points[y].bulge != 0) {
+          // Handle bulge (arc segment)
+          Point2d bulgeStart = polyline.points[y].point;
+          Point2d bulgeEnd = polyline.points[y + 1].point;
+
+          Point2d midpoint = geo::midpoint(bulgeStart, bulgeEnd);
+          double  distance = geo::distance(bulgeStart, midpoint);
+          double  sagitta = polyline.points[y].bulge * distance;
+
+          geo::Line bulgeLine = geo::createPolarLine(
+            midpoint,
+            geo::measurePolarAngle(bulgeStart, bulgeEnd) + 270,
+            sagitta);
+          Point2d arc_center =
+            geo::threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
+
+          double arc_endAngle, arc_startAngle = 0;
+          if (sagitta > 0) {
+            arc_endAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
+            arc_startAngle = geo::measurePolarAngle(arc_center, bulgeStart);
+          }
+          else {
+            arc_endAngle = geo::measurePolarAngle(arc_center, bulgeStart);
+            arc_startAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
+          }
+
+          // Explode arc to lines and add directly to this layer
+          double               radius = geo::distance(arc_center, bulgeStart);
+          std::vector<Point2d> arc_points;
+          Point2d              start, end;
+
+          start.x =
+            arc_center.x + (radius * cosf(arc_startAngle * M_PI / 180.0f));
+          start.y =
+            arc_center.y + (radius * sinf(arc_startAngle * M_PI / 180.0f));
+          end.x = arc_center.x + (radius * cosf(arc_endAngle * M_PI / 180.0f));
+          end.y = arc_center.y + (radius * sinf(arc_endAngle * M_PI / 180.0f));
+
+          arc_points.push_back(start);
+
+          double angle_span = arc_endAngle - arc_startAngle;
+          if (angle_span < 0.0)
+            angle_span += 360.0;
+
+          int    num_segments = 100;
+          double angle_increment = angle_span / num_segments;
+          double angle_pointer = arc_startAngle + angle_increment;
+
+          for (int i = 0; i < num_segments - 1; i++) {
+            Point2d sweeper;
+            sweeper.x =
+              arc_center.x + (radius * cosf(angle_pointer * M_PI / 180.0f));
+            sweeper.y =
+              arc_center.y + (radius * sinf(angle_pointer * M_PI / 180.0f));
+            angle_pointer += angle_increment;
+            arc_points.push_back(sweeper);
+          }
+
+          arc_points.push_back(end);
+
+          for (size_t i = 1; i < arc_points.size(); i++) {
+            DxfLine line;
+            line.start = arc_points[i - 1];
+            line.end = arc_points[i];
+            layer_data.lines.push_back(line);
+          }
+        }
+        else {
+          // Regular line segment
+          DxfLine line;
+          line.start = polyline.points[y].point;
+          line.end = polyline.points[y + 1].point;
+          layer_data.lines.push_back(line);
+        }
       }
 
-      // Create line segments from simplified points
-      for (size_t i = 1; i < pointList.size(); i++) {
-        addLine(DL_LineData((double) pointList[i - 1].x,
-                            (double) pointList[i - 1].y,
-                            0,
-                            (double) pointList[i].x,
-                            (double) pointList[i].y,
-                            0));
+      // Check if polyline should be closed
+      int     shared = 0;
+      Point2d our_endpoint = polyline.points.back().point;
+      Point2d our_startpoint = polyline.points.front().point;
+
+      for (const auto& line : layer_data.lines) {
+        if (geo::distance(line.start, our_endpoint) < m_chain_tolerance) {
+          shared++;
+        }
+        if (geo::distance(line.start, our_startpoint) < m_chain_tolerance) {
+          shared++;
+        }
+        if (geo::distance(line.end, our_startpoint) < m_chain_tolerance) {
+          shared++;
+        }
+        if (geo::distance(line.end, our_endpoint) < m_chain_tolerance) {
+          shared++;
+        }
       }
 
-      // Close the spline if needed
-      if (m_splines[x].is_closed && pointList.size() > 2) {
-        addLine(DL_LineData((double) pointList.back().x,
-                            (double) pointList.back().y,
-                            0,
-                            (double) pointList[0].x,
-                            (double) pointList[0].y,
-                            0));
+      // Close polyline if appropriate
+      if (shared == 2) {
+        if (polyline.points.back().bulge == 0.0f) {
+          // Simple line closure
+          DxfLine line;
+          line.start = polyline.points.back().point;
+          line.end = polyline.points.front().point;
+          layer_data.lines.push_back(line);
+        }
+        else {
+          // Handle bulge on closing segment
+          Point2d bulgeStart = polyline.points.back().point;
+          Point2d bulgeEnd = polyline.points.front().point;
+
+          Point2d midpoint = geo::midpoint(bulgeStart, bulgeEnd);
+          double  distance = geo::distance(bulgeStart, midpoint);
+          double  sagitta = polyline.points.back().bulge * distance;
+
+          geo::Line bulgeLine = geo::createPolarLine(
+            midpoint,
+            geo::measurePolarAngle(bulgeStart, bulgeEnd) + 270,
+            sagitta);
+          Point2d arc_center =
+            geo::threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
+
+          double arc_endAngle, arc_startAngle = 0;
+          if (sagitta > 0) {
+            arc_endAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
+            arc_startAngle = geo::measurePolarAngle(arc_center, bulgeStart);
+          }
+          else {
+            arc_endAngle = geo::measurePolarAngle(arc_center, bulgeStart);
+            arc_startAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
+          }
+
+          // Explode arc to lines
+          double               radius = geo::distance(arc_center, bulgeStart);
+          std::vector<Point2d> arc_points;
+          Point2d              start, end;
+
+          start.x =
+            arc_center.x + (radius * cosf(arc_startAngle * M_PI / 180.0f));
+          start.y =
+            arc_center.y + (radius * sinf(arc_startAngle * M_PI / 180.0f));
+          end.x = arc_center.x + (radius * cosf(arc_endAngle * M_PI / 180.0f));
+          end.y = arc_center.y + (radius * sinf(arc_endAngle * M_PI / 180.0f));
+
+          arc_points.push_back(start);
+
+          double angle_span = arc_endAngle - arc_startAngle;
+          if (angle_span < 0.0)
+            angle_span += 360.0;
+
+          int    num_segments = 100;
+          double angle_increment = angle_span / num_segments;
+          double angle_pointer = arc_startAngle + angle_increment;
+
+          for (int i = 0; i < num_segments - 1; i++) {
+            Point2d sweeper;
+            sweeper.x =
+              arc_center.x + (radius * cosf(angle_pointer * M_PI / 180.0f));
+            sweeper.y =
+              arc_center.y + (radius * sinf(angle_pointer * M_PI / 180.0f));
+            angle_pointer += angle_increment;
+            arc_points.push_back(sweeper);
+          }
+
+          arc_points.push_back(end);
+
+          for (size_t i = 1; i < arc_points.size(); i++) {
+            DxfLine line;
+            line.start = arc_points[i - 1];
+            line.end = arc_points[i];
+            layer_data.lines.push_back(line);
+          }
+        }
       }
     }
   }
 
-  LOG_F(INFO,
-        "(DXFParsePathAdaptor::Finish) Processing %lu polylines",
-        m_polylines.size());
+  // Collect all chains from all layers to calculate global bounding box
+  std::vector<std::vector<Point2d>> all_chains;
+  std::vector<std::string> chain_layers; // Track which layer each chain belongs to
 
-  // Process m_polylines with bulge handling
-  for (int x = 0; x < m_polylines.size(); x++) {
-    for (int y = 0; y < m_polylines[x].points.size() - 1; y++) {
-      if (m_polylines[x].points[y].bulge != 0) {
-        // Handle bulge (arc segment)
-        Point2d bulgeStart;
-        bulgeStart.x = m_polylines[x].points[y].point.x;
-        bulgeStart.y = m_polylines[x].points[y].point.y;
+  for (const auto& [layer_name, layer_data] : m_layers) {
+    if (layer_data.lines.empty())
+      continue;
 
-        Point2d bulgeEnd;
-        bulgeEnd.x = m_polylines[x].points[y + 1].point.x;
-        bulgeEnd.y = m_polylines[x].points[y + 1].point.y;
+    LOG_F(INFO,
+          "(DXFParsePathAdaptor::Finish) Chaining layer '%s': %lu lines",
+          layer_name.c_str(),
+          layer_data.lines.size());
 
-        Point2d midpoint = geo::midpoint(bulgeStart, bulgeEnd);
-        double  distance = geo::distance(bulgeStart, midpoint);
-        double  sagitta = m_polylines[x].points[y].bulge * distance;
+    std::vector<std::vector<Point2d>> chains =
+      chainify(layer_data.lines, m_chain_tolerance);
 
-        geo::Line bulgeLine = geo::createPolarLine(
-          midpoint,
-          geo::measurePolarAngle(bulgeStart, bulgeEnd) + 270,
-          sagitta);
-        Point2d arc_center =
-          geo::threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
-
-        double arc_endAngle, arc_startAngle = 0;
-        if (sagitta > 0) {
-          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
-          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeStart);
-        }
-        else {
-          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeStart);
-          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
-        }
-
-        addArc(DL_ArcData((double) arc_center.x,
-                          (double) arc_center.y,
-                          0,
-                          geo::distance(arc_center, bulgeStart),
-                          arc_startAngle,
-                          arc_endAngle));
-      }
-      else {
-        // Regular line segment
-        addLine(DL_LineData((double) m_polylines[x].points[y].point.x,
-                            (double) m_polylines[x].points[y].point.y,
-                            0,
-                            (double) m_polylines[x].points[y + 1].point.x,
-                            (double) m_polylines[x].points[y + 1].point.y,
-                            0));
-      }
-    }
-
-    // Check if polyline should be closed
-    int     shared = 0;
-    Point2d our_endpoint = { m_polylines[x].points.back().point.x,
-                             m_polylines[x].points.back().point.y };
-    Point2d our_startpoint = { m_polylines[x].points.front().point.x,
-                               m_polylines[x].points.front().point.y };
-
-    for (std::vector<double_line_t>::iterator it = m_line_stack.begin();
-         it != m_line_stack.end();
-         ++it) {
-      if (geo::distance(it->start, our_endpoint) < m_chain_tolerance) {
-        shared++;
-      }
-      if (geo::distance(it->start, our_startpoint) < m_chain_tolerance) {
-        shared++;
-      }
-      if (geo::distance(it->end, our_startpoint) < m_chain_tolerance) {
-        shared++;
-      }
-      if (geo::distance(it->end, our_endpoint) < m_chain_tolerance) {
-        shared++;
-      }
-    }
-
-    // Close polyline if appropriate
-    if (shared == 2) {
-      if (m_polylines[x].points.back().bulge == 0.0f) {
-        addLine(DL_LineData((double) m_polylines[x].points.front().point.x,
-                            (double) m_polylines[x].points.front().point.y,
-                            0,
-                            (double) m_polylines[x].points.back().point.x,
-                            (double) m_polylines[x].points.back().point.y,
-                            0));
-      }
-      else {
-        // Handle bulge on closing segment
-        Point2d bulgeStart;
-        bulgeStart.x = m_polylines[x].points.back().point.x;
-        bulgeStart.y = m_polylines[x].points.back().point.y;
-
-        Point2d bulgeEnd;
-        bulgeEnd.x = m_polylines[x].points.front().point.x;
-        bulgeEnd.y = m_polylines[x].points.front().point.y;
-
-        Point2d midpoint = geo::midpoint(bulgeStart, bulgeEnd);
-        double  distance = geo::distance(bulgeStart, midpoint);
-        double  sagitta = m_polylines[x].points.back().bulge * distance;
-
-        geo::Line bulgeLine = geo::createPolarLine(
-          midpoint,
-          geo::measurePolarAngle(bulgeStart, bulgeEnd) + 270,
-          sagitta);
-        Point2d arc_center =
-          geo::threePointCircleCenter(bulgeStart, bulgeLine.end, bulgeEnd);
-
-        double arc_endAngle, arc_startAngle = 0;
-        if (sagitta > 0) {
-          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
-          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeStart);
-        }
-        else {
-          arc_endAngle = geo::measurePolarAngle(arc_center, bulgeStart);
-          arc_startAngle = geo::measurePolarAngle(arc_center, bulgeEnd);
-        }
-
-        addArc(DL_ArcData((double) arc_center.x,
-                          (double) arc_center.y,
-                          0,
-                          geo::distance(arc_center, bulgeStart),
-                          arc_startAngle,
-                          arc_endAngle));
-      }
+    // Add to combined list
+    for (const auto& chain : chains) {
+      all_chains.push_back(chain);
+      chain_layers.push_back(layer_name);
     }
   }
 
-  // Chain all lines into contours
-  std::vector<std::vector<Point2d>> chains =
-    chainify(m_line_stack, m_chain_tolerance);
+  // Calculate global bounding box
+  Point2d bb_min, bb_max;
+  getBoundingBox(all_chains, bb_min, bb_max);
 
-  std::vector<Part::path_t> paths;
-  Point2d                   bb_min, bb_max;
-  getBoundingBox(chains, bb_min, bb_max);
+  // Create layer-organized structure
+  std::unordered_map<std::string, Part::Layer> part_layers;
 
-  // Create paths from chains
-  for (size_t i = 0; i < chains.size(); i++) {
+  // Create paths from all chains, organized by layer
+  for (size_t i = 0; i < all_chains.size(); i++) {
     Part::path_t path;
     path.is_inside_contour = false;
 
-    if (geo::distance(chains[i].front(), chains[i].back()) >
+    if (geo::distance(all_chains[i].front(), all_chains[i].back()) >
         m_chain_tolerance) {
       path.is_closed = false;
     }
@@ -1063,38 +1121,81 @@ void DXFParsePathAdaptor::finish()
 
     path.color = getColor(m_cam_view->m_outside_contour_color);
 
-    for (size_t j = 0; j < chains[i].size(); j++) {
-      const double px = chains[i][j].x - bb_min.x;
-      const double py = chains[i][j].y - bb_min.y;
+    // Adjust coordinates relative to bounding box
+    for (size_t j = 0; j < all_chains[i].size(); j++) {
+      const double px = all_chains[i][j].x - bb_min.x;
+      const double py = all_chains[i][j].y - bb_min.y;
       path.points.push_back({ px, py });
     }
 
-    path.layer = "default";
-    path.toolpath_offset = 0.0f;
-    path.toolpath_visible = false;
-    paths.push_back(path);
+    // Add path to appropriate layer
+    const std::string& layer_name = chain_layers[i];
+    part_layers[layer_name].paths.push_back(path);
   }
 
-  // Determine inside/outside contours
-  for (size_t x = 0; x < paths.size(); x++) {
-    for (size_t i = 0; i < paths.size(); i++) {
-      if (i != x) {
-        if (checkIfPathIsInsidePath(paths[x].points, paths[i].points)) {
-          paths[x].is_inside_contour = true;
-          if (paths[x].is_closed == true) {
-            paths[x].color = getColor(m_cam_view->m_inside_contour_color);
-          }
-          else {
-            paths[x].color = getColor(m_cam_view->m_open_contour_color);
-          }
-          break;
+  // Determine inside/outside contours (check across ALL layers)
+  // Create temporary flat list for containment checking
+  struct PathRef {
+    std::string   layer_name;
+    size_t        path_index;
+    bool          is_closed;
+    geo::Extents  bbox;
+  };
+  std::vector<PathRef> path_refs;
+
+  for (auto& [layer_name, layer] : part_layers) {
+    for (size_t i = 0; i < layer.paths.size(); i++) {
+      PathRef ref;
+      ref.layer_name = layer_name;
+      ref.path_index = i;
+      ref.is_closed = layer.paths[i].is_closed;
+      ref.bbox = geo::calculateBoundingBox(layer.paths[i].points);
+
+      path_refs.push_back(ref);
+    }
+  }
+
+  for (size_t x = 0; x < path_refs.size(); x++) {
+    auto& path_x = part_layers[path_refs[x].layer_name].paths[path_refs[x].path_index];
+
+    for (size_t i = 0; i < path_refs.size(); i++) {
+      if (i == x) continue;
+
+      // Skip non-closed paths - they can't contain other paths
+      if (!path_refs[i].is_closed) continue;
+
+      // Bounding box pre-check: if path_x's bbox isn't inside path_i's bbox,
+      // skip expensive check
+      if (!geo::extentsContain(path_refs[i].bbox, path_refs[x].bbox)) {
+        continue;
+      }
+
+      auto& path_i = part_layers[path_refs[i].layer_name].paths[path_refs[i].path_index];
+
+      if (checkIfPathIsInsidePath(path_x.points, path_i.points)) {
+        path_x.is_inside_contour = true;
+        if (path_x.is_closed) {
+          path_x.color = getColor(m_cam_view->m_inside_contour_color);
+        } else {
+          path_x.color = getColor(m_cam_view->m_open_contour_color);
         }
+        break;
       }
     }
   }
 
-  // Create the final primitive
-  Part* p = m_nc_render_instance->pushPrimitive<Part>(m_filename, paths);
+  size_t total_paths = 0;
+  for (const auto& [layer_name, layer] : part_layers) {
+    total_paths += layer.paths.size();
+  }
+
+  LOG_F(INFO,
+        "(DXFParsePathAdaptor::Finish) Created %lu paths from %lu layers",
+        total_paths,
+        part_layers.size());
+
+  // Create the final primitive with layer-organized structure
+  Part* p = m_nc_render_instance->pushPrimitive<Part>(m_filename, std::move(part_layers));
   p->m_control.smoothing = m_smoothing;
   p->m_control.scale = 1.0;
   p->mouse_callback = m_mouse_callback;
@@ -1273,17 +1374,18 @@ void DXFParsePathAdaptor::addPoint(const DL_PointData& data)
 
 void DXFParsePathAdaptor::addLine(const DL_LineData& data)
 {
-  DL_Attributes attribs = getAttributes();
   if (shouldSkipCurrentEntity()) {
     return;
   }
 
-  double_line_t l;
-  l.start.x = data.x1;
-  l.start.y = data.y1;
-  l.end.x = data.x2;
-  l.end.y = data.y2;
-  m_line_stack.push_back(l);
+  DL_Attributes attribs = getAttributes();
+  std::string   layer = attribs.getLayer();
+
+  DxfLine line;
+  line.start = { data.x1, data.y1 };
+  line.end = { data.x2, data.y2 };
+
+  m_layers[layer].lines.push_back(line);
 }
 
 void DXFParsePathAdaptor::addXLine(const DL_XLineData& data)
@@ -1340,7 +1442,7 @@ void DXFParsePathAdaptor::addPolyline(const DL_PolylineData& data)
 {
   // Finalize any previous polyline first (only if not skipped)
   if (m_current_polyline.points.size() > 0 && !m_skip_current_polyline) {
-    m_polylines.push_back(m_current_polyline);
+    m_layers[m_current_entity_layer].polylines.push_back(m_current_polyline);
   }
   m_current_polyline.points.clear();
   m_current_polyline.is_closed = false;
@@ -1352,6 +1454,7 @@ void DXFParsePathAdaptor::addPolyline(const DL_PolylineData& data)
   }
 
   m_skip_current_polyline = false;
+  m_current_entity_layer = getAttributes().getLayer();
 
   if ((data.flags & (1 << 0))) {
     m_current_polyline.is_closed = true;
@@ -1368,9 +1471,8 @@ void DXFParsePathAdaptor::addVertex(const DL_VertexData& data)
     return;
   }
 
-  polyline_vertex_t vertex;
-  vertex.point.x = data.x;
-  vertex.point.y = data.y;
+  DxfPolylineVertex vertex;
+  vertex.point = { data.x, data.y };
   vertex.bulge = data.bulge;
   m_current_polyline.points.push_back(vertex);
 }
@@ -1381,9 +1483,9 @@ void DXFParsePathAdaptor::addSpline(const DL_SplineData& data)
   if ((m_current_spline.control_points.size() > 0 ||
        m_current_spline.fit_points.size() > 0) &&
       !m_skip_current_spline) {
-    m_splines.push_back(m_current_spline);
+    m_layers[m_current_entity_layer].splines.push_back(m_current_spline);
   }
-  m_current_spline = spline_t();
+  m_current_spline = DxfSpline();
 
   // Check if we should skip this spline
   if (shouldSkipCurrentEntity()) {
@@ -1392,6 +1494,7 @@ void DXFParsePathAdaptor::addSpline(const DL_SplineData& data)
   }
 
   m_skip_current_spline = false;
+  m_current_entity_layer = getAttributes().getLayer();
 
   // Set spline properties
   m_current_spline.degree = data.degree;

@@ -39,18 +39,25 @@ class NcCamView;
  * @author Andrew Mustun
  */
 
-struct polyline_vertex_t {
+// DXF-specific intermediate data structures (distinct from general geo:: types)
+
+struct DxfLine {
+  Point2d start;
+  Point2d end;
+};
+
+struct DxfPolylineVertex {
   Point2d point;
   double  bulge;
 };
 
-struct polyline_t {
-  std::vector<polyline_vertex_t> points;
+struct DxfPolyline {
+  std::vector<DxfPolylineVertex> points;
   bool                           is_closed;
 };
 
 // Enhanced spline structure supporting both control points and fit points
-struct spline_t {
+struct DxfSpline {
   std::vector<Point2d> control_points; // NURBS control points
   std::vector<Point2d> fit_points;     // Fit points for interpolation
   std::vector<double>  knots;          // Knot vector for NURBS
@@ -60,10 +67,17 @@ struct spline_t {
   bool                 has_fit_points; // Uses fit points?
   bool                 has_knots;      // Has explicit knot vector?
 
-  spline_t()
+  DxfSpline()
     : degree(3), is_closed(false), has_fit_points(false), has_knots(false)
   {
   }
+};
+
+// Container for all geometry data on a single layer
+struct DxfLayerData {
+  std::vector<DxfLine>     lines;
+  std::vector<DxfPolyline> polylines;
+  std::vector<DxfSpline>   splines;
 };
 
 class DXFParsePathAdaptor : public DL_CreationAdapter {
@@ -126,7 +140,7 @@ public:
   bool checkIfPathIsInsidePath(std::vector<Point2d> path1,
                                std::vector<Point2d> path2);
   std::vector<std::vector<Point2d>>
-       chainify(std::vector<double_line_t> line_stack, double tolerance);
+       chainify(const std::vector<DxfLine>& lines, double tolerance);
   void scaleAllPoints(double scale);
   void finish();
   void explodeArcToLines(double cx,
@@ -165,15 +179,15 @@ public:
   double      m_chain_tolerance;
   Units       m_units;
 
-  std::vector<double_line_t> m_line_stack;
+  // All geometry organized by layer name
+  std::unordered_map<std::string, DxfLayerData> m_layers;
 
-  std::vector<polyline_t> m_polylines;
-  polyline_t              m_current_polyline;
-  bool                    m_skip_current_polyline = false;
-
-  std::vector<spline_t> m_splines;
-  spline_t              m_current_spline;
-  bool                  m_skip_current_spline = false;
+  // Current entities being built (for multi-call DXF entities)
+  DxfPolyline m_current_polyline;
+  DxfSpline   m_current_spline;
+  std::string m_current_entity_layer; // Track layer for entities built across multiple callbacks
+  bool        m_skip_current_polyline = false;
+  bool        m_skip_current_spline = false;
 
   std::unordered_map<std::string, LayerProps> m_layer_props;
 };

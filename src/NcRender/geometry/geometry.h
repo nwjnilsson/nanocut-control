@@ -87,6 +87,10 @@ std::vector<Line> normalize(const std::vector<GeometryPrimitive>& geometry_stack
 Extents getExtents(const std::vector<Line>& lines);
 Extents getExtents(const std::vector<GeometryPrimitive>& geometry_stack);
 
+// Bounding box helpers for containment optimization
+Extents calculateBoundingBox(const Path& path);
+bool    extentsContain(const Extents& outer, const Extents& inner);
+
 // Path operations
 std::vector<Contour>          chainify(const std::vector<Line>& lines,
                                        double                   tolerance);
@@ -111,8 +115,5 @@ bool pointIsInsidePolygon(const Path& polygon, Point2d point);
 bool polygonIsInsidePolygon(const Path& polygon1, const Path& polygon2);
 
 } // namespace geo
-
-// Legacy typedef for backwards compatibility (will be removed)
-using double_line_t = geo::Line;
 
 #endif

@@ -170,6 +170,7 @@ private:
   void renderOperationsViewer(bool& show_create_operation,
                               int&  show_edit_tool_operation);
   void renderLayersViewer();
+  void reevaluateContours();
 
   // Iteration helpers for Part management
   template <typename Func> void forEachPart(Func&& func);
@@ -177,6 +178,9 @@ private:
   Part*                         findPartByName(const std::string& name);
   std::vector<Part*>            getAllParts();
   std::vector<std::string>      getAllLayers();
+
+  // Layer visibility state
+  std::unordered_map<std::string, bool> m_layer_visibility;
 
   Point2d m_show_viewer_context_menu;
   Point2d m_last_mouse_click_position;

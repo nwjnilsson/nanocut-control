@@ -93,25 +93,38 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
       Part* part = dynamic_cast<Part*>(c);
       if (part) {
         if (hover.event == EventType::MouseIn) {
-          size_t x =
+          size_t global_index =
             (hover.path_index >= 0) ? static_cast<size_t>(hover.path_index) : 0;
-          part->m_paths[x].color = getColor(m_mouse_over_color);
           m_mouse_over_part = part;
-          m_mouse_over_path = x;
+          m_mouse_over_path = global_index;
+
+          // Find path by global index across all layers
+          size_t current_index = 0;
+          for (auto& [layer_name, layer] : part->m_layers) {
+            for (auto& path : layer.paths) {
+              if (current_index == global_index) {
+                path.color = getColor(m_mouse_over_color);
+                return; // Found it, exit early
+              }
+              current_index++;
+            }
+          }
         }
         if (hover.event == EventType::MouseOut) {
           m_mouse_over_part = NULL;
-          for (auto& path : part->m_paths) {
-            if (path.is_inside_contour == true) {
-              if (path.is_closed == true) {
-                path.color = getColor(m_inside_contour_color);
+          for (auto& [layer_name, layer] : part->m_layers) {
+            for (auto& path : layer.paths) {
+              if (path.is_inside_contour == true) {
+                if (path.is_closed == true) {
+                  path.color = getColor(m_inside_contour_color);
+                }
+                else {
+                  path.color = getColor(m_open_contour_color);
+                }
               }
               else {
-                path.color = getColor(m_open_contour_color);
+                path.color = getColor(m_outside_contour_color);
               }
-            }
-            else {
-              path.color = getColor(m_outside_contour_color);
             }
           }
         }
@@ -123,23 +136,27 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
       if (part) {
         if (hover.event == EventType::MouseIn) {
           part->m_is_part_selected = true;
-          for (auto& path : part->m_paths) {
-            path.color = getColor(m_mouse_over_color);
+          for (auto& [layer_name, layer] : part->m_layers) {
+            for (auto& path : layer.paths) {
+              path.color = getColor(m_mouse_over_color);
+            }
           }
         }
         else if (hover.event == EventType::MouseOut) {
           part->m_is_part_selected = false;
-          for (auto& path : part->m_paths) {
-            if (path.is_inside_contour == true) {
-              if (path.is_closed == true) {
-                path.color = getColor(m_inside_contour_color);
+          for (auto& [layer_name, layer] : part->m_layers) {
+            for (auto& path : layer.paths) {
+              if (path.is_inside_contour == true) {
+                if (path.is_closed == true) {
+                  path.color = getColor(m_inside_contour_color);
+                }
+                else {
+                  path.color = getColor(m_open_contour_color);
+                }
               }
               else {
-                path.color = getColor(m_open_contour_color);
+                path.color = getColor(m_outside_contour_color);
               }
-            }
-            else {
-              path.color = getColor(m_outside_contour_color);
             }
           }
         }
@@ -277,11 +294,47 @@ in the part's properties after importing.
     ImGui::Begin(
       "Edit Contour", &show_edit_contour, ImGuiWindowFlags_AlwaysAutoResize);
     Part* part = dynamic_cast<Part*>(m_edit_contour_part);
-    char  layer[1024];
+    static char layer_buffer[1024];
+    static std::string current_layer_name;
+
     if (part) {
-      sprintf(layer, "%s", part->m_paths[m_edit_contour_path].layer.c_str());
-      ImGui::InputText("Layer", layer, IM_ARRAYSIZE(layer));
-      part->m_paths[m_edit_contour_path].layer = std::string(layer);
+      // Find the path by global index and get its layer name
+      size_t current_index = 0;
+      bool found = false;
+      for (auto& [layer_name, layer] : part->m_layers) {
+        for (size_t i = 0; i < layer.paths.size(); i++) {
+          if (current_index == m_edit_contour_path) {
+            current_layer_name = layer_name;
+            sprintf(layer_buffer, "%s", layer_name.c_str());
+            found = true;
+            break;
+          }
+          current_index++;
+        }
+        if (found) break;
+      }
+
+      ImGui::InputText("Layer", layer_buffer, IM_ARRAYSIZE(layer_buffer));
+
+      // If layer name changed, move the path to the new layer
+      std::string new_layer_name(layer_buffer);
+      if (new_layer_name != current_layer_name && !current_layer_name.empty()) {
+        // Find and move the path
+        current_index = 0;
+        for (auto& [layer_name, layer] : part->m_layers) {
+          for (auto it = layer.paths.begin(); it != layer.paths.end(); ++it) {
+            if (current_index == m_edit_contour_path) {
+              // Move path to new layer
+              part->m_layers[new_layer_name].paths.push_back(std::move(*it));
+              layer.paths.erase(it);
+              current_layer_name = new_layer_name;
+              goto done_moving;
+            }
+            current_index++;
+          }
+        }
+        done_moving:;
+      }
     }
     if (ImGui::Button("Ok")) {
       m_action_stack.push_back(std::make_unique<RebuildToolpathsAction>());
@@ -413,9 +466,21 @@ void NcCamView::renderContextMenus(bool& show_edit_contour)
     }
     if (ImGui::Button("Delete")) {
       if (m_mouse_over_part) {
-        m_mouse_over_part->m_paths.erase(m_mouse_over_part->m_paths.begin() +
-                                         m_mouse_over_path);
-        m_mouse_over_part->m_last_control.angle = 1; // Trigger rebuild
+        // Find and delete path by global index
+        size_t current_index = 0;
+        bool found = false;
+        for (auto& [layer_name, layer] : m_mouse_over_part->m_layers) {
+          for (auto it = layer.paths.begin(); it != layer.paths.end(); ++it) {
+            if (current_index == m_mouse_over_path) {
+              layer.paths.erase(it);
+              m_mouse_over_part->m_last_control.angle = 1; // Trigger rebuild
+              found = true;
+              break;
+            }
+            current_index++;
+          }
+          if (found) break;
+        }
       }
       m_show_viewer_context_menu = Point2d::infNeg();
     }
@@ -430,7 +495,13 @@ void NcCamView::renderPropertiesWindow(Part*& selected_part)
     ImGui::Text("Width: %.4f, Height: %.4f",
                 (selected_part->m_bb_max.x - selected_part->m_bb_min.x),
                 (selected_part->m_bb_max.y - selected_part->m_bb_min.y));
-    ImGui::Text("Number of Paths: %lu", selected_part->m_paths.size());
+
+    // Count total paths across all layers
+    size_t total_paths = 0;
+    for (const auto& [layer_name, layer] : selected_part->m_layers) {
+      total_paths += layer.paths.size();
+    }
+    ImGui::Text("Number of Paths: %lu", total_paths);
     ImGui::Text("Number of Vertices: %lu",
                 selected_part->m_number_of_verticies);
     ImGui::Text("Offset X: %.4f", selected_part->m_control.offset.x);
@@ -908,19 +979,45 @@ void NcCamView::renderLayersViewer()
     return;
 
   if (!ImGui::BeginTable("layers_table",
-                         1,
+                         2,
                          ImGuiTableFlags_SizingFixedFit |
                            ImGuiTableFlags_Reorderable |
                            ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders))
     return;
 
-  ImGui::TableSetupColumn("Layers Viewer");
+  ImGui::TableSetupColumn("Visible");
+  ImGui::TableSetupColumn("Layer");
   ImGui::TableHeadersRow();
 
   std::vector<std::string> layers = getAllLayers();
   for (const auto& layer : layers) {
     ImGui::TableNextRow();
+
+    // Checkbox column
     ImGui::TableSetColumnIndex(0);
+    // Initialize layer visibility if not in map (default to visible)
+    if (m_layer_visibility.find(layer) == m_layer_visibility.end()) {
+      m_layer_visibility[layer] = true;
+    }
+    bool visible = m_layer_visibility[layer];
+    if (ImGui::Checkbox(("##visible_" + layer).c_str(), &visible)) {
+      m_layer_visibility[layer] = visible;
+
+      // Sync visibility to all Part layers and force rebuild
+      forEachPart([&](Part* part) {
+        auto layer_it = part->m_layers.find(layer);
+        if (layer_it != part->m_layers.end()) {
+          layer_it->second.visible = visible;
+          // Force rebuild of toolpaths by invalidating last_control
+          part->m_last_control.angle = part->m_control.angle + 1.0;
+        }
+      });
+
+      reevaluateContours();
+    }
+
+    // Layer name column
+    ImGui::TableSetColumnIndex(1);
     ImGui::Text("%s", layer.c_str());
   }
 
@@ -996,13 +1093,87 @@ std::vector<std::string> NcCamView::getAllLayers()
 {
   std::vector<std::string> layers;
   forEachPart([&](Part* part) {
-    for (const auto& path : part->m_paths) {
-      if (std::find(layers.begin(), layers.end(), path.layer) == layers.end()) {
-        layers.push_back(path.layer);
+    for (const auto& [layer_name, layer] : part->m_layers) {
+      if (std::find(layers.begin(), layers.end(), layer_name) == layers.end()) {
+        layers.push_back(layer_name);
       }
     }
   });
   return layers;
+}
+
+void NcCamView::reevaluateContours()
+{
+  // Collect all paths from all parts with their layer information
+  struct PathRef {
+    Part*        part;
+    std::string  layer_name;
+    size_t       path_index;
+    bool         is_closed;
+    geo::Extents bbox;
+  };
+
+  std::vector<PathRef> all_path_refs;
+  forEachPart([&](Part* part) {
+    for (auto& [layer_name, layer] : part->m_layers) {
+      for (size_t i = 0; i < layer.paths.size(); i++) {
+        PathRef ref;
+        ref.part = part;
+        ref.layer_name = layer_name;
+        ref.path_index = i;
+        ref.is_closed = layer.paths[i].is_closed;
+        ref.bbox = geo::calculateBoundingBox(layer.paths[i].points);
+
+        all_path_refs.push_back(ref);
+      }
+    }
+  });
+
+  // Reset all paths to outside contour
+  for (auto& ref : all_path_refs) {
+    Part::path_t& path = ref.part->m_layers[ref.layer_name].paths[ref.path_index];
+    path.is_inside_contour = false;
+    path.color = getColor(m_outside_contour_color);
+  }
+
+  // Re-evaluate inside/outside relationships considering only visible layers
+  for (size_t x = 0; x < all_path_refs.size(); x++) {
+    Part::path_t& path_x = all_path_refs[x].part->m_layers[all_path_refs[x].layer_name]
+                             .paths[all_path_refs[x].path_index];
+
+    for (size_t i = 0; i < all_path_refs.size(); i++) {
+      if (i == x) continue;
+
+      // Skip non-closed paths - they can't contain other paths
+      if (!all_path_refs[i].is_closed) continue;
+
+      // Check if layer i is visible (default to visible if not in map)
+      auto it = m_layer_visibility.find(all_path_refs[i].layer_name);
+      bool is_visible = (it == m_layer_visibility.end()) || it->second;
+
+      if (!is_visible) continue; // Skip invisible layers
+
+      // Bounding box pre-check: if path_x's bbox isn't inside path_i's bbox,
+      // then path_x can't be inside path_i
+      if (!geo::extentsContain(all_path_refs[i].bbox, all_path_refs[x].bbox)) {
+        continue;
+      }
+
+      Part::path_t& path_i = all_path_refs[i].part->m_layers[all_path_refs[i].layer_name]
+                               .paths[all_path_refs[i].path_index];
+
+      // Now do the expensive check
+      if (all_path_refs[x].part->checkIfPathIsInsidePath(path_x.points, path_i.points)) {
+        path_x.is_inside_contour = true;
+        if (all_path_refs[x].is_closed) {
+          path_x.color = getColor(m_inside_contour_color);
+        } else {
+          path_x.color = getColor(m_open_contour_color);
+        }
+        break;
+      }
+    }
+  }
 }
 
 // ============================================================================
@@ -1169,14 +1340,16 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
   // Add existing parts to nesting
   view->forEachPart([&](Part* part) {
     std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-    for (const auto& path : part->m_paths) {
-      if (path.is_inside_contour == false) {
-        std::vector<PolyNest::PolyPoint> points;
-        points.reserve(path.points.size());
-        for (const auto& p : path.points) {
-          points.push_back({ p.x, p.y });
+    for (const auto& [layer_name, layer] : part->m_layers) {
+      for (const auto& path : layer.paths) {
+        if (path.is_inside_contour == false) {
+          std::vector<PolyNest::PolyPoint> points;
+          points.reserve(path.points.size());
+          for (const auto& p : path.points) {
+            points.push_back({ p.x, p.y });
+          }
+          poly_part.push_back(std::move(points));
         }
-        poly_part.push_back(std::move(points));
       }
     }
     view->m_dxf_nest.pushPlacedPolyPart(poly_part,
@@ -1190,23 +1363,28 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
   Part* new_part = nullptr;
   view->forEachPart([&](Part* part) {
     if (part->m_part_name == m_part_name && !new_part) {
-      std::vector<Part::path_t>                     paths;
+      std::unordered_map<std::string, Part::Layer>  layers_copy;
       std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
 
-      for (const auto& path : part->m_paths) {
-        paths.push_back(path);
-        if (path.is_inside_contour == false) {
-          std::vector<PolyNest::PolyPoint> points;
-          points.reserve(path.points.size());
-          for (const auto& p : path.points) {
-            points.push_back({ p.x, p.y });
+      // Copy the entire layer structure
+      for (const auto& [layer_name, layer] : part->m_layers) {
+        layers_copy[layer_name] = layer; // Copy layer with all its paths
+
+        // Build nesting data from outside contours
+        for (const auto& path : layer.paths) {
+          if (path.is_inside_contour == false) {
+            std::vector<PolyNest::PolyPoint> points;
+            points.reserve(path.points.size());
+            for (const auto& p : path.points) {
+              points.push_back({ p.x, p.y });
+            }
+            poly_part.push_back(std::move(points));
           }
-          poly_part.push_back(std::move(points));
         }
       }
 
       new_part = renderer.pushPrimitive<Part>(
-        part->m_part_name + ":" + std::to_string(dup_count), paths);
+        part->m_part_name + ":" + std::to_string(dup_count), std::move(layers_copy));
 
       // Set initial position
       if (dup_count > 1) {
@@ -1277,14 +1455,16 @@ bool NcCamView::dxfFileOpen(std::string filename,
       auto* part = dynamic_cast<Part*>(pPrimitive.get());
       if (part and part->view == renderer.getCurrentView()) {
         std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-        for (const auto& path : part->m_paths) {
-          if (path.is_inside_contour == false) {
-            std::vector<PolyNest::PolyPoint> points;
-            points.reserve(path.points.size());
-            for (const Point2d& p : path.points) {
-              points.push_back({ p.x, p.y });
+        for (const auto& [layer_name, layer] : part->m_layers) {
+          for (const auto& path : layer.paths) {
+            if (path.is_inside_contour == false) {
+              std::vector<PolyNest::PolyPoint> points;
+              points.reserve(path.points.size());
+              for (const Point2d& p : path.points) {
+                points.push_back({ p.x, p.y });
+              }
+              poly_part.push_back(std::move(points));
             }
-            poly_part.push_back(std::move(points));
           }
         }
         m_dxf_nest.pushPlacedPolyPart(poly_part,
@@ -1343,19 +1523,30 @@ bool NcCamView::dxfFileParseTimer(void* p)
     //       target_density);
 
     self->m_dxf_creation_interface->finish();
+
+    // Initialize layer visibility from DXF frozen state
+    // DXF layer flag bit 0x01 indicates frozen layer
+    for (const auto& [layer_name, layer_props] :
+         self->m_dxf_creation_interface->m_layer_props) {
+      bool is_frozen = (layer_props.flags & 0x01) != 0;
+      self->m_layer_visibility[layer_name] = !is_frozen;
+    }
+
     for (auto& pPrimitive : renderer.getPrimitiveStack()) {
       auto* part = dynamic_cast<Part*>(pPrimitive.get());
       if (part and pPrimitive->view == renderer.getCurrentView() and
           part->m_part_name == self->m_dxf_creation_interface->m_filename) {
         std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-        for (const auto& path : part->m_paths) {
-          if (path.is_inside_contour == false) {
-            std::vector<PolyNest::PolyPoint> points;
-            points.reserve(path.points.size());
-            for (const Point2d& p : path.points) {
-              points.push_back({ p.x, p.y });
+        for (const auto& [layer_name, layer] : part->m_layers) {
+          for (const auto& path : layer.paths) {
+            if (path.is_inside_contour == false) {
+              std::vector<PolyNest::PolyPoint> points;
+              points.reserve(path.points.size());
+              for (const Point2d& p : path.points) {
+                points.push_back({ p.x, p.y });
+              }
+              poly_part.push_back(std::move(points));
             }
-            poly_part.push_back(std::move(points));
           }
         }
         part->visible = true;
@@ -1461,19 +1652,28 @@ void NcCamView::tick()
   for (size_t x = 0; x < m_toolpath_operations.size(); x++) {
     if (m_toolpath_operations[x].enabled !=
         m_toolpath_operations[x].last_enabled) {
+      const std::string& operation_layer = m_toolpath_operations[x].layer;
+
       forEachVisiblePart([&](Part* part) {
-        for (auto& path : part->m_paths) {
-          if (path.layer == m_toolpath_operations[x].layer) {
-            if (m_tool_library.size() > m_toolpath_operations[x].tool_number) {
-              path.toolpath_offset =
-                m_tool_library[m_toolpath_operations[x].tool_number].kerf_width;
-            }
-            path.toolpath_visible = m_toolpath_operations[x].enabled;
-            part->m_control.lead_in_length =
-              m_toolpath_operations[x].lead_in_length;
-            part->m_control.lead_out_length =
-              m_toolpath_operations[x].lead_out_length;
+        // Direct layer access - no filtering needed!
+        auto layer_it = part->m_layers.find(operation_layer);
+        if (layer_it != part->m_layers.end()) {
+          Part::Layer& layer = layer_it->second;
+
+          // Set layer-level properties
+          if (m_tool_library.size() > m_toolpath_operations[x].tool_number) {
+            layer.toolpath_offset =
+              m_tool_library[m_toolpath_operations[x].tool_number].kerf_width;
           }
+          layer.toolpath_visible = m_toolpath_operations[x].enabled;
+
+          part->m_control.lead_in_length =
+            m_toolpath_operations[x].lead_in_length;
+          part->m_control.lead_out_length =
+            m_toolpath_operations[x].lead_out_length;
+
+          // Force rebuild of toolpaths by invalidating last_control
+          part->m_last_control.angle = part->m_control.angle + 1.0;
         }
       });
     }

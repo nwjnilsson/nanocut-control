@@ -37,36 +37,38 @@ void        Part::processMouse(float mpos_x, float mpos_y)
     size_t path_index = -1;
     if (m_control.mouse_mode == 0) {
       bool mouse_is_over_path = false;
-      for (size_t x = 0; x < m_paths.size(); x++) {
-        for (size_t i = 1; i < m_paths[x].built_points.size(); i++) {
-          if (geo::lineIntersectsWithCircle(
-                { { m_paths[x].built_points.at(i - 1).x,
-                    m_paths[x].built_points.at(i - 1).y },
-                  { m_paths[x].built_points.at(i).x,
-                    m_paths[x].built_points.at(i).y } },
-                { mpos_x, mpos_y },
-                mouse_over_padding / scale)) {
-            path_index = x;
-            mouse_is_over_path = true;
-            break;
+      size_t global_index = 0;
+      for (auto& [layer_name, layer] : m_layers) {
+        for (auto& path : layer.paths) {
+          for (size_t i = 1; i < path.built_points.size(); i++) {
+            if (geo::lineIntersectsWithCircle(
+                  { { path.built_points.at(i - 1).x,
+                      path.built_points.at(i - 1).y },
+                    { path.built_points.at(i).x,
+                      path.built_points.at(i).y } },
+                  { mpos_x, mpos_y },
+                  mouse_over_padding / scale)) {
+              path_index = global_index;
+              mouse_is_over_path = true;
+              break;
+            }
           }
-        }
-        if (m_paths[x].is_closed == true) {
-          if (geo::lineIntersectsWithCircle(
-                { { m_paths[x].built_points.at(0).x,
-                    m_paths[x].built_points.at(0).y },
-                  { m_paths[x]
-                      .built_points.at(m_paths[x].built_points.size() - 1)
-                      .x,
-                    m_paths[x]
-                      .built_points.at(m_paths[x].built_points.size() - 1)
-                      .y } },
-                { mpos_x, mpos_y },
-                mouse_over_padding / scale)) {
-            path_index = x;
-            mouse_is_over_path = true;
+          if (path.is_closed == true) {
+            if (geo::lineIntersectsWithCircle(
+                  { { path.built_points.at(0).x,
+                      path.built_points.at(0).y },
+                    { path.built_points.at(path.built_points.size() - 1).x,
+                      path.built_points.at(path.built_points.size() - 1).y } },
+                  { mpos_x, mpos_y },
+                  mouse_over_padding / scale)) {
+              path_index = global_index;
+              mouse_is_over_path = true;
+            }
           }
+          if (mouse_is_over_path) break;
+          global_index++;
         }
+        if (mouse_is_over_path) break;
       }
       if (mouse_is_over_path == true) {
         if (mouse_over == false) {
@@ -85,15 +87,20 @@ void        Part::processMouse(float mpos_x, float mpos_y)
     }
     else if (m_control.mouse_mode == 1) { // nesting
       bool mouse_is_inside_perimeter = false;
-      for (size_t x = 0; x < m_paths.size(); x++) {
-        if (m_paths[x].is_inside_contour == false) {
-          if (checkIfPointIsInsidePath(m_paths[x].built_points,
-                                       { mpos_x, mpos_y })) {
-            path_index = x;
-            mouse_is_inside_perimeter = true;
-            break;
+      size_t global_index = 0;
+      for (auto& [layer_name, layer] : m_layers) {
+        for (auto& path : layer.paths) {
+          if (path.is_inside_contour == false) {
+            if (checkIfPointIsInsidePath(path.built_points,
+                                         { mpos_x, mpos_y })) {
+              path_index = global_index;
+              mouse_is_inside_perimeter = true;
+              break;
+            }
           }
+          global_index++;
         }
+        if (mouse_is_inside_perimeter) break;
       }
       if (mouse_is_inside_perimeter == true) {
         if (mouse_over == false) {
@@ -224,78 +231,121 @@ void Part::render()
   if (!(m_last_control == m_control)) {
     m_number_of_verticies = 0;
     m_tool_paths.clear();
-    for (std::vector<path_t>::iterator it = m_paths.begin();
-         it != m_paths.end();
-         ++it) {
-      it->built_points.clear();
-      try {
-        std::vector<Point2d> simplified;
+    for (auto& [layer_name, layer] : m_layers) {
+      // Skip invisible layers
+      if (!layer.visible) continue;
 
-        // For closed paths with very few points, skip simplification to
-        // preserve geometry
-        if (it->is_closed && it->points.size() <= 6) {
-          simplified = it->points;
-        }
-        else {
-          simplify(it->points, simplified, m_control.smoothing);
-        }
+      for (auto& path : layer.paths) {
+        path.built_points.clear();
+        try {
+          std::vector<Point2d> simplified;
 
-        for (size_t i = 0; i < simplified.size(); i++) {
-          Point2d rotated =
-            geo::rotatePoint({ 0, 0 }, simplified[i], m_control.angle);
-          it->built_points.push_back(
-            { (rotated.x + m_control.offset.x) * m_control.scale,
-              (rotated.y + m_control.offset.y) * m_control.scale });
-          m_number_of_verticies++;
-        }
-        if (it->toolpath_visible == true) {
-          if (it->is_closed == true) {
-            // Need at least 3 points to form a valid closed polygon
-            if (it->built_points.size() < 3) {
-              continue;
-            }
-            if (it->is_inside_contour == true) {
-              std::vector<std::vector<Point2d>> tpaths = offsetPath(
-                it->built_points, -(double) fabs(it->toolpath_offset));
-              for (size_t x = 0; x < tpaths.size(); x++) {
-                size_t count = 0;
-                while (createToolpathLeads(&tpaths[x],
-                                           m_control.lead_in_length,
-                                           tpaths[x].front(),
-                                           -1) == false &&
-                       count < tpaths[x].size()) {
-                  if (tpaths[x].size() > 2) {
-                    tpaths[x].push_back(tpaths[x][1]);
-                    tpaths[x].erase(tpaths[x].begin());
+          // For closed paths with very few points, skip simplification to
+          // preserve geometry
+          if (path.is_closed && path.points.size() <= 6) {
+            simplified = path.points;
+          }
+          else {
+            simplify(path.points, simplified, m_control.smoothing);
+          }
+
+          for (size_t i = 0; i < simplified.size(); i++) {
+            Point2d rotated =
+              geo::rotatePoint({ 0, 0 }, simplified[i], m_control.angle);
+            path.built_points.push_back(
+              { (rotated.x + m_control.offset.x) * m_control.scale,
+                (rotated.y + m_control.offset.y) * m_control.scale });
+            m_number_of_verticies++;
+          }
+          if (layer.toolpath_visible == true) {
+            if (path.is_closed == true) {
+              // Need at least 3 points to form a valid closed polygon
+              if (path.built_points.size() < 3) {
+                continue;
+              }
+              if (path.is_inside_contour == true) {
+                std::vector<std::vector<Point2d>> tpaths = offsetPath(
+                  path.built_points, -(double) fabs(layer.toolpath_offset));
+                for (size_t x = 0; x < tpaths.size(); x++) {
+                  size_t count = 0;
+                  while (createToolpathLeads(&tpaths[x],
+                                             m_control.lead_in_length,
+                                             tpaths[x].front(),
+                                             -1) == false &&
+                         count < tpaths[x].size()) {
+                    if (tpaths[x].size() > 2) {
+                      tpaths[x].push_back(tpaths[x][1]);
+                      tpaths[x].erase(tpaths[x].begin());
+                    }
+                    count++;
                   }
-                  count++;
+                  m_tool_paths.push_back(tpaths[x]);
                 }
-                m_tool_paths.push_back(tpaths[x]);
+              }
+              else {
+                std::vector<std::vector<Point2d>> tpaths = offsetPath(
+                  path.built_points, (double) fabs(layer.toolpath_offset));
+                for (size_t x = 0; x < tpaths.size(); x++) {
+                  size_t count = 0;
+                  while (createToolpathLeads(&tpaths[x],
+                                             m_control.lead_out_length,
+                                             tpaths[x].front(),
+                                             +1) == false &&
+                         count < tpaths[x].size()) {
+                    if (tpaths[x].size() > 2) {
+                      tpaths[x].push_back(tpaths[x][1]);
+                      tpaths[x].erase(tpaths[x].begin());
+                    }
+                    count++;
+                  }
+                  m_tool_paths.push_back(tpaths[x]);
+                }
               }
             }
             else {
-              std::vector<std::vector<Point2d>> tpaths = offsetPath(
-                it->built_points, (double) fabs(it->toolpath_offset));
-              for (size_t x = 0; x < tpaths.size(); x++) {
-                size_t count = 0;
-                while (createToolpathLeads(&tpaths[x],
-                                           m_control.lead_out_length,
-                                           tpaths[x].front(),
-                                           +1) == false &&
-                       count < tpaths[x].size()) {
-                  if (tpaths[x].size() > 2) {
-                    tpaths[x].push_back(tpaths[x][1]);
-                    tpaths[x].erase(tpaths[x].begin());
-                  }
-                  count++;
-                }
-                m_tool_paths.push_back(tpaths[x]);
-              }
+              m_tool_paths.push_back(path.built_points);
             }
           }
-          else {
-            m_tool_paths.push_back(it->built_points);
-          }
+        }
+        catch (std::exception& e) {
+          LOG_F(ERROR,
+                "(Part::render) Exception: %s, setting visability "
+                "to false to avoid further exceptions!",
+                e.what());
+          visible = false;
+        }
+      }
+    }
+    getBoundingBox(&m_bb_min, &m_bb_max);
+  }
+  m_last_control = m_control;
+  glPushMatrix();
+  glTranslatef(offset[0], offset[1], offset[2]);
+  glScalef(scale, scale, scale);
+  glLineWidth(m_width);
+  for (auto& [layer_name, layer] : m_layers) {
+    // Skip invisible layers
+    if (!layer.visible) continue;
+
+    for (auto& path : layer.paths) {
+      glColor4f(path.color.r / 255,
+                path.color.g / 255,
+                path.color.b / 255,
+                path.color.a / 255);
+      if (path.is_closed == true) {
+        glBegin(GL_LINE_LOOP);
+      }
+      else {
+        glBegin(GL_LINE_STRIP);
+      }
+      if (m_style == "dashed") {
+        glPushAttrib(GL_ENABLE_BIT);
+        glLineStipple(10, 0xAAAA);
+        glEnable(GL_LINE_STIPPLE);
+      }
+      try {
+        for (int i = 0; i < path.built_points.size(); i++) {
+          glVertex3f(path.built_points[i].x, path.built_points[i].y, 0.f);
         }
       }
       catch (std::exception& e) {
@@ -305,44 +355,8 @@ void Part::render()
               e.what());
         visible = false;
       }
-      getBoundingBox(&m_bb_min, &m_bb_max);
+      glEnd();
     }
-  }
-  m_last_control = m_control;
-  glPushMatrix();
-  glTranslatef(offset[0], offset[1], offset[2]);
-  glScalef(scale, scale, scale);
-  glLineWidth(m_width);
-  for (std::vector<path_t>::iterator it = m_paths.begin(); it != m_paths.end();
-       ++it) {
-    glColor4f(it->color.r / 255,
-              it->color.g / 255,
-              it->color.b / 255,
-              it->color.a / 255);
-    if (it->is_closed == true) {
-      glBegin(GL_LINE_LOOP);
-    }
-    else {
-      glBegin(GL_LINE_STRIP);
-    }
-    if (m_style == "dashed") {
-      glPushAttrib(GL_ENABLE_BIT);
-      glLineStipple(10, 0xAAAA);
-      glEnable(GL_LINE_STIPPLE);
-    }
-    try {
-      for (int i = 0; i < it->built_points.size(); i++) {
-        glVertex3f(it->built_points[i].x, it->built_points[i].y, 0.f);
-      }
-    }
-    catch (std::exception& e) {
-      LOG_F(ERROR,
-            "(Part::render) Exception: %s, setting visability "
-            "to false to avoid further exceptions!",
-            e.what());
-      visible = false;
-    }
-    glEnd();
   }
   for (int x = 0; x < m_tool_paths.size(); x++) {
     glColor4f(0, 1, 0, 0.5);
@@ -358,19 +372,26 @@ void Part::render()
 }
 nlohmann::json Part::serialize()
 {
-  nlohmann::json paths;
-  for (std::vector<path_t>::iterator it = m_paths.begin(); it != m_paths.end();
-       ++it) {
-    nlohmann::json path;
-    path["is_closed"] = it->is_closed;
-    for (int i = 0; i < it->points.size(); i++) {
-      path["points"].push_back(
-        { { "x", it->points[i].x }, { "y", it->points[i].y }, { 0.f } });
+  nlohmann::json layers_json;
+  for (auto& [layer_name, layer] : m_layers) {
+    nlohmann::json layer_json;
+    layer_json["toolpath_offset"] = layer.toolpath_offset;
+    layer_json["toolpath_visible"] = layer.toolpath_visible;
+    nlohmann::json paths_json;
+    for (auto& path : layer.paths) {
+      nlohmann::json path_json;
+      path_json["is_closed"] = path.is_closed;
+      for (int i = 0; i < path.points.size(); i++) {
+        path_json["points"].push_back(
+          { { "x", path.points[i].x }, { "y", path.points[i].y }, { 0.f } });
+      }
+      paths_json.push_back(path_json);
     }
-    paths.push_back(path);
+    layer_json["paths"] = paths_json;
+    layers_json[layer_name] = layer_json;
   }
   nlohmann::json j;
-  j["paths"] = paths;
+  j["layers"] = layers_json;
   j["part_name"] = m_part_name;
   j["width"] = m_width;
   j["style"] = m_style;
@@ -382,19 +403,20 @@ void Part::getBoundingBox(Point2d* bbox_min, Point2d* bbox_max)
   bbox_max->y = -inf<double>();
   bbox_min->x = inf<double>();
   bbox_min->y = inf<double>();
-  for (std::vector<path_t>::iterator it = m_paths.begin(); it != m_paths.end();
-       ++it) {
-    for (std::vector<Point2d>::iterator p = it->built_points.begin();
-         p != it->built_points.end();
-         ++p) {
-      if ((double) (*p).x < bbox_min->x)
-        bbox_min->x = (double) (*p).x;
-      if ((double) (*p).x > bbox_max->x)
-        bbox_max->x = (double) (*p).x;
-      if ((double) (*p).y < bbox_min->y)
-        bbox_min->y = (double) (*p).y;
-      if ((double) (*p).y > bbox_max->y)
-        bbox_max->y = (double) (*p).y;
+  for (auto& [layer_name, layer] : m_layers) {
+    for (auto& path : layer.paths) {
+      for (std::vector<Point2d>::iterator p = path.built_points.begin();
+           p != path.built_points.end();
+           ++p) {
+        if ((double) (*p).x < bbox_min->x)
+          bbox_min->x = (double) (*p).x;
+        if ((double) (*p).x > bbox_max->x)
+          bbox_max->x = (double) (*p).x;
+        if ((double) (*p).y < bbox_min->y)
+          bbox_min->y = (double) (*p).y;
+        if ((double) (*p).y > bbox_max->y)
+          bbox_max->y = (double) (*p).y;
+      }
     }
   }
 }
@@ -464,11 +486,25 @@ std::vector<std::vector<Point2d>> Part::getOrderedToolpaths()
     }
     // Find the toolpaths that have other paths inside them and push them to the
     // back of stack because they are the outside cuts and need to be cut last
+
+    // Cache bounding boxes for all toolpaths
+    std::vector<geo::Extents> bboxes;
+    bboxes.reserve(ret.size());
+    for (const auto& path : ret) {
+      bboxes.push_back(geo::calculateBoundingBox(path));
+    }
+
     std::vector<std::vector<Point2d>> outside_paths;
     for (size_t x = 0; x < ret.size(); x++) {
       bool has_paths_inside = false;
       for (size_t i = 0; i < ret.size(); i++) {
         if (i != x) {
+          // Bounding box pre-check: if ret[i]'s bbox isn't inside ret[x]'s bbox,
+          // skip expensive check
+          if (!geo::extentsContain(bboxes[x], bboxes[i])) {
+            continue;
+          }
+
           if (checkIfPathIsInsidePath(ret[i], ret[x]) == true) {
             has_paths_inside = true;
           }
