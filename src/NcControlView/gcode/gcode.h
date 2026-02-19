@@ -1,9 +1,8 @@
 #ifndef GCODE__
 #define GCODE__
 
-#include <nlohmann/json.hpp>
 #include <NanoCut.h>
-#include <fstream>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -35,16 +34,21 @@ public:
 
   // Public API
   bool        openFile(const std::string& filepath);
+  bool        loadFromLines(std::vector<std::string>&& lines);
   std::string getFilename() const;
-  bool        parseTimer();
+  const std::vector<std::string>& getLines() const;
+  bool                            parseTimer();
 
 private:
   // Application context
   NcApp*         m_app;
   NcControlView* m_view;
 
+  // G-code line storage (always populated after open/load)
+  std::vector<std::string> m_lines;
+  size_t                   m_line_index = 0;
+
   // G-code file state
-  std::ifstream m_file;
   std::string   m_filename;
   unsigned long m_line_count = 0;
   unsigned long m_lines_consumed = 0;
@@ -57,7 +61,7 @@ private:
   // Private helper methods
   nlohmann::json parseLine(const std::string& line);
   void           pushCurrentPathToViewer(int rapid_line);
-  unsigned long  countLines(const std::string& filepath);
+  void           resetParseState();
 };
 
 #endif // GCODE__

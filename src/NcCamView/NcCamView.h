@@ -135,6 +135,11 @@ private:
     void execute(NcCamView* view) override;
   };
 
+  class SendToControllerAction : public CamAction {
+  public:
+    void execute(NcCamView* view) override;
+  };
+
   class DuplicatePartAction : public CamAction {
     std::string m_part_name;
 

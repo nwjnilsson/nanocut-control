@@ -352,7 +352,10 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
 
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
-      if (ImGui::MenuItem("Post Process", "")) {
+      bool has_toolpaths = std::any_of(
+        m_toolpath_operations.begin(), m_toolpath_operations.end(),
+        [](const auto& op) { return op.enabled; });
+      if (ImGui::MenuItem("Post Process", "", false, has_toolpaths)) {
         LOG_F(INFO, "File->Post Process");
         std::string path = ".";
         auto&       renderer = m_app->getRenderer();
@@ -365,6 +368,10 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
         config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
           "PostNcDialog", "Choose File", ".nc", config);
+      }
+      if (ImGui::MenuItem("Send to Controller", "", false, has_toolpaths)) {
+        LOG_F(INFO, "File->Send to Controller");
+        m_action_stack.push_back(std::make_unique<SendToControllerAction>());
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Save Job", "")) {
@@ -921,7 +928,28 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
       ImGui::EndPopup();
     }
     if (tree_node_open) {
-      // Render duplicates
+      std::string prefix = part->m_part_name + ":";
+      forEachPart([&](Part* dup) {
+        if (dup->m_part_name.find(prefix) == 0) {
+          ImGui::Checkbox(std::string("##" + dup->m_part_name).c_str(),
+                          &dup->visible);
+          ImGui::SameLine();
+          ImGui::TreeNodeEx(
+            dup->m_part_name.c_str(),
+            ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+          if (ImGui::BeginPopupContextItem()) {
+            if (ImGui::MenuItem("Delete")) {
+              m_action_stack.push_back(
+                std::make_unique<DeletePartAction>(dup->m_part_name));
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Properties")) {
+              selected_part = dup;
+            }
+            ImGui::EndPopup();
+          }
+        }
+      });
       ImGui::TreePop();
     }
   });
@@ -1234,6 +1262,56 @@ void NcCamView::PostProcessAction::execute(NcCamView* view)
   LOG_F(INFO, "Finished writing gcode file!");
 }
 
+// SendToControllerAction implementation
+void NcCamView::SendToControllerAction::execute(NcCamView* view)
+{
+  if (!view->m_app)
+    return;
+
+  std::vector<std::string> lines;
+
+  for (size_t i = 0; i < view->m_toolpath_operations.size(); i++) {
+    LOG_F(INFO,
+          "Sending toolpath operation: %lu on layer: %s",
+          i,
+          view->m_toolpath_operations[i].layer.c_str());
+
+    view->forEachVisiblePart([&](Part* part) {
+      std::vector<std::vector<Point2d>> tool_paths =
+        part->getOrderedToolpaths();
+
+      if (view->m_tool_library.size() >
+          view->m_toolpath_operations[i].tool_number) {
+        const auto& tool =
+          view->m_tool_library[view->m_toolpath_operations[i].tool_number];
+
+        if (tool.thc > 0) {
+          lines.push_back("$T=" + std::to_string(tool.thc));
+        }
+
+        for (size_t x = 0; x < tool_paths.size(); x++) {
+          lines.push_back("G0 X" + std::to_string(tool_paths[x][0].x) +
+                          " Y" + std::to_string(tool_paths[x][0].y));
+          lines.push_back("fire_torch " +
+                          std::to_string(tool.pierce_height) + " " +
+                          std::to_string(tool.pierce_delay) + " " +
+                          std::to_string(tool.cut_height));
+          for (size_t z = 0; z < tool_paths[x].size(); z++) {
+            lines.push_back("G1 X" + std::to_string(tool_paths[x][z].x) +
+                            " Y" + std::to_string(tool_paths[x][z].y) +
+                            " F" + std::to_string(tool.feed_rate));
+          }
+          lines.push_back("torch_off");
+        }
+      }
+    });
+  }
+
+  lines.push_back("M30");
+  view->m_app->getControlView().loadGCodeFromLines(std::move(lines));
+  LOG_F(INFO, "Sent G-code to controller!");
+}
+
 // RebuildToolpathsAction implementation
 void NcCamView::RebuildToolpathsAction::execute(NcCamView* view)
 {
@@ -1359,56 +1437,54 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
                                         &part->visible);
   });
 
-  // Find and duplicate the master part
-  Part* new_part = nullptr;
-  view->forEachPart([&](Part* part) {
-    if (part->m_part_name == m_part_name && !new_part) {
-      std::unordered_map<std::string, Part::Layer>  layers_copy;
-      std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
+  // Find master part first (read-only, no mutation of primitive stack)
+  Part* master_part = view->findPartByName(m_part_name);
+  if (!master_part)
+    return;
 
-      // Copy the entire layer structure
-      for (const auto& [layer_name, layer] : part->m_layers) {
-        layers_copy[layer_name] = layer; // Copy layer with all its paths
+  // Collect data from master part before modifying the primitive stack
+  std::unordered_map<std::string, Part::Layer>  layers_copy;
+  std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
 
-        // Build nesting data from outside contours
-        for (const auto& path : layer.paths) {
-          if (path.is_inside_contour == false) {
-            std::vector<PolyNest::PolyPoint> points;
-            points.reserve(path.points.size());
-            for (const auto& p : path.points) {
-              points.push_back({ p.x, p.y });
-            }
-            poly_part.push_back(std::move(points));
-          }
+  for (const auto& [layer_name, layer] : master_part->m_layers) {
+    layers_copy[layer_name] = layer;
+    for (const auto& path : layer.paths) {
+      if (!path.is_inside_contour) {
+        std::vector<PolyNest::PolyPoint> points;
+        points.reserve(path.points.size());
+        for (const auto& p : path.points) {
+          points.push_back({ p.x, p.y });
         }
+        poly_part.push_back(std::move(points));
       }
-
-      new_part = renderer.pushPrimitive<Part>(
-        part->m_part_name + ":" + std::to_string(dup_count), std::move(layers_copy));
-
-      // Set initial position
-      if (dup_count > 1) {
-        Part* prev_dup = view->findPartByName(m_part_name + ":" +
-                                              std::to_string(dup_count - 1));
-        if (prev_dup) {
-          new_part->m_control.offset = prev_dup->m_control.offset;
-        }
-      }
-      else {
-        new_part->m_control.offset = part->m_control.offset;
-      }
-
-      new_part->m_control.scale = part->m_control.scale;
-      new_part->mouse_callback = part->mouse_callback;
-      new_part->matrix_callback = part->matrix_callback;
-
-      view->m_dxf_nest.pushUnplacedPolyPart(poly_part,
-                                            &new_part->m_control.offset.x,
-                                            &new_part->m_control.offset.y,
-                                            &new_part->m_control.angle,
-                                            &new_part->visible);
     }
-  });
+  }
+
+  // Create duplicate outside any iteration (avoids iterator invalidation)
+  Part* new_part = renderer.pushPrimitive<Part>(
+    m_part_name + ":" + std::to_string(dup_count), std::move(layers_copy));
+
+  // Set initial position
+  if (dup_count > 1) {
+    Part* prev_dup = view->findPartByName(
+      m_part_name + ":" + std::to_string(dup_count - 1));
+    if (prev_dup) {
+      new_part->m_control.offset = prev_dup->m_control.offset;
+    }
+  }
+  else {
+    new_part->m_control.offset = master_part->m_control.offset;
+  }
+
+  new_part->m_control.scale = master_part->m_control.scale;
+  new_part->mouse_callback = master_part->mouse_callback;
+  new_part->matrix_callback = master_part->matrix_callback;
+
+  view->m_dxf_nest.pushUnplacedPolyPart(poly_part,
+                                        &new_part->m_control.offset.x,
+                                        &new_part->m_control.offset.y,
+                                        &new_part->m_control.angle,
+                                        &new_part->visible);
 
   view->m_dxf_nest.beginPlaceUnplacedPolyParts();
   renderer.pushTimer(0, [view]() {

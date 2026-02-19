@@ -69,6 +69,14 @@ private:
   PolyPoint             m_offset_increments;
   std::vector<PolyPart> m_unplaced_parts;
   std::vector<PolyPart> m_placed_parts;
+  // For tracking best placement when no perfect fit is found
+  struct BestPlacement {
+    double score;
+    double offset_x;
+    double offset_y;
+    double angle;
+    bool   valid;
+  } m_best_placement;
   bool   checkIfPointIsInsidePath(std::vector<PolyPoint> path, PolyPoint point);
   bool   checkIfPathIsInsidePath(std::vector<PolyPoint> path1,
                                  std::vector<PolyPoint> path2);
@@ -89,6 +97,15 @@ private:
                       double*                             angle,
                       bool*                               visible);
   PolyPoint getDefaultOffsetXY(const PolyPart&);
+  double   calculatePlacementScore(const PolyPart& part,
+                                   double              offset_x,
+                                   double              offset_y,
+                                   double              angle);
+  void     resetBestPlacement();
+  void     updateBestPlacement(const PolyPart& part,
+                                double              offset_x,
+                                double              offset_y,
+                                double              angle);
 
 public:
   PolyNest()
@@ -102,6 +119,7 @@ public:
     m_offset_increments.y = SCALE(5.0);
     m_unplaced_parts.clear();
     m_placed_parts.clear();
+    resetBestPlacement();
   };
   void        setExtents(PolyPoint min, PolyPoint max);
   void        pushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p,

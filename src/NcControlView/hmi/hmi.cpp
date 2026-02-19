@@ -8,6 +8,7 @@
 #include "../util.h"
 #include "NcControlView/NcControlView.h"
 #include <cmath>
+#include <fstream>
 
 // Helper function to parse button ID string into enum
 static HmiButtonId parseButtonId(const std::string& id)
@@ -197,26 +198,15 @@ void NcHmi::handleButton(const std::string& id)
         case HmiButtonId::Run: {
           LOG_F(INFO, "Clicked Run");
           if (checkPathBounds()) {
-            try {
-              std::string filename = control_view.getGCode().getFilename();
-              if (filename != "") {
-                std::ifstream gcode_file(filename);
-                if (gcode_file.is_open()) {
-                  std::string line;
-                  while (std::getline(gcode_file, line)) {
-                    control_view.m_motion_controller->pushGCode(line);
-                  }
-                  gcode_file.close();
-                  control_view.m_motion_controller->runStack();
-                }
-                else {
-                  m_view->getDialogs().setInfoValue("Could not open file!");
-                }
+            const auto& lines = control_view.getGCode().getLines();
+            if (!lines.empty()) {
+              for (const auto& line : lines) {
+                control_view.m_motion_controller->pushGCode(line);
               }
+              control_view.m_motion_controller->runStack();
             }
-            catch (...) {
-              m_view->getDialogs().setInfoValue(
-                "Caught exception while trying to read file!");
+            else {
+              m_view->getDialogs().setInfoValue("No G-code loaded!");
             }
           }
           else {
@@ -228,33 +218,23 @@ void NcHmi::handleButton(const std::string& id)
         case HmiButtonId::TestRun: {
           LOG_F(INFO, "Clicked Test Run");
           if (checkPathBounds()) {
-            try {
-              std::string filename = control_view.getGCode().getFilename();
-              if (filename != "") {
-                std::ifstream gcode_file(filename);
-                if (gcode_file.is_open()) {
-                  std::string line;
-                  while (std::getline(gcode_file, line)) {
-                    if (line.find("fire_torch") != std::string::npos) {
-                      removeSubstrs(line, "fire_torch");
-                      control_view.m_motion_controller->pushGCode(
-                        "touch_torch" + line);
-                    }
-                    else {
-                      control_view.m_motion_controller->pushGCode(line);
-                    }
-                  }
-                  gcode_file.close();
-                  control_view.m_motion_controller->runStack();
+            const auto& lines = control_view.getGCode().getLines();
+            if (!lines.empty()) {
+              for (const auto& line : lines) {
+                if (line.find("fire_torch") != std::string::npos) {
+                  std::string modified = line;
+                  removeSubstrs(modified, "fire_torch");
+                  control_view.m_motion_controller->pushGCode(
+                    "touch_torch" + modified);
                 }
                 else {
-                  m_view->getDialogs().setInfoValue("Could not open file!");
+                  control_view.m_motion_controller->pushGCode(line);
                 }
               }
+              control_view.m_motion_controller->runStack();
             }
-            catch (...) {
-              m_view->getDialogs().setInfoValue(
-                "Caught exception while trying to read file!");
+            else {
+              m_view->getDialogs().setInfoValue("No G-code loaded!");
             }
           }
           else {
@@ -403,30 +383,17 @@ void NcHmi::jumpin(Primitive* p)
     return;
   auto& control_view = m_app->getControlView();
   if (checkPathBounds()) {
-    try {
-      std::string filename = control_view.getGCode().getFilename();
-      if (filename != "") {
-        std::ifstream gcode_file(filename);
-        if (gcode_file.is_open()) {
-          std::string   line;
-          unsigned long count = 0;
-          int           rapid_line = std::get<int>(p->user_data);
-          while (std::getline(gcode_file, line)) {
-            if (count > (unsigned long) rapid_line - 1)
-              control_view.m_motion_controller->pushGCode(line);
-            count++;
-          }
-          gcode_file.close();
-          control_view.m_motion_controller->runStack();
-        }
-        else {
-          m_view->getDialogs().setInfoValue("Could not open file!");
-        }
+    const auto& lines = control_view.getGCode().getLines();
+    if (!lines.empty()) {
+      int           rapid_line = std::get<int>(p->user_data);
+      unsigned long start = (rapid_line > 0) ? static_cast<unsigned long>(rapid_line) : 0;
+      for (unsigned long i = start; i < lines.size(); i++) {
+        control_view.m_motion_controller->pushGCode(lines[i]);
       }
+      control_view.m_motion_controller->runStack();
     }
-    catch (...) {
-      m_view->getDialogs().setInfoValue(
-        "Caught exception while trying to read file!");
+    else {
+      m_view->getDialogs().setInfoValue("No G-code loaded!");
     }
   }
   else {
@@ -439,72 +406,73 @@ void NcHmi::reverse(Primitive* p)
 {
   if (!m_app)
     return;
-  auto&                    control_view = m_app->getControlView();
+  auto& control_view = m_app->getControlView();
+  const auto& source_lines = control_view.getGCode().getLines();
+  if (source_lines.empty()) {
+    m_view->getDialogs().setInfoValue("No G-code loaded!");
+    return;
+  }
+
   std::vector<std::string> gcode_lines_before_reverse;
   std::vector<std::string> gcode_lines_to_reverse;
   std::vector<std::string> gcode_lines_after_reverse;
   bool                     found_path_end = false;
-  std::string              filename = control_view.getGCode().getFilename();
-  try {
-    if (filename != "") {
-      std::ifstream gcode_file(filename);
-      if (gcode_file.is_open()) {
-        std::string   line;
-        unsigned long count = 0;
-        int           rapid_line = std::get<int>(p->user_data);
-        while (std::getline(gcode_file, line)) {
-          if (count <= (unsigned long) rapid_line + 1) {
-            gcode_lines_before_reverse.push_back(line);
-          }
-          else if (count > (unsigned long) rapid_line + 1) {
-            if (line.find("torch_off") != std::string::npos) {
-              found_path_end = true;
-            }
-            if (found_path_end == true) {
-              gcode_lines_after_reverse.push_back(line);
-            }
-            else {
-              gcode_lines_to_reverse.push_back(line);
-            }
-          }
-          count++;
-        }
-        gcode_file.close();
+  int                      rapid_line = std::get<int>(p->user_data);
+
+  for (unsigned long count = 0; count < source_lines.size(); count++) {
+    const auto& line = source_lines[count];
+    if (count <= (unsigned long) rapid_line + 1) {
+      gcode_lines_before_reverse.push_back(line);
+    }
+    else {
+      if (line.find("torch_off") != std::string::npos) {
+        found_path_end = true;
+      }
+      if (found_path_end) {
+        gcode_lines_after_reverse.push_back(line);
       }
       else {
-        m_view->getDialogs().setInfoValue("Could not open file!");
+        gcode_lines_to_reverse.push_back(line);
       }
     }
   }
-  catch (...) {
-    m_view->getDialogs().setInfoValue(
-      "Caught exception while trying to read file!");
+
+  // Build the new line set with the reversed section
+  std::vector<std::string> new_lines;
+  new_lines.reserve(source_lines.size());
+  for (const auto& line : gcode_lines_before_reverse) {
+    new_lines.push_back(line);
   }
-  try {
-    std::ofstream out(filename);
-    for (unsigned long x = 0; x < gcode_lines_before_reverse.size(); x++) {
-      out << gcode_lines_before_reverse.at(x);
-      out << std::endl;
+  for (auto it = gcode_lines_to_reverse.rbegin();
+       it != gcode_lines_to_reverse.rend(); ++it) {
+    new_lines.push_back(*it);
+  }
+  for (const auto& line : gcode_lines_after_reverse) {
+    new_lines.push_back(line);
+  }
+
+  // Write back to file if there is a backing file
+  std::string filename = control_view.getGCode().getFilename();
+  if (!filename.empty()) {
+    try {
+      std::ofstream out(filename);
+      for (const auto& line : new_lines) {
+        out << line << std::endl;
+      }
+      out.close();
     }
-    while (gcode_lines_to_reverse.size() > 0) {
-      out << gcode_lines_to_reverse.back();
-      out << std::endl;
-      gcode_lines_to_reverse.pop_back();
-    }
-    for (unsigned long x = 0; x < gcode_lines_after_reverse.size(); x++) {
-      out << gcode_lines_after_reverse.at(x);
-      out << std::endl;
-    }
-    out.close();
-    clearHighlights();
-    if (control_view.getGCode().openFile(filename)) {
-      auto& gcode = control_view.getGCode();
-      m_app->getRenderer().pushTimer(0,
-                                     [&gcode]() { return gcode.parseTimer(); });
+    catch (...) {
+      m_view->getDialogs().setInfoValue("Could not write gcode file to disk!");
+      return;
     }
   }
-  catch (...) {
-    m_view->getDialogs().setInfoValue("Could not write gcode file to disk!");
+
+  // Reload from the new lines
+  clearHighlights();
+  if (control_view.getGCode().loadFromLines(std::move(new_lines))) {
+    auto& gcode = control_view.getGCode();
+    m_app->getRenderer().pushTimer(0,
+                                   [&gcode]() { return gcode.parseTimer(); });
   }
 }
 

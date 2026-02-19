@@ -266,6 +266,21 @@ void NcControlView::makeActive()
                          m_preferences.background_color[1] * 255.0f,
                          m_preferences.background_color[2] * 255.0f);
 }
+void NcControlView::loadGCodeFromLines(std::vector<std::string>&& lines)
+{
+  if (!m_app || !m_gcode)
+    return;
+
+  // Switch view first so the timer and any primitives created during parsing
+  // are associated with NcControlView (timers only fire in their own view)
+  makeActive();
+
+  if (m_gcode->loadFromLines(std::move(lines))) {
+    m_app->getRenderer().pushTimer(0,
+                                   [this]() { return m_gcode->parseTimer(); });
+  }
+}
+
 void NcControlView::close() {}
 
 void NcControlView::handleMouseEvent(const MouseButtonEvent& e,

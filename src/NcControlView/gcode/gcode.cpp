@@ -3,6 +3,7 @@
 #include "../hmi/hmi.h"
 #include <NcControlView/NcControlView.h>
 #include <NcRender/geometry/geometry.h>
+#include <fstream>
 #include <loguru.hpp>
 
 // Helper function for splitting strings (can remain as a free function)
@@ -23,41 +24,62 @@ GCode::GCode(NcApp* app, NcControlView* view) : m_app(app), m_view(view) {}
 // Public API
 std::string GCode::getFilename() const { return m_filename; }
 
-unsigned long GCode::countLines(const std::string& filepath)
+void GCode::resetParseState()
 {
-  std::string   line;
-  unsigned long count = 0;
-  std::ifstream in(filepath);
-  while (std::getline(in, line)) {
-    count++;
-  }
-  return count;
+  if (!m_app)
+    return;
+  auto& renderer = m_app->getRenderer();
+
+  renderer.deletePrimitivesById("gcode");
+  renderer.deletePrimitivesById("gcode_arrows");
+  m_line_count = m_lines.size();
+  m_lines_consumed = 0;
+  m_line_index = 0;
+  m_last_rapid_line = 0;
+  m_current_path.points.clear();
+  m_paths.clear();
+  m_view->getDialogs().showProgressWindow(true);
+  m_view->getDialogs().setProgressValue(0.0f);
 }
 
 bool GCode::openFile(const std::string& filepath)
 {
   if (!m_app)
     return false;
-  auto& renderer = m_app->getRenderer();
 
-  m_file.open(filepath);
-  if (m_file.is_open()) {
-    renderer.deletePrimitivesById("gcode");
-    renderer.deletePrimitivesById("gcode_arrows");
-    m_line_count = countLines(filepath);
-    m_lines_consumed = 0;
-    m_filename = filepath;
-    LOG_F(
-      INFO, "Opened file: %s, size: %lu lines", filepath.c_str(), m_line_count);
-    m_view->getDialogs().showProgressWindow(true);
-    m_view->getDialogs().setProgressValue(0.0f);
-    return true;
-  }
-  else {
+  std::ifstream file(filepath);
+  if (!file.is_open()) {
     LOG_F(ERROR, "Could not open file: %s", filepath.c_str());
     return false;
   }
+
+  m_lines.clear();
+  std::string line;
+  while (std::getline(file, line)) {
+    m_lines.push_back(std::move(line));
+  }
+  file.close();
+
+  m_filename = filepath;
+  resetParseState();
+  LOG_F(
+    INFO, "Opened file: %s, size: %lu lines", filepath.c_str(), m_line_count);
+  return true;
 }
+
+bool GCode::loadFromLines(std::vector<std::string>&& lines)
+{
+  if (!m_app)
+    return false;
+
+  m_lines = lines;
+  m_filename = "";
+  resetParseState();
+  LOG_F(INFO, "Loaded %lu lines from memory", m_line_count);
+  return true;
+}
+
+const std::vector<std::string>& GCode::getLines() const { return m_lines; }
 
 nlohmann::json GCode::parseLine(const std::string& line)
 {
@@ -130,7 +152,8 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
           direction_indicator->m_is_closed = false; // V shaped
           direction_indicator->color = getColor(Color::Blue);
           direction_indicator->id = "gcode_arrows";
-          direction_indicator->flags = PrimitiveFlags::GCode | PrimitiveFlags::GCodeArrow;
+          direction_indicator->flags =
+            PrimitiveFlags::GCode | PrimitiveFlags::GCodeArrow;
           direction_indicator->matrix_callback = m_view->getTransformCallback();
           direction_indicator->visible = false;
         }
@@ -144,10 +167,10 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
       g->m_is_closed = false;
       g->id = "gcode";
       g->flags = PrimitiveFlags::GCode;
-      g->user_data = rapid_line;  // Store rapid_line index as type-safe int
+      g->user_data = rapid_line; // Store rapid_line index as type-safe int
       g->color = getColor(Color::White);
       g->matrix_callback = m_view->getTransformCallback();
-      g->mouse_callback = [view = m_view](Primitive*                           c,
+      g->mouse_callback = [view = m_view](Primitive*                       c,
                                           const Primitive::MouseEventData& e) {
         view->getHmi().mouseCallback(c, e);
       };
@@ -165,9 +188,9 @@ bool GCode::parseTimer()
     return false;
   auto& renderer = m_app->getRenderer();
 
-  std::string line;
   for (int x = 0; x < 1000; x++) {
-    if (std::getline(m_file, line)) {
+    if (m_line_index < m_lines.size()) {
+      const std::string& line = m_lines[m_line_index++];
       m_lines_consumed++;
       m_view->getDialogs().setProgressValue((float) m_lines_consumed /
                                             (float) m_line_count);
@@ -219,24 +242,22 @@ bool GCode::parseTimer()
       }
     }
     else {
-      LOG_F(INFO, "Reached end of file!");
+      LOG_F(INFO, "Reached end of G-code lines!");
       pushCurrentPathToViewer(m_last_rapid_line);
       if (m_current_path.points.size() > 0)
         m_paths.push_back(m_current_path);
       m_current_path.points.clear();
-      m_file.close();
       m_view->getDialogs().setProgressValue(1.0f);
       m_view->getDialogs().showProgressWindow(false);
       auto& stack = renderer.getPrimitiveStack();
       for (size_t x = 0; x < stack.size(); x++) {
-        if ((stack.at(x)->flags & PrimitiveFlags::GCode) != PrimitiveFlags::None) {
+        if ((stack.at(x)->flags & PrimitiveFlags::GCode) !=
+            PrimitiveFlags::None) {
           stack.at(x)->visible = true;
         }
       }
       return false;
     }
   }
-  // LOG_F(INFO, "Progress: %.4f", (float)(((float)m_lines_consumed /
-  // (float)m_line_count) * 100.0f));
   return true;
 }

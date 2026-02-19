@@ -164,13 +164,13 @@ public:
     p.precise_jog_units = j.at("precise_jog_units").get<float>();
   }
 
-  Preferences                     m_preferences;
-  Box*                            m_machine_plane;
-  Box*                            m_cuttable_plane;
-  Circle*                         m_torch_pointer;
-  Circle*                         m_waypoint_pointer;
-  MachineParameters               m_machine_parameters;
-  Point2d                         m_way_point_position;
+  Preferences       m_preferences;
+  Box*              m_machine_plane;
+  Box*              m_cuttable_plane;
+  Circle*           m_torch_pointer;
+  Circle*           m_waypoint_pointer;
+  MachineParameters m_machine_parameters;
+  Point2d           m_way_point_position;
 
   // UI elements
   NcRender::NcRenderGui* m_menu_bar = nullptr;
@@ -194,8 +194,8 @@ public:
   explicit NcControlView(NcApp* app)
     : View(app), m_machine_plane(nullptr), m_cuttable_plane(nullptr),
       m_torch_pointer(nullptr), m_waypoint_pointer(nullptr),
-      m_way_point_position{}, m_motion_controller(nullptr),
-      m_hmi(nullptr), m_app(app) {
+      m_way_point_position{}, m_motion_controller(nullptr), m_hmi(nullptr),
+      m_app(app) {
         // Dependency injection constructor
       };
 
@@ -209,6 +209,7 @@ public:
   void           tick() override;
   void           makeActive();
   void           close();
+  void           loadGCodeFromLines(std::vector<std::string>&& lines);
 
   void handleMouseEvent(const MouseButtonEvent& e,
                         const InputState&       input) override;
