@@ -1316,15 +1316,6 @@ bool DXFParsePathAdaptor::shouldSkipCurrentEntity()
   // Get layer name (before lowercase transform for flag lookup)
   std::string layer_name = attribs.getLayer();
 
-  // Check layer flags (frozen, off, etc.)
-  auto it = m_layer_props.find(layer_name);
-  if (it != m_layer_props.end()) {
-    int flags = it->second.flags;
-    if (flags & 0x01) { // Check if frozen
-      return true;
-    }
-  }
-
   // Skip construction layer entities
   std::string layer_name_lower = layer_name;
   std::transform(layer_name_lower.begin(),

@@ -128,6 +128,7 @@ void NcRender::pushTimer(unsigned long interval, std::function<bool()> c)
 {
   m_timer_stack.emplace_back(m_current_view, millis(), interval, c);
 }
+
 NcRender::NcRenderGui* NcRender::pushGui(bool                  visible,
                                          std::function<void()> callback)
 {

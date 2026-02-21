@@ -868,24 +868,29 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   renderPartsViewer(selected_part);
   ImGui::Separator();
   renderOperationsViewer(show_create_operation, show_edit_tool_operation);
-  ImGui::Separator();
-  renderLayersViewer();
 
   // Action buttons pinned to bottom of pane
-  bool has_toolpaths =
-    std::any_of(m_toolpath_operations.begin(),
-                m_toolpath_operations.end(),
-                [](const auto& op) { return op.enabled; });
+  bool has_toolpaths = std::any_of(m_toolpath_operations.begin(),
+                                   m_toolpath_operations.end(),
+                                   [](const auto& op) { return op.enabled; });
 
   float button_area_height =
-    ImGui::GetFrameHeightWithSpacing() * 2 + ImGui::GetStyle().ItemSpacing.y;
+    ImGui::GetFrameHeightWithSpacing() * 3 + ImGui::GetStyle().ItemSpacing.y;
   float target_y = ImGui::GetWindowHeight() - button_area_height -
                    ImGui::GetStyle().WindowPadding.y;
   if (ImGui::GetCursorPosY() < target_y) {
     ImGui::SetCursorPosY(target_y);
   }
 
+  bool has_parts = false;
+  forEachPart([&](Part*) { has_parts = true; });
+  ImGui::BeginDisabled(!has_parts || m_nesting_in_progress);
+  if (ImGui::Button("Arrange", ImVec2(-1, 0))) {
+    m_action_stack.push_back(std::make_unique<ArrangePartsAction>());
+  }
+  ImGui::EndDisabled();
   ImGui::Separator();
+
   ImGui::BeginDisabled(!has_toolpaths);
   if (ImGui::Button("Save GCode", ImVec2(-1, 0))) {
     std::string path = ".";
@@ -964,6 +969,43 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
       ImGui::EndPopup();
     }
     if (tree_node_open) {
+      // Layer visibility checkboxes
+      if (!part->m_layers.empty()) {
+        std::vector<std::string> layer_names;
+        layer_names.reserve(part->m_layers.size());
+        for (const auto& [name, layer] : part->m_layers) {
+          layer_names.push_back(name);
+        }
+        std::sort(layer_names.begin(), layer_names.end());
+
+        ImGui::Text("Layers:");
+        for (const auto& layer_name : layer_names) {
+          auto& layer = part->m_layers[layer_name];
+          bool  visible = layer.visible;
+          if (ImGui::Checkbox(
+                ("##layer_" + part->m_part_name + "_" + layer_name).c_str(),
+                &visible)) {
+            layer.visible = visible;
+            // Propagate to duplicates (prefix match)
+            std::string prefix = part->m_part_name + ":";
+            forEachPart([&](Part* dup) {
+              if (dup->m_part_name.find(prefix) == 0) {
+                auto dup_layer_it = dup->m_layers.find(layer_name);
+                if (dup_layer_it != dup->m_layers.end()) {
+                  dup_layer_it->second.visible = visible;
+                  dup->m_last_control.angle = dup->m_control.angle + 1.0;
+                }
+              }
+            });
+            part->m_last_control.angle = part->m_control.angle + 1.0;
+            reevaluateContours();
+          }
+          ImGui::SameLine();
+          ImGui::Text("%s", layer_name.c_str());
+        }
+        ImGui::Separator();
+      }
+
       std::string prefix = part->m_part_name + ":";
       forEachPart([&](Part* dup) {
         if (dup->m_part_name.find(prefix) == 0) {
@@ -1034,57 +1076,6 @@ void NcCamView::renderOperationsViewer(bool& show_create_operation,
       m_action_stack.push_back(std::make_unique<DeleteOperationAction>(x));
     }
   }
-  ImGui::EndTable();
-}
-
-void NcCamView::renderLayersViewer()
-{
-  if (!m_app)
-    return;
-
-  if (!ImGui::BeginTable("layers_table",
-                         2,
-                         ImGuiTableFlags_SizingFixedFit |
-                           ImGuiTableFlags_Reorderable |
-                           ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders))
-    return;
-
-  ImGui::TableSetupColumn("Visible");
-  ImGui::TableSetupColumn("Layer");
-  ImGui::TableHeadersRow();
-
-  std::vector<std::string> layers = getAllLayers();
-  for (const auto& layer : layers) {
-    ImGui::TableNextRow();
-
-    // Checkbox column
-    ImGui::TableSetColumnIndex(0);
-    // Initialize layer visibility if not in map (default to visible)
-    if (m_layer_visibility.find(layer) == m_layer_visibility.end()) {
-      m_layer_visibility[layer] = true;
-    }
-    bool visible = m_layer_visibility[layer];
-    if (ImGui::Checkbox(("##visible_" + layer).c_str(), &visible)) {
-      m_layer_visibility[layer] = visible;
-
-      // Sync visibility to all Part layers and force rebuild
-      forEachPart([&](Part* part) {
-        auto layer_it = part->m_layers.find(layer);
-        if (layer_it != part->m_layers.end()) {
-          layer_it->second.visible = visible;
-          // Force rebuild of toolpaths by invalidating last_control
-          part->m_last_control.angle = part->m_control.angle + 1.0;
-        }
-      });
-
-      reevaluateContours();
-    }
-
-    // Layer name column
-    ImGui::TableSetColumnIndex(1);
-    ImGui::Text("%s", layer.c_str());
-  }
-
   ImGui::EndTable();
 }
 
@@ -1166,6 +1157,34 @@ std::vector<std::string> NcCamView::getAllLayers()
   return layers;
 }
 
+void NcCamView::resetNesting()
+{
+  m_dxf_nest = PolyNest::PolyNest();
+  m_dxf_nest.setExtents(
+    {m_material_plane->m_bottom_left.x, m_material_plane->m_bottom_left.y},
+    {m_material_plane->m_bottom_left.x + m_material_plane->m_width,
+     m_material_plane->m_bottom_left.y + m_material_plane->m_height});
+}
+
+std::vector<std::vector<PolyNest::PolyPoint>>
+NcCamView::collectOutsideContours(Part* part)
+{
+  std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
+  for (const auto& [layer_name, layer] : part->m_layers) {
+    for (const auto& path : layer.paths) {
+      if (!path.is_inside_contour) {
+        std::vector<PolyNest::PolyPoint> points;
+        points.reserve(path.points.size());
+        for (const auto& p : path.points) {
+          points.push_back({p.x, p.y});
+        }
+        poly_part.push_back(std::move(points));
+      }
+    }
+  }
+  return poly_part;
+}
+
 void NcCamView::reevaluateContours()
 {
   // Collect all paths from all parts with their layer information
@@ -1208,16 +1227,18 @@ void NcCamView::reevaluateContours()
                              .paths[all_path_refs[x].path_index];
 
     for (size_t i = 0; i < all_path_refs.size(); i++) {
-      if (i == x)
+      if (i == x or all_path_refs[i].part != all_path_refs[x].part)
         continue;
 
       // Skip non-closed paths - they can't contain other paths
       if (!all_path_refs[i].is_closed)
         continue;
 
-      // Check if layer i is visible (default to visible if not in map)
-      auto it = m_layer_visibility.find(all_path_refs[i].layer_name);
-      bool is_visible = (it == m_layer_visibility.end()) || it->second;
+      // Check if layer i is visible
+      auto layer_it =
+        all_path_refs[i].part->m_layers.find(all_path_refs[i].layer_name);
+      bool is_visible = (layer_it != all_path_refs[i].part->m_layers.end()) &&
+                        layer_it->second.visible;
 
       if (!is_visible)
         continue; // Skip invisible layers
@@ -1403,7 +1424,6 @@ void NcCamView::DeletePartAction::execute(NcCamView* view)
   }
 }
 
-// DuplicatePartAction implementation
 void NcCamView::DuplicatePartAction::execute(NcCamView* view)
 {
   if (!view->m_app)
@@ -1419,30 +1439,11 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
   });
 
   // Setup nesting
-  view->m_dxf_nest = PolyNest::PolyNest();
-  view->m_dxf_nest.setExtents(
-    PolyNest::PolyPoint(view->m_material_plane->m_bottom_left.x,
-                        view->m_material_plane->m_bottom_left.y),
-    PolyNest::PolyPoint(view->m_material_plane->m_bottom_left.x +
-                          view->m_material_plane->m_width,
-                        view->m_material_plane->m_bottom_left.y +
-                          view->m_material_plane->m_height));
+  view->resetNesting();
 
   // Add existing parts to nesting
   view->forEachPart([&](Part* part) {
-    std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-    for (const auto& [layer_name, layer] : part->m_layers) {
-      for (const auto& path : layer.paths) {
-        if (path.is_inside_contour == false) {
-          std::vector<PolyNest::PolyPoint> points;
-          points.reserve(path.points.size());
-          for (const auto& p : path.points) {
-            points.push_back({ p.x, p.y });
-          }
-          poly_part.push_back(std::move(points));
-        }
-      }
-    }
+    auto poly_part = view->collectOutsideContours(part);
     view->m_dxf_nest.pushPlacedPolyPart(poly_part,
                                         &part->m_control.offset.x,
                                         &part->m_control.offset.y,
@@ -1456,22 +1457,11 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
     return;
 
   // Collect data from master part before modifying the primitive stack
-  std::unordered_map<std::string, Part::Layer>  layers_copy;
-  std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-
+  std::unordered_map<std::string, Part::Layer> layers_copy;
   for (const auto& [layer_name, layer] : master_part->m_layers) {
     layers_copy[layer_name] = layer;
-    for (const auto& path : layer.paths) {
-      if (!path.is_inside_contour) {
-        std::vector<PolyNest::PolyPoint> points;
-        points.reserve(path.points.size());
-        for (const auto& p : path.points) {
-          points.push_back({ p.x, p.y });
-        }
-        poly_part.push_back(std::move(points));
-      }
-    }
   }
+  auto poly_part = view->collectOutsideContours(master_part);
 
   // Create duplicate outside any iteration (avoids iterator invalidation)
   Part* new_part = renderer.pushPrimitive<Part>(
@@ -1492,6 +1482,7 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
   new_part->m_control.scale = master_part->m_control.scale;
   new_part->mouse_callback = master_part->mouse_callback;
   new_part->matrix_callback = master_part->matrix_callback;
+  new_part->visible = false; // Hidden until nesting places it
 
   view->m_dxf_nest.pushUnplacedPolyPart(poly_part,
                                         &new_part->m_control.offset.x,
@@ -1500,28 +1491,60 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
                                         &new_part->visible);
 
   view->m_dxf_nest.beginPlaceUnplacedPolyParts();
-  renderer.pushTimer(0, [view]() {
-    return view->m_dxf_nest.placeUnplacedPolyPartsTick(&view->m_dxf_nest);
-  });
+  view->startNestingThread();
 }
 
-void NcCamView::renderProgressWindow(void* p)
+void NcCamView::ArrangePartsAction::execute(NcCamView* view)
 {
-  NcCamView* self = reinterpret_cast<NcCamView*>(p);
-  if (self != NULL) {
-    ImGui::Begin("Progress",
-                 &self->m_progress_window_handle->visible,
-                 ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::ProgressBar(self->m_progress_window_progress, ImVec2(0.0f, 0.0f));
-    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-    ImGui::Text("Progress");
-    ImGui::End();
-  }
+  if (!view->m_app)
+    return;
+
+  view->resetNesting();
+
+  // Push all parts as unplaced, resetting their positions
+  view->forEachPart([&](Part* part) {
+    part->m_control.offset = { 0, 0 };
+    part->m_control.angle = 0;
+    part->visible = false;
+
+    auto poly_part = view->collectOutsideContours(part);
+    view->m_dxf_nest.pushUnplacedPolyPart(poly_part,
+                                          &part->m_control.offset.x,
+                                          &part->m_control.offset.y,
+                                          &part->m_control.angle,
+                                          &part->visible);
+  });
+
+  view->m_dxf_nest.beginPlaceUnplacedPolyParts();
+  view->startNestingThread();
 }
-void NcCamView::showProgressWindow(bool v)
+
+void NcCamView::renderProgressWindow()
 {
-  m_progress_window_progress = 0.0;
-  m_progress_window_handle->visible = true;
+  if (!m_nesting_in_progress)
+    return;
+
+  ImGui::Begin("Nesting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  float progress = m_nesting_progress.load();
+  ImGui::ProgressBar(progress, ImVec2(200.f, 0.0f));
+  ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+  ImGui::Text("Placing parts...");
+  ImGui::End();
+}
+
+void NcCamView::startNestingThread()
+{
+  if (m_nesting_thread && m_nesting_thread->joinable()) {
+    m_nesting_thread->join();
+  }
+
+  m_nesting_in_progress = true;
+  m_nesting_progress = 0.0f;
+
+  m_nesting_thread = std::make_unique<std::thread>([this]() {
+    m_dxf_nest.placeAllUnplacedParts(&m_nesting_progress);
+    m_nesting_in_progress = false;
+  });
 }
 
 bool NcCamView::dxfFileOpen(std::string filename,
@@ -1534,37 +1557,16 @@ bool NcCamView::dxfFileOpen(std::string filename,
   auto& renderer = m_app->getRenderer();
   m_dxf_fp.reset(fopen(filename.c_str(), "rt"));
   if (m_dxf_fp) {
-    m_dxf_nest = PolyNest::PolyNest();
-    m_dxf_nest.setExtents(
-      { m_material_plane->m_bottom_left.x, m_material_plane->m_bottom_left.y },
-      { m_material_plane->m_bottom_left.x + m_material_plane->m_width,
-        m_material_plane->m_bottom_left.y + m_material_plane->m_height });
-    for (auto& pPrimitive : renderer.getPrimitiveStack()) {
-      // Copy existing objects
-      auto* part = dynamic_cast<Part*>(pPrimitive.get());
-      if (part and part->view == renderer.getCurrentView()) {
-        std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-        for (const auto& [layer_name, layer] : part->m_layers) {
-          for (const auto& path : layer.paths) {
-            if (path.is_inside_contour == false) {
-              std::vector<PolyNest::PolyPoint> points;
-              points.reserve(path.points.size());
-              for (const Point2d& p : path.points) {
-                points.push_back({ p.x, p.y });
-              }
-              poly_part.push_back(std::move(points));
-            }
-          }
-        }
-        m_dxf_nest.pushPlacedPolyPart(poly_part,
-                                      &part->m_control.offset.x,
-                                      &part->m_control.offset.y,
-                                      &part->m_control.angle,
-                                      &part->visible);
-      }
-    }
+    resetNesting();
+    forEachPart([&](Part* part) {
+      auto poly_part = collectOutsideContours(part);
+      m_dxf_nest.pushPlacedPolyPart(poly_part,
+                                    &part->m_control.offset.x,
+                                    &part->m_control.offset.y,
+                                    &part->m_control.angle,
+                                    &part->visible);
+    });
     m_dl_dxf = std::make_unique<DL_Dxf>();
-    auto& renderer = m_app->getRenderer();
     m_dxf_creation_interface = std::make_unique<DXFParsePathAdaptor>(
       &renderer,
       getTransformCallback(),
@@ -1575,88 +1577,64 @@ bool NcCamView::dxfFileOpen(std::string filename,
     m_dxf_creation_interface->setFilename(name);
     m_dxf_creation_interface->setImportScale(import_scale);
     m_dxf_creation_interface->setImportQuality(import_quality);
-    // m_dxf_creation_interface->SetSmoothing(0.030);
-    renderer.pushTimer(100, [this]() { return dxfFileParseTimer(this); });
+    parseDxfFile();
     LOG_F(INFO, "Parsing DXF File: %s", filename.c_str());
     return true;
   }
   return false;
 }
 
-bool NcCamView::dxfFileParseTimer(void* p)
+void NcCamView::parseDxfFile()
 {
-  NcCamView* self = reinterpret_cast<NcCamView*>(p);
-  if (self != NULL && self->m_app) {
-    auto& renderer = self->m_app->getRenderer();
-    // self->DXFcreationInterface->SetScaleFactor(15.4);
-    // self->DXFcreationInterface->SetSmoothing(0.0);
-    // self->DXFcreationInterface->SetChainTolorance(0.001);
-    while (self->m_dl_dxf->readDxfGroups(
-      self->m_dxf_fp.get(), self->m_dxf_creation_interface.get())) {
-    }
-    LOG_F(INFO, "Successfully parsed DXF groups.");
+  if (!m_app)
+    return;
+  auto& renderer = m_app->getRenderer();
 
-    // Point2d bbox_min, bbox_max;
-    // size_t         vertex_count;
-    // self->DXFcreationInterface->
-    // self->DXFcreationInterface->GetApproxBoundingBox(
-    //   bbox_min, bbox_max, vertex_count);
-    // const double area = (bbox_max.x - bbox_min.x) * (bbox_max.y -
-    // bbox_min.y); const double avg_density = vertex_count / area; const
-    // double target_density =
-    //   1 / std::pow(self->DXFcreationInterface->chain_tolerance, 2);
+  while (
+    m_dl_dxf->readDxfGroups(m_dxf_fp.get(), m_dxf_creation_interface.get())) {
+  }
+  LOG_F(INFO, "Successfully parsed DXF groups.");
 
-    // LOG_F(INFO,
-    //       "avg density = %f, target density = %f",
-    //       avg_density,
-    //       target_density);
+  m_dxf_creation_interface->finish();
 
-    self->m_dxf_creation_interface->finish();
-
-    // Initialize layer visibility from DXF frozen state
-    // DXF layer flag bit 0x01 indicates frozen layer
-    for (const auto& [layer_name, layer_props] :
-         self->m_dxf_creation_interface->m_layer_props) {
-      bool is_frozen = (layer_props.flags & 0x01) != 0;
-      self->m_layer_visibility[layer_name] = !is_frozen;
-    }
-
-    for (auto& pPrimitive : renderer.getPrimitiveStack()) {
-      auto* part = dynamic_cast<Part*>(pPrimitive.get());
-      if (part and pPrimitive->view == renderer.getCurrentView() and
-          part->m_part_name == self->m_dxf_creation_interface->m_filename) {
-        std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-        for (const auto& [layer_name, layer] : part->m_layers) {
-          for (const auto& path : layer.paths) {
-            if (path.is_inside_contour == false) {
-              std::vector<PolyNest::PolyPoint> points;
-              points.reserve(path.points.size());
-              for (const Point2d& p : path.points) {
-                points.push_back({ p.x, p.y });
-              }
-              poly_part.push_back(std::move(points));
-            }
+  // Set frozen DXF layers to invisible on the Part
+  for (auto& pPrimitive : renderer.getPrimitiveStack()) {
+    auto* part = dynamic_cast<Part*>(pPrimitive.get());
+    if (part && pPrimitive->view == renderer.getCurrentView() &&
+        part->m_part_name == m_dxf_creation_interface->m_filename) {
+      for (const auto& [layer_name, layer_props] :
+           m_dxf_creation_interface->m_layer_props) {
+        bool is_frozen = (layer_props.flags & 0x01) != 0;
+        if (is_frozen) {
+          auto layer_it = part->m_layers.find(layer_name);
+          if (layer_it != part->m_layers.end()) {
+            layer_it->second.visible = false;
           }
         }
-        part->visible = true;
-        self->m_dxf_nest.pushUnplacedPolyPart(poly_part,
-                                              &part->m_control.offset.x,
-                                              &part->m_control.offset.y,
-                                              &part->m_control.angle,
-                                              &part->visible);
       }
     }
-    self->m_dxf_nest.beginPlaceUnplacedPolyParts();
-    renderer.pushTimer(0, [self]() {
-      return self->m_dxf_nest.placeUnplacedPolyPartsTick(&self->m_dxf_nest);
-    });
-    // Smart pointers automatically handle cleanup
-    self->m_dxf_fp.reset();
-    self->m_dxf_creation_interface.reset();
-    self->m_dl_dxf.reset();
-    return false;
   }
-  return false;
+
+  for (auto& pPrimitive : renderer.getPrimitiveStack()) {
+    auto* part = dynamic_cast<Part*>(pPrimitive.get());
+    if (part and pPrimitive->view == renderer.getCurrentView() and
+        part->m_part_name == m_dxf_creation_interface->m_filename) {
+      part->visible = false; // Hidden until nesting places it
+      auto poly_part = collectOutsideContours(part);
+      m_dxf_nest.pushUnplacedPolyPart(poly_part,
+                                      &part->m_control.offset.x,
+                                      &part->m_control.offset.y,
+                                      &part->m_control.angle,
+                                      &part->visible);
+    }
+  }
+  m_dxf_nest.beginPlaceUnplacedPolyParts();
+  startNestingThread();
+
+  // Smart pointers automatically handle cleanup
+  m_dxf_fp.reset();
+  m_dxf_creation_interface.reset();
+  m_dl_dxf.reset();
 }
 void NcCamView::preInit()
 {
@@ -1707,8 +1685,8 @@ void NcCamView::init()
   m_app->getRenderer().setCurrentView("NcCamView");
   // Events now handled through view delegation system
   m_menu_bar = m_app->getRenderer().pushGui(true, [this]() { RenderUI(); });
-  m_progress_window_handle = m_app->getRenderer().pushGui(
-    false, [this]() { renderProgressWindow(this); });
+  m_progress_window_handle =
+    m_app->getRenderer().pushGui(true, [this]() { renderProgressWindow(); });
   m_material_plane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d{ 0, 0 },
                                             m_job_options.material_size[0],
@@ -1796,7 +1774,12 @@ void NcCamView::makeActive()
                                      m_preferences.background_color[2] *
                                        255.0f);
 }
-void NcCamView::close() {}
+void NcCamView::close()
+{
+  if (m_nesting_thread && m_nesting_thread->joinable()) {
+    m_nesting_thread->join();
+  }
+}
 
 void NcCamView::handleScrollEvent(const ScrollEvent& e, const InputState& input)
 {

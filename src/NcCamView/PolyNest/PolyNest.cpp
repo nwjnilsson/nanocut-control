@@ -424,103 +424,117 @@ void PolyNest::PolyNest::setExtents(PolyPoint min, PolyPoint max)
   m_max_extents = max;
 }
 
-bool PolyNest::PolyNest::placeUnplacedPolyPartsTick(void* p)
+void PolyNest::PolyNest::placeAllUnplacedParts(std::atomic<float>* progress)
 {
-  PolyNest* self = reinterpret_cast<PolyNest*>(p);
-  if (self == NULL || self->m_unplaced_parts.empty()) {
-    return false; // Nothing to do, stop the timer
+  if (m_unplaced_parts.empty()) {
+    if (progress) progress->store(1.0f);
+    return;
   }
 
-  while (not self->m_unplaced_parts.empty()) {
-    auto& part = self->m_unplaced_parts.front();
+  const size_t total_parts = m_unplaced_parts.size() + m_placed_parts.size();
+  const size_t initially_placed = m_placed_parts.size();
+
+  while (not m_unplaced_parts.empty()) {
+    auto& part = m_unplaced_parts.front();
 
     // Use part-proportional increments for the grid search
     double part_width = part.m_bbox_max.x - part.m_bbox_min.x;
     double part_height = part.m_bbox_max.y - part.m_bbox_min.y;
-    double x_step = std::max(part_width * 0.1, self->m_offset_increments.x);
-    double y_step = std::max(part_height * 0.1, self->m_offset_increments.y);
+    double x_step = std::max(part_width * 0.1, m_offset_increments.x);
+    double y_step = std::max(part_height * 0.1, m_offset_increments.y);
 
-    if (self->m_found_valid_placement) {
+    if (m_found_valid_placement) {
       LOG_F(INFO,
             "Found valid placement at offset (%.3f, %.3f) (rotation: %.3f)",
             *part.m_offset_x,
             *part.m_offset_y,
             *part.m_angle);
       *part.m_visible = true;
-      self->m_found_valid_placement = false;
-      self->m_placed_parts.push_back(self->m_unplaced_parts.front());
-      self->m_unplaced_parts.erase(self->m_unplaced_parts.begin());
-      if (not self->m_unplaced_parts.empty()) {
-        auto& next_part = self->m_unplaced_parts.front();
-        *next_part.m_offset_x = self->getDefaultOffsetXY(next_part).x;
-        *next_part.m_offset_y = self->getDefaultOffsetXY(next_part).y;
+      m_found_valid_placement = false;
+      m_placed_parts.push_back(m_unplaced_parts.front());
+      m_unplaced_parts.erase(m_unplaced_parts.begin());
+      if (not m_unplaced_parts.empty()) {
+        auto& next_part = m_unplaced_parts.front();
+        *next_part.m_offset_x = getDefaultOffsetXY(next_part).x;
+        *next_part.m_offset_y = getDefaultOffsetXY(next_part).y;
       }
-      self->resetBestPlacement(); // Reset best placement for next part
+      resetBestPlacement(); // Reset best placement for next part
+      if (progress) {
+        size_t placed_so_far = m_placed_parts.size() - initially_placed;
+        progress->store(static_cast<float>(placed_so_far) /
+                        static_cast<float>(total_parts - initially_placed));
+      }
       continue;
     }
 
     // Try all rotations at the current position
-    for (size_t x = 0; x < (360.0 / self->m_rotation_increments); x++) {
+    for (size_t x = 0; x < (360.0 / m_rotation_increments); x++) {
       // Check extents first (cheap) before collision (expensive)
-      if (self->checkIfPolyPartIsInsideExtents(
-            part, self->m_min_extents, self->m_max_extents) &&
-          !self->checkIfPolyPartTouchesAnyPlacedPolyPart(part)) {
-        self->m_found_valid_placement = true;
+      if (checkIfPolyPartIsInsideExtents(
+            part, m_min_extents, m_max_extents) &&
+          !checkIfPolyPartTouchesAnyPlacedPolyPart(part)) {
+        m_found_valid_placement = true;
         break;
       }
-      
+
       // Track near-miss placements for fallback
-      self->updateBestPlacement(part, *part.m_offset_x, *part.m_offset_y, *part.m_angle);
-      
-      *part.m_angle += self->m_rotation_increments;
+      updateBestPlacement(part, *part.m_offset_x, *part.m_offset_y, *part.m_angle);
+
+      *part.m_angle += m_rotation_increments;
       if (*part.m_angle >= 360)
         *part.m_angle -= 360.0;
       part.build();
     }
 
-    if (self->m_found_valid_placement) {
+    if (m_found_valid_placement) {
       continue; // Will be placed on next while iteration
     }
 
     // No valid rotation at this position, advance to next grid position
     *part.m_offset_x += x_step;
-    if (*part.m_offset_x > self->m_max_extents.x) {
-      *part.m_offset_x = self->getDefaultOffsetXY(part).x;
+    if (*part.m_offset_x > m_max_extents.x) {
+      *part.m_offset_x = getDefaultOffsetXY(part).x;
       *part.m_offset_y += y_step;
     }
-    if (*part.m_offset_y > self->m_max_extents.y) {
+    if (*part.m_offset_y > m_max_extents.y) {
       // Out of space, use best near-miss placement if available
-      if (self->m_best_placement.valid && self->m_best_placement.score > 0.0) {
+      if (m_best_placement.valid && m_best_placement.score > 0.0) {
         LOG_F(INFO, "Using best near-miss placement (score: %.3f) at offset (%.3f, %.3f) (rotation: %.3f)",
-              self->m_best_placement.score,
-              self->m_best_placement.offset_x,
-              self->m_best_placement.offset_y,
-              self->m_best_placement.angle);
-        
-        *part.m_offset_x = self->m_best_placement.offset_x;
-        *part.m_offset_y = self->m_best_placement.offset_y;
-        *part.m_angle = self->m_best_placement.angle;
+              m_best_placement.score,
+              m_best_placement.offset_x,
+              m_best_placement.offset_y,
+              m_best_placement.angle);
+
+        *part.m_offset_x = m_best_placement.offset_x;
+        *part.m_offset_y = m_best_placement.offset_y;
+        *part.m_angle = m_best_placement.angle;
         part.build();
         *part.m_visible = true;
-        self->m_placed_parts.push_back(self->m_unplaced_parts.front());
-        self->m_unplaced_parts.erase(self->m_unplaced_parts.begin());
-        self->resetBestPlacement();
-        
-        if (not self->m_unplaced_parts.empty()) {
-          auto& next_part = self->m_unplaced_parts.front();
-          *next_part.m_offset_x = self->getDefaultOffsetXY(next_part).x;
-          *next_part.m_offset_y = self->getDefaultOffsetXY(next_part).y;
+        m_placed_parts.push_back(m_unplaced_parts.front());
+        m_unplaced_parts.erase(m_unplaced_parts.begin());
+        resetBestPlacement();
+
+        if (not m_unplaced_parts.empty()) {
+          auto& next_part = m_unplaced_parts.front();
+          *next_part.m_offset_x = getDefaultOffsetXY(next_part).x;
+          *next_part.m_offset_y = getDefaultOffsetXY(next_part).y;
+        }
+        if (progress) {
+          size_t placed_so_far = m_placed_parts.size() - initially_placed;
+          progress->store(static_cast<float>(placed_so_far) /
+                          static_cast<float>(total_parts - initially_placed));
         }
         continue;
       }
       else {
         LOG_F(INFO, "Not enough material to place part!");
         *part.m_visible = true;
-        return false; // Out of space, stop the timer
+        if (progress) progress->store(1.0f);
+        return;
       }
     }
     part.build();
   }
 
-  return false; // All parts placed, stop the timer
+  if (progress) progress->store(1.0f);
 }

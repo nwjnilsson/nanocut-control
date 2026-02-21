@@ -2,8 +2,10 @@
 #define JET_CAM_VIEW_
 
 // Standard library includes
+#include <atomic>
 #include <cstdio>
 #include <memory>
+#include <thread>
 
 // System includes
 #include <NcRender/NcRender.h>
@@ -151,6 +153,11 @@ private:
     void execute(NcCamView* view) override;
   };
 
+  class ArrangePartsAction : public CamAction {
+  public:
+    void execute(NcCamView* view) override;
+  };
+
   std::vector<std::unique_ptr<CamAction>> m_action_stack;
   NcRender::NcRenderGui*                  m_menu_bar;
   void zoomEventCallback(const ScrollEvent& e, const InputState& input);
@@ -174,8 +181,7 @@ private:
   void renderPartsViewer(Part*& selected_part);
   void renderOperationsViewer(bool& show_create_operation,
                               int&  show_edit_tool_operation);
-  void renderLayersViewer();
-  void                    reevaluateContours();
+  void reevaluateContours();
   std::vector<std::string> generateGCode();
 
   // Iteration helpers for Part management
@@ -185,8 +191,10 @@ private:
   std::vector<Part*>            getAllParts();
   std::vector<std::string>      getAllLayers();
 
-  // Layer visibility state
-  std::unordered_map<std::string, bool> m_layer_visibility;
+  // Nesting helpers
+  void resetNesting();
+  std::vector<std::vector<PolyNest::PolyPoint>> collectOutsideContours(
+    Part* part);
 
   Point2d m_show_viewer_context_menu;
   Point2d m_last_mouse_click_position;
@@ -203,12 +211,16 @@ private:
                                                    std::string name,
                                                    int         import_quality,
                                                    float       import_scale);
-  static bool                          dxfFileParseTimer(void* p);
+  void                                 parseDxfFile();
 
-  float                  m_progress_window_progress;
+  // Threading for nesting placement
+  std::unique_ptr<std::thread> m_nesting_thread;
+  std::atomic<bool>            m_nesting_in_progress{false};
+  std::atomic<float>           m_nesting_progress{0.0f};
+  void                         startNestingThread();
+
   NcRender::NcRenderGui* m_progress_window_handle;
-  void                   showProgressWindow(bool v);
-  static void            renderProgressWindow(void* p);
+  void                   renderProgressWindow();
 
 public:
   Part*  m_mouse_over_part;

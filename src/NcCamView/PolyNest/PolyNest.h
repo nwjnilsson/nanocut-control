@@ -6,6 +6,7 @@
 #include <NanoCut.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -133,7 +134,7 @@ public:
                                  double*                             angle,
                                  bool*                               visible);
   void        beginPlaceUnplacedPolyParts();
-  static bool placeUnplacedPolyPartsTick(void* p);
+  void        placeAllUnplacedParts(std::atomic<float>* progress);
 };
 }; // namespace PolyNest
 
