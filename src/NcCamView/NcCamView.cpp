@@ -874,21 +874,73 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
                                    m_toolpath_operations.end(),
                                    [](const auto& op) { return op.enabled; });
 
+  // Calculate height needed for bottom section
+  int failed = m_operation.failed_count.load();
+  bool operation_in_progress = m_operation.in_progress.load();
   float button_area_height =
     ImGui::GetFrameHeightWithSpacing() * 3 + ImGui::GetStyle().ItemSpacing.y;
+
+  // Add space for progress bar if operation is running
+  if (operation_in_progress) {
+    button_area_height += ImGui::GetFrameHeightWithSpacing() * 2.0f;
+  }
+
+  // Add space for warning text if needed (approximately 2-3 lines of wrapped text)
+  if (failed > 0) {
+    button_area_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f;
+  }
+
   float target_y = ImGui::GetWindowHeight() - button_area_height -
                    ImGui::GetStyle().WindowPadding.y;
   if (ImGui::GetCursorPosY() < target_y) {
     ImGui::SetCursorPosY(target_y);
   }
 
+  // Show progress bar for background operations
+  if (operation_in_progress) {
+    // Get operation title
+    const char* operation_title = "Progress";
+    switch (m_operation.type) {
+      case BackgroundOperationType::Nesting:
+        operation_title = "Nesting";
+        break;
+      case BackgroundOperationType::DxfImport:
+        operation_title = "Importing DXF";
+        break;
+      case BackgroundOperationType::ToolpathGeneration:
+        operation_title = "Generating Toolpaths";
+        break;
+      default:
+        break;
+    }
+
+    ImGui::Separator();
+    ImGui::Text("%s", operation_title);
+    float progress = m_operation.progress.load();
+    ImGui::ProgressBar(progress, ImVec2(-1, 0));
+    ImGui::TextWrapped("%s", m_operation.status_text.c_str());
+    ImGui::Separator();
+  }
+
+  // Show warning if parts failed to place
+  if (failed > 0) {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.86f, 0.48f, 0.15f, 1.0f));
+    ImGui::TextWrapped(
+      "Warning: %d part%s could not be placed. Not enough material space.",
+      failed,
+      failed == 1 ? "" : "s");
+    ImGui::PopStyleColor();
+  }
+
   bool has_parts = false;
   forEachPart([&](Part*) { has_parts = true; });
-  ImGui::BeginDisabled(!has_parts || m_nesting_in_progress);
+  bool nesting_active = (m_operation.type == BackgroundOperationType::Nesting && m_operation.in_progress);
+  ImGui::BeginDisabled(!has_parts || nesting_active);
   if (ImGui::Button("Arrange", ImVec2(-1, 0))) {
     m_action_stack.push_back(std::make_unique<ArrangePartsAction>());
   }
   ImGui::EndDisabled();
+
   ImGui::Separator();
 
   ImGui::BeginDisabled(!has_toolpaths);
@@ -1161,9 +1213,9 @@ void NcCamView::resetNesting()
 {
   m_dxf_nest = PolyNest::PolyNest();
   m_dxf_nest.setExtents(
-    {m_material_plane->m_bottom_left.x, m_material_plane->m_bottom_left.y},
-    {m_material_plane->m_bottom_left.x + m_material_plane->m_width,
-     m_material_plane->m_bottom_left.y + m_material_plane->m_height});
+    { m_material_plane->m_bottom_left.x, m_material_plane->m_bottom_left.y },
+    { m_material_plane->m_bottom_left.x + m_material_plane->m_width,
+      m_material_plane->m_bottom_left.y + m_material_plane->m_height });
 }
 
 std::vector<std::vector<PolyNest::PolyPoint>>
@@ -1176,7 +1228,7 @@ NcCamView::collectOutsideContours(Part* part)
         std::vector<PolyNest::PolyPoint> points;
         points.reserve(path.points.size());
         for (const auto& p : path.points) {
-          points.push_back({p.x, p.y});
+          points.push_back({ p.x, p.y });
         }
         poly_part.push_back(std::move(points));
       }
@@ -1519,31 +1571,112 @@ void NcCamView::ArrangePartsAction::execute(NcCamView* view)
   view->startNestingThread();
 }
 
-void NcCamView::renderProgressWindow()
-{
-  if (!m_nesting_in_progress)
-    return;
-
-  ImGui::Begin("Nesting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  float progress = m_nesting_progress.load();
-  ImGui::ProgressBar(progress, ImVec2(200.f, 0.0f));
-  ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-  ImGui::Text("Placing parts...");
-  ImGui::End();
-}
-
 void NcCamView::startNestingThread()
 {
-  if (m_nesting_thread && m_nesting_thread->joinable()) {
-    m_nesting_thread->join();
+  // Handle previous background thread
+  if (m_background_thread && m_background_thread->joinable()) {
+    // Check if we're being called from within the background thread itself
+    if (std::this_thread::get_id() == m_background_thread->get_id()) {
+      // Detach the current thread so it can finish independently
+      m_background_thread->detach();
+    } else {
+      // Join from a different thread (normal case)
+      m_background_thread->join();
+    }
   }
 
-  m_nesting_in_progress = true;
-  m_nesting_progress = 0.0f;
+  // Setup operation state
+  m_operation.reset();
+  m_operation.type = BackgroundOperationType::Nesting;
+  m_operation.status_text = "Placing parts...";
+  m_operation.in_progress = true;
+  m_operation.progress = 0.0f;
+  m_operation.failed_count = 0;
 
-  m_nesting_thread = std::make_unique<std::thread>([this]() {
-    m_dxf_nest.placeAllUnplacedParts(&m_nesting_progress);
-    m_nesting_in_progress = false;
+  // Launch thread
+  m_background_thread = std::make_unique<std::thread>([this]() {
+    int failed = m_dxf_nest.placeAllUnplacedParts(&m_operation.progress);
+    m_operation.failed_count = failed;
+    m_operation.in_progress = false;
+  });
+}
+
+void NcCamView::startImportThread()
+{
+  // Join any previous background thread
+  if (m_background_thread && m_background_thread->joinable()) {
+    m_background_thread->join();
+  }
+
+  // Setup operation state BEFORE starting thread
+  m_operation.reset();
+  m_operation.type = BackgroundOperationType::DxfImport;
+  m_operation.status_text = "Processing DXF geometry...";
+  m_operation.in_progress = true;
+  m_operation.progress = 0.0f;
+
+  // Pass progress pointer to DXF adaptor
+  m_dxf_creation_interface->setProgressTracking(&m_operation.progress);
+
+  // Launch background thread
+  m_background_thread = std::make_unique<std::thread>([this]() {
+    if (!m_app)
+      return;
+    auto& renderer = m_app->getRenderer();
+
+    // Parse DXF file (blocking while loop reading groups)
+    while (m_dl_dxf->readDxfGroups(m_dxf_fp.get(), m_dxf_creation_interface.get())) {
+      // Progress updates happen in finish() method
+    }
+    LOG_F(INFO, "Successfully parsed DXF groups.");
+
+    // Process geometry (heavy work with 5 progress checkpoints)
+    m_dxf_creation_interface->finish();
+
+    // Post-processing: handle frozen layers
+    for (auto& pPrimitive : renderer.getPrimitiveStack()) {
+      auto* part = dynamic_cast<Part*>(pPrimitive.get());
+      if (part && pPrimitive->view == renderer.getCurrentView() &&
+          part->m_part_name == m_dxf_creation_interface->m_filename) {
+        for (const auto& [layer_name, layer_props] :
+             m_dxf_creation_interface->m_layer_props) {
+          bool is_frozen = (layer_props.flags & 0x01) != 0;
+          if (is_frozen) {
+            auto layer_it = part->m_layers.find(layer_name);
+            if (layer_it != part->m_layers.end()) {
+              layer_it->second.visible = false;
+            }
+          }
+        }
+      }
+    }
+
+    // Setup nesting with imported parts
+    for (auto& pPrimitive : renderer.getPrimitiveStack()) {
+      auto* part = dynamic_cast<Part*>(pPrimitive.get());
+      if (part and pPrimitive->view == renderer.getCurrentView() and
+          part->m_part_name == m_dxf_creation_interface->m_filename) {
+        part->visible = false; // Hidden until nesting places it
+        auto poly_part = collectOutsideContours(part);
+        m_dxf_nest.pushUnplacedPolyPart(poly_part,
+                                        &part->m_control.offset.x,
+                                        &part->m_control.offset.y,
+                                        &part->m_control.angle,
+                                        &part->visible);
+      }
+    }
+
+    // Import complete
+    m_operation.in_progress = false;
+
+    // Smart pointers automatically handle cleanup
+    m_dxf_fp.reset();
+    m_dxf_creation_interface.reset();
+    m_dl_dxf.reset();
+
+    // Chain to nesting operation
+    m_dxf_nest.beginPlaceUnplacedPolyParts();
+    startNestingThread();
   });
 }
 
@@ -1577,65 +1710,16 @@ bool NcCamView::dxfFileOpen(std::string filename,
     m_dxf_creation_interface->setFilename(name);
     m_dxf_creation_interface->setImportScale(import_scale);
     m_dxf_creation_interface->setImportQuality(import_quality);
-    parseDxfFile();
-    LOG_F(INFO, "Parsing DXF File: %s", filename.c_str());
+
+    // START THREADED IMPORT (replaces synchronous parseDxfFile())
+    startImportThread();
+
+    LOG_F(INFO, "Started DXF import thread for: %s", filename.c_str());
     return true;
   }
   return false;
 }
 
-void NcCamView::parseDxfFile()
-{
-  if (!m_app)
-    return;
-  auto& renderer = m_app->getRenderer();
-
-  while (
-    m_dl_dxf->readDxfGroups(m_dxf_fp.get(), m_dxf_creation_interface.get())) {
-  }
-  LOG_F(INFO, "Successfully parsed DXF groups.");
-
-  m_dxf_creation_interface->finish();
-
-  // Set frozen DXF layers to invisible on the Part
-  for (auto& pPrimitive : renderer.getPrimitiveStack()) {
-    auto* part = dynamic_cast<Part*>(pPrimitive.get());
-    if (part && pPrimitive->view == renderer.getCurrentView() &&
-        part->m_part_name == m_dxf_creation_interface->m_filename) {
-      for (const auto& [layer_name, layer_props] :
-           m_dxf_creation_interface->m_layer_props) {
-        bool is_frozen = (layer_props.flags & 0x01) != 0;
-        if (is_frozen) {
-          auto layer_it = part->m_layers.find(layer_name);
-          if (layer_it != part->m_layers.end()) {
-            layer_it->second.visible = false;
-          }
-        }
-      }
-    }
-  }
-
-  for (auto& pPrimitive : renderer.getPrimitiveStack()) {
-    auto* part = dynamic_cast<Part*>(pPrimitive.get());
-    if (part and pPrimitive->view == renderer.getCurrentView() and
-        part->m_part_name == m_dxf_creation_interface->m_filename) {
-      part->visible = false; // Hidden until nesting places it
-      auto poly_part = collectOutsideContours(part);
-      m_dxf_nest.pushUnplacedPolyPart(poly_part,
-                                      &part->m_control.offset.x,
-                                      &part->m_control.offset.y,
-                                      &part->m_control.angle,
-                                      &part->visible);
-    }
-  }
-  m_dxf_nest.beginPlaceUnplacedPolyParts();
-  startNestingThread();
-
-  // Smart pointers automatically handle cleanup
-  m_dxf_fp.reset();
-  m_dxf_creation_interface.reset();
-  m_dl_dxf.reset();
-}
 void NcCamView::preInit()
 {
   if (!m_app)
@@ -1685,8 +1769,6 @@ void NcCamView::init()
   m_app->getRenderer().setCurrentView("NcCamView");
   // Events now handled through view delegation system
   m_menu_bar = m_app->getRenderer().pushGui(true, [this]() { RenderUI(); });
-  m_progress_window_handle =
-    m_app->getRenderer().pushGui(true, [this]() { renderProgressWindow(); });
   m_material_plane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d{ 0, 0 },
                                             m_job_options.material_size[0],
@@ -1776,8 +1858,9 @@ void NcCamView::makeActive()
 }
 void NcCamView::close()
 {
-  if (m_nesting_thread && m_nesting_thread->joinable()) {
-    m_nesting_thread->join();
+  // Join background thread before destruction
+  if (m_background_thread && m_background_thread->joinable()) {
+    m_background_thread->join();
   }
 }
 

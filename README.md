@@ -1,12 +1,14 @@
 # NanoCut Control
 ![Build](https://github.com/nwjnilsson/nanocut-control/workflows/Build/badge.svg)
 
+> No Proma? No problem.
+
 Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)).
 NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine.
 NanoCut is Native Cross-Platform (Windows, Linux, and MacOS),
 but I have currently only tested it on Linux.
 
-# Features
+## Features
 - 2D Gcode Viewer
 - Built-In Machine Parameter Editing (No editing of Config files necessary)
 - Has a primary focus on CNC Plasma cutting and CNC Routing as a secondary focus
@@ -36,7 +38,9 @@ still be traces left of some pretty bizarre code. NanoCut also supports:
 - customizable precise jog distance
 - machine jogging by clicking anywhere on machine plane
 - panning control and CAM views (press and hold right click)
-- Much more robust DXF importer supporting variable quality and using proper NURBs
+- much more robust DXF importer supporting variable quality and using proper NURBs
+- multilayer .dxf support
+- automatic part arrangement in CAM view to save material
 
 ![deer](assets/cam_view.png "High quality DXF importing for gcode generation")
 

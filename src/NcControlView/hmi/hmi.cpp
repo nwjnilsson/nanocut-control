@@ -576,12 +576,14 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
         control_view.m_waypoint_pointer->visible = true;
 
         // Show popup asking user if they want to go to this location
+        // Position popup near the click location
         m_view->getDialogs().askYesNo(
           "Go to waypoint position?",
           [this]() { goToWaypoint(nullptr); },
           [&control_view]() {
             control_view.m_waypoint_pointer->visible = false;
-          });
+          },
+          screen_pos);
       }
     }
   }

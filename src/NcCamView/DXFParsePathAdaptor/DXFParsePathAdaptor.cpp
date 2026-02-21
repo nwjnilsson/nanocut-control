@@ -447,6 +447,11 @@ void DXFParsePathAdaptor::setChainTolerance(double chain_tolerance)
   m_chain_tolerance = chain_tolerance;
 }
 
+void DXFParsePathAdaptor::setProgressTracking(std::atomic<float>* progress)
+{
+  m_progress_ptr = progress;
+}
+
 void DXFParsePathAdaptor::getApproxBoundingBox(Point2d& bbox_min,
                                                Point2d& bbox_max,
                                                size_t&  vertex_count)
@@ -544,6 +549,9 @@ DXFParsePathAdaptor::chainify(const std::vector<DxfLine>& haystack,
   if (haystack.empty()) {
     return {};
   }
+
+  if (m_progress_ptr)
+    m_progress_ptr->store(0.f);
 
   std::vector<std::vector<Point2d>> contours;
 
@@ -686,9 +694,8 @@ DXFParsePathAdaptor::chainify(const std::vector<DxfLine>& haystack,
     if (used[start_idx])
       continue;
 
-    if (processed % 100 == 0) {
-      LOG_F(INFO, "Chaining %u%%", (uint32_t) (100 * processed / total));
-    }
+    m_progress_ptr->store(static_cast<float>(processed) /
+                          static_cast<float>(total));
 
     std::vector<Point2d> chain;
     Point2d              point;
@@ -800,7 +807,6 @@ void DXFParsePathAdaptor::scaleAllPoints(double scale)
 
 void DXFParsePathAdaptor::finish()
 {
-
   // Finalize any pending polyline
   if (m_current_polyline.points.size() > 0 && !m_skip_current_polyline) {
     m_layers[m_current_entity_layer].polylines.push_back(m_current_polyline);
@@ -895,9 +901,11 @@ void DXFParsePathAdaptor::finish()
         }
       }
     }
+  }
 
-    // Process polylines: convert bulges to arcs/lines and add to this layer's
-    // lines
+  // Process polylines: convert bulges to arcs/lines and add to this layer's
+  // lines
+  for (auto& [layer_name, layer_data] : m_layers) {
     for (const auto& polyline : layer_data.polylines) {
       for (size_t y = 0; y < polyline.points.size() - 1; y++) {
         if (polyline.points[y].bulge != 0) {
@@ -1078,7 +1086,8 @@ void DXFParsePathAdaptor::finish()
 
   // Collect all chains from all layers to calculate global bounding box
   std::vector<std::vector<Point2d>> all_chains;
-  std::vector<std::string> chain_layers; // Track which layer each chain belongs to
+  std::vector<std::string> chain_layers; // Track which layer each chain belongs
+                                         // to
 
   for (const auto& [layer_name, layer_data] : m_layers) {
     if (layer_data.lines.empty())
@@ -1136,10 +1145,10 @@ void DXFParsePathAdaptor::finish()
   // Determine inside/outside contours (check across ALL layers)
   // Create temporary flat list for containment checking
   struct PathRef {
-    std::string   layer_name;
-    size_t        path_index;
-    bool          is_closed;
-    geo::Extents  bbox;
+    std::string  layer_name;
+    size_t       path_index;
+    bool         is_closed;
+    geo::Extents bbox;
   };
   std::vector<PathRef> path_refs;
 
@@ -1156,13 +1165,16 @@ void DXFParsePathAdaptor::finish()
   }
 
   for (size_t x = 0; x < path_refs.size(); x++) {
-    auto& path_x = part_layers[path_refs[x].layer_name].paths[path_refs[x].path_index];
+    auto& path_x =
+      part_layers[path_refs[x].layer_name].paths[path_refs[x].path_index];
 
     for (size_t i = 0; i < path_refs.size(); i++) {
-      if (i == x) continue;
+      if (i == x)
+        continue;
 
       // Skip non-closed paths - they can't contain other paths
-      if (!path_refs[i].is_closed) continue;
+      if (!path_refs[i].is_closed)
+        continue;
 
       // Bounding box pre-check: if path_x's bbox isn't inside path_i's bbox,
       // skip expensive check
@@ -1170,13 +1182,15 @@ void DXFParsePathAdaptor::finish()
         continue;
       }
 
-      auto& path_i = part_layers[path_refs[i].layer_name].paths[path_refs[i].path_index];
+      auto& path_i =
+        part_layers[path_refs[i].layer_name].paths[path_refs[i].path_index];
 
       if (checkIfPathIsInsidePath(path_x.points, path_i.points)) {
         path_x.is_inside_contour = true;
         if (path_x.is_closed) {
           path_x.color = getColor(m_cam_view->m_inside_contour_color);
-        } else {
+        }
+        else {
           path_x.color = getColor(m_cam_view->m_open_contour_color);
         }
         break;
@@ -1195,7 +1209,8 @@ void DXFParsePathAdaptor::finish()
         part_layers.size());
 
   // Create the final primitive with layer-organized structure
-  Part* p = m_nc_render_instance->pushPrimitive<Part>(m_filename, std::move(part_layers));
+  Part* p = m_nc_render_instance->pushPrimitive<Part>(m_filename,
+                                                      std::move(part_layers));
   p->m_control.smoothing = m_smoothing;
   p->m_control.scale = 1.0;
   p->mouse_callback = m_mouse_callback;

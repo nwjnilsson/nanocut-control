@@ -138,9 +138,15 @@ void NcDialogs::renderMachineParameters()
 {
   static NcControlView::MachineParameters temp_parameters =
     m_view->m_machine_parameters;
+
+  // Make the window full-screen and modal
+  ImGui::SetNextWindowPos(ImVec2(0, 0));
+  ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
   ImGui::Begin("Machine Parameters",
                &m_machine_parameters_window_handle->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
+               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoCollapse);
   ImGui::Separator();
   ImGui::Text(
     "Machine extents is the max distance each axis can travel freely. X0 is "
@@ -380,33 +386,45 @@ void NcDialogs::renderControllerHomingWindow()
   ImGui::End();
 }
 
-void NcDialogs::askYesNo(const std::string&    question,
-                         std::function<void()> yes_callback,
-                         std::function<void()> no_callback)
+void NcDialogs::askYesNo(const std::string&     question,
+                         std::function<void()>  yes_callback,
+                         std::function<void()>  no_callback,
+                         std::optional<Point2d> placement)
 {
-  m_ask_text = question;
-  m_ask_window_yes_callback = yes_callback;
-  m_ask_window_no_callback = no_callback;
-  LOG_F(INFO, "Ask Window => %s", m_ask_text.c_str());
-  m_ask_window_handle->visible = true;
+  m_ask_window.text = question;
+  m_ask_window.yes_callback = yes_callback;
+  m_ask_window.no_callback = no_callback;
+  m_ask_window.placement = placement;
+  LOG_F(INFO, "Ask Window => %s", m_ask_window.text.c_str());
+  m_ask_window.handle->visible = true;
 }
 
 void NcDialogs::renderAskWindow()
 {
+  if (m_ask_window.placement.has_value()) {
+    const Point2d& pos = m_ask_window.placement.value();
+    auto           window_size = ImGui::GetIO().DisplaySize;
+    float window_x = static_cast<float>(pos.x) + (window_size.x / 2.0f);
+    float window_y = (window_size.y / 2.0f) - static_cast<float>(pos.y);
+
+    ImGui::SetNextWindowPos(ImVec2(window_x + 10.0f, window_y + 10.0f),
+                            ImGuiCond_Always);
+  }
+
   ImGui::Begin("Question",
-               &m_ask_window_handle->visible,
+               &m_ask_window.handle->visible,
                ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("%s", m_ask_text.c_str());
+  ImGui::Text("%s", m_ask_window.text.c_str());
   if (ImGui::Button("Yes")) {
-    if (m_ask_window_yes_callback)
-      m_ask_window_yes_callback();
-    m_ask_window_handle->visible = false;
+    if (m_ask_window.yes_callback)
+      m_ask_window.yes_callback();
+    m_ask_window.handle->visible = false;
   }
   ImGui::SameLine();
   if (ImGui::Button("No")) {
-    if (m_ask_window_no_callback)
-      m_ask_window_no_callback();
-    m_ask_window_handle->visible = false;
+    if (m_ask_window.no_callback)
+      m_ask_window.no_callback();
+    m_ask_window.handle->visible = false;
   }
   ImGui::End();
 }
@@ -462,7 +480,7 @@ void NcDialogs::init()
     false, [this]() { renderControllerAlarmWindow(); });
   m_controller_homing_window_handle = m_app->getRenderer().pushGui(
     false, [this]() { renderControllerHomingWindow(); });
-  m_ask_window_handle =
+  m_ask_window.handle =
     m_app->getRenderer().pushGui(false, [this]() { renderAskWindow(); });
   m_thc_window_handle =
     m_app->getRenderer().pushGui(false, [this]() { renderThcWindow(); });

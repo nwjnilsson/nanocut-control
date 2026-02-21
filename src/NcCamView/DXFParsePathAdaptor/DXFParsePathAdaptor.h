@@ -133,6 +133,7 @@ public:
   void setImportQuality(int quality);
   void setSmoothing(float smoothing);
   void setChainTolerance(double chain_tolerance);
+  void setProgressTracking(std::atomic<float>* progress);
   void getApproxBoundingBox(Point2d& bbox_min,
                             Point2d& bbox_max,
                             size_t&  vertex_count);
@@ -178,6 +179,7 @@ public:
   int         m_import_quality;
   double      m_chain_tolerance;
   Units       m_units;
+  std::atomic<float>* m_progress_ptr = nullptr;  // Optional progress tracking
 
   // All geometry organized by layer name
   std::unordered_map<std::string, DxfLayerData> m_layers;

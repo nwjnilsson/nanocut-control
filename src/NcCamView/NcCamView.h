@@ -41,6 +41,29 @@ struct FileDeleter {
 #define DEFAULT_LEAD_IN (DEFAULT_KERF_WIDTH * 1.5f)
 #define DEFAULT_LEAD_OUT DEFAULT_LEAD_IN
 
+enum class BackgroundOperationType {
+  None,
+  Nesting,
+  DxfImport,
+  ToolpathGeneration  // Future extensibility
+};
+
+struct BackgroundOperationState {
+  BackgroundOperationType type = BackgroundOperationType::None;
+  std::atomic<bool>       in_progress{false};
+  std::atomic<float>      progress{0.0f};       // 0.0 to 1.0
+  std::string             status_text;          // Set once before thread starts
+  std::atomic<int>        failed_count{0};      // For operations that can partially fail
+
+  void reset() {
+    type = BackgroundOperationType::None;
+    in_progress = false;
+    progress = 0.0f;
+    status_text.clear();
+    failed_count = 0;
+  }
+};
+
 class NcCamView : public View {
 private:
   struct Preferences {
@@ -211,16 +234,12 @@ private:
                                                    std::string name,
                                                    int         import_quality,
                                                    float       import_scale);
-  void                                 parseDxfFile();
 
-  // Threading for nesting placement
-  std::unique_ptr<std::thread> m_nesting_thread;
-  std::atomic<bool>            m_nesting_in_progress{false};
-  std::atomic<float>           m_nesting_progress{0.0f};
+  // Unified threading for all background operations
+  std::unique_ptr<std::thread> m_background_thread;
+  BackgroundOperationState     m_operation;
   void                         startNestingThread();
-
-  NcRender::NcRenderGui* m_progress_window_handle;
-  void                   renderProgressWindow();
+  void                         startImportThread();
 
 public:
   Part*  m_mouse_over_part;

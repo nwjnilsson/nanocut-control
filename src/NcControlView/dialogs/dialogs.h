@@ -3,6 +3,7 @@
 
 #include <NcRender/NcRender.h>
 #include <functional>
+#include <optional>
 #include <string>
 
 // Forward declarations
@@ -59,9 +60,10 @@ public:
   void showThcWindow(bool visible);
 
   // Yes/No question dialog
-  void askYesNo(const std::string&    question,
-                std::function<void()> yes_callback,
-                std::function<void()> no_callback = nullptr);
+  void askYesNo(const std::string&       question,
+                std::function<void()>    yes_callback,
+                std::function<void()>    no_callback = nullptr,
+                std::optional<Point2d>   placement = std::nullopt);
 
 private:
   // Application context
@@ -78,15 +80,21 @@ private:
   NcRender::NcRenderGui* m_controller_offline_window_handle = nullptr;
   NcRender::NcRenderGui* m_controller_alarm_window_handle = nullptr;
   NcRender::NcRenderGui* m_controller_homing_window_handle = nullptr;
-  NcRender::NcRenderGui* m_ask_window_handle = nullptr;
+
+  // Ask window data
+  struct AskWindowData {
+    std::string           text;
+    std::function<void()> yes_callback;
+    std::function<void()> no_callback;
+    NcRender::NcRenderGui* handle = nullptr;
+    std::optional<Point2d> placement;
+  };
 
   // Dialog state
   float                 m_progress = 0.0f;
   std::string           m_info;
   std::string           m_controller_alarm_text;
-  std::string           m_ask_text;
-  std::function<void()> m_ask_window_yes_callback;
-  std::function<void()> m_ask_window_no_callback;
+  AskWindowData         m_ask_window;
 
   // Private rendering methods
   void renderFileOpen();
