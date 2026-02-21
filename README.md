@@ -38,7 +38,7 @@ still be traces left of some pretty bizarre code. NanoCut also supports:
 - panning control and CAM views (press and hold right click)
 - Much more robust DXF importer supporting variable quality and using proper NURBs
 
-![deer](assets/deer.png "High quality DXF importing for gcode generation")
+![deer](assets/cam_view.png "High quality DXF importing for gcode generation")
 
 ## Important notes on using this software
 - If you intend to use imperial units for your machine, go into `include/config.h`

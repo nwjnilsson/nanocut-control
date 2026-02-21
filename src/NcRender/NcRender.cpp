@@ -412,7 +412,7 @@ bool NcRender::poll(bool should_quit)
   glLoadIdentity();
   glViewport(0, 0, m_window_size[0], m_window_size[1]);
   glClear(GL_COLOR_BUFFER_BIT);
-  std::sort(
+  std::stable_sort(
     m_primitive_stack.begin(),
     m_primitive_stack.end(),
     [](const auto& lhs, const auto& rhs) { return lhs->zindex < rhs->zindex; });

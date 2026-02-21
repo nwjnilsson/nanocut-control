@@ -448,6 +448,7 @@ bool Part::checkIfPathIsInsidePath(std::vector<Point2d> path1,
   }
   return false;
 }
+
 std::vector<std::vector<Point2d>> Part::getOrderedToolpaths()
 {
   std::vector<std::vector<Point2d>> toolpaths = m_tool_paths;

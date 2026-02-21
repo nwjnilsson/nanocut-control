@@ -1,16 +1,16 @@
 #include "NcCamView.h"
-#include "../NcApp/NcApp.h"
 #include "../Input/InputEvents.h"
 #include "../Input/InputState.h"
+#include "../NcApp/NcApp.h"
 #include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"
 #include "NcControlView/NcControlView.h"
 #include "PolyNest/PolyNest.h"
+#include <ImGuiFileDialog.h>
 #include <NcControlView/util.h>
 #include <NcRender/NcRender.h>
-#include <ImGuiFileDialog.h>
+#include <dxflib/dl_dxf.h>
 #include <imgui.h>
 #include <loguru.hpp>
-#include <dxflib/dl_dxf.h>
 
 // JSON serialization for ToolData
 void NcCamView::to_json(nlohmann::json& j, const ToolData& tool)
@@ -293,14 +293,14 @@ in the part's properties after importing.
   if (show_edit_contour == true) {
     ImGui::Begin(
       "Edit Contour", &show_edit_contour, ImGuiWindowFlags_AlwaysAutoResize);
-    Part* part = dynamic_cast<Part*>(m_edit_contour_part);
-    static char layer_buffer[1024];
+    Part*              part = dynamic_cast<Part*>(m_edit_contour_part);
+    static char        layer_buffer[1024];
     static std::string current_layer_name;
 
     if (part) {
       // Find the path by global index and get its layer name
       size_t current_index = 0;
-      bool found = false;
+      bool   found = false;
       for (auto& [layer_name, layer] : part->m_layers) {
         for (size_t i = 0; i < layer.paths.size(); i++) {
           if (current_index == m_edit_contour_path) {
@@ -311,7 +311,8 @@ in the part's properties after importing.
           }
           current_index++;
         }
-        if (found) break;
+        if (found)
+          break;
       }
 
       ImGui::InputText("Layer", layer_buffer, IM_ARRAYSIZE(layer_buffer));
@@ -333,7 +334,7 @@ in the part's properties after importing.
             current_index++;
           }
         }
-        done_moving:;
+      done_moving:;
       }
     }
     if (ImGui::Button("Ok")) {
@@ -352,11 +353,12 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
 
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
-      bool has_toolpaths = std::any_of(
-        m_toolpath_operations.begin(), m_toolpath_operations.end(),
-        [](const auto& op) { return op.enabled; });
-      if (ImGui::MenuItem("Post Process", "", false, has_toolpaths)) {
-        LOG_F(INFO, "File->Post Process");
+      bool has_toolpaths =
+        std::any_of(m_toolpath_operations.begin(),
+                    m_toolpath_operations.end(),
+                    [](const auto& op) { return op.enabled; });
+      if (ImGui::MenuItem("Save GCode", "", false, has_toolpaths)) {
+        LOG_F(INFO, "File->Save GCode");
         std::string path = ".";
         auto&       renderer = m_app->getRenderer();
         std::string p = renderer.fileToString(renderer.getConfigDirectory() +
@@ -373,11 +375,11 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
         LOG_F(INFO, "File->Send to Controller");
         m_action_stack.push_back(std::make_unique<SendToControllerAction>());
       }
-      ImGui::Separator();
-      if (ImGui::MenuItem("Save Job", "")) {
-      }
-      if (ImGui::MenuItem("Open Job", "")) {
-      }
+      // ImGui::Separator();
+      // if (ImGui::MenuItem("Save Job", "")) {
+      // }
+      // if (ImGui::MenuItem("Open Job", "")) {
+      // }
       ImGui::Separator();
       if (ImGui::MenuItem("New Part", "")) {
         LOG_F(INFO, "File->Open");
@@ -475,7 +477,7 @@ void NcCamView::renderContextMenus(bool& show_edit_contour)
       if (m_mouse_over_part) {
         // Find and delete path by global index
         size_t current_index = 0;
-        bool found = false;
+        bool   found = false;
         for (auto& [layer_name, layer] : m_mouse_over_part->m_layers) {
           for (auto it = layer.paths.begin(); it != layer.paths.end(); ++it) {
             if (current_index == m_mouse_over_path) {
@@ -486,7 +488,8 @@ void NcCamView::renderContextMenus(bool& show_edit_contour)
             }
             current_index++;
           }
-          if (found) break;
+          if (found)
+            break;
         }
       }
       m_show_viewer_context_menu = Point2d::infNeg();
@@ -868,6 +871,39 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   ImGui::Separator();
   renderLayersViewer();
 
+  // Action buttons pinned to bottom of pane
+  bool has_toolpaths =
+    std::any_of(m_toolpath_operations.begin(),
+                m_toolpath_operations.end(),
+                [](const auto& op) { return op.enabled; });
+
+  float button_area_height =
+    ImGui::GetFrameHeightWithSpacing() * 2 + ImGui::GetStyle().ItemSpacing.y;
+  float target_y = ImGui::GetWindowHeight() - button_area_height -
+                   ImGui::GetStyle().WindowPadding.y;
+  if (ImGui::GetCursorPosY() < target_y) {
+    ImGui::SetCursorPosY(target_y);
+  }
+
+  ImGui::Separator();
+  ImGui::BeginDisabled(!has_toolpaths);
+  if (ImGui::Button("Save GCode", ImVec2(-1, 0))) {
+    std::string path = ".";
+    std::string p = renderer.fileToString(renderer.getConfigDirectory() +
+                                          "last_nc_post_path.conf");
+    if (p != "") {
+      path = p;
+    }
+    IGFD::FileDialogConfig config;
+    config.path = path;
+    ImGuiFileDialog::Instance()->OpenDialog(
+      "PostNcDialog", "Choose File", ".nc", config);
+  }
+  if (ImGui::Button("Send to Controller", ImVec2(-1, 0))) {
+    m_action_stack.push_back(std::make_unique<SendToControllerAction>());
+  }
+  ImGui::EndDisabled();
+
   ImGui::End();
 }
 
@@ -934,9 +970,9 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
           ImGui::Checkbox(std::string("##" + dup->m_part_name).c_str(),
                           &dup->visible);
           ImGui::SameLine();
-          ImGui::TreeNodeEx(
-            dup->m_part_name.c_str(),
-            ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+          ImGui::TreeNodeEx(dup->m_part_name.c_str(),
+                            ImGuiTreeNodeFlags_Leaf |
+                              ImGuiTreeNodeFlags_NoTreePushOnOpen);
           if (ImGui::BeginPopupContextItem()) {
             if (ImGui::MenuItem("Delete")) {
               m_action_stack.push_back(
@@ -1159,27 +1195,32 @@ void NcCamView::reevaluateContours()
 
   // Reset all paths to outside contour
   for (auto& ref : all_path_refs) {
-    Part::path_t& path = ref.part->m_layers[ref.layer_name].paths[ref.path_index];
+    Part::path_t& path =
+      ref.part->m_layers[ref.layer_name].paths[ref.path_index];
     path.is_inside_contour = false;
     path.color = getColor(m_outside_contour_color);
   }
 
   // Re-evaluate inside/outside relationships considering only visible layers
   for (size_t x = 0; x < all_path_refs.size(); x++) {
-    Part::path_t& path_x = all_path_refs[x].part->m_layers[all_path_refs[x].layer_name]
+    Part::path_t& path_x = all_path_refs[x]
+                             .part->m_layers[all_path_refs[x].layer_name]
                              .paths[all_path_refs[x].path_index];
 
     for (size_t i = 0; i < all_path_refs.size(); i++) {
-      if (i == x) continue;
+      if (i == x)
+        continue;
 
       // Skip non-closed paths - they can't contain other paths
-      if (!all_path_refs[i].is_closed) continue;
+      if (!all_path_refs[i].is_closed)
+        continue;
 
       // Check if layer i is visible (default to visible if not in map)
       auto it = m_layer_visibility.find(all_path_refs[i].layer_name);
       bool is_visible = (it == m_layer_visibility.end()) || it->second;
 
-      if (!is_visible) continue; // Skip invisible layers
+      if (!is_visible)
+        continue; // Skip invisible layers
 
       // Bounding box pre-check: if path_x's bbox isn't inside path_i's bbox,
       // then path_x can't be inside path_i
@@ -1187,15 +1228,18 @@ void NcCamView::reevaluateContours()
         continue;
       }
 
-      Part::path_t& path_i = all_path_refs[i].part->m_layers[all_path_refs[i].layer_name]
+      Part::path_t& path_i = all_path_refs[i]
+                               .part->m_layers[all_path_refs[i].layer_name]
                                .paths[all_path_refs[i].path_index];
 
       // Now do the expensive check
-      if (all_path_refs[x].part->checkIfPathIsInsidePath(path_x.points, path_i.points)) {
+      if (all_path_refs[x].part->checkIfPathIsInsidePath(path_x.points,
+                                                         path_i.points)) {
         path_x.is_inside_contour = true;
         if (all_path_refs[x].is_closed) {
           path_x.color = getColor(m_inside_contour_color);
-        } else {
+        }
+        else {
           path_x.color = getColor(m_open_contour_color);
         }
         break;
@@ -1208,56 +1252,65 @@ void NcCamView::reevaluateContours()
 // Action Handler Methods
 // ============================================================================
 
-// PostProcessAction implementation
-void NcCamView::PostProcessAction::execute(NcCamView* view)
+// Generate G-code lines from current toolpath operations
+std::vector<std::string> NcCamView::generateGCode()
 {
-  if (!view->m_app)
-    return;
-  auto&         renderer = view->m_app->getRenderer();
-  std::ofstream gcode_file;
-  gcode_file.open(m_file);
+  std::vector<std::string> lines;
 
-  if (!gcode_file.is_open()) {
-    LOG_F(WARNING, "Could not open gcode file for writing!");
-    return;
-  }
-
-  for (size_t i = 0; i < view->m_toolpath_operations.size(); i++) {
+  for (size_t i = 0; i < m_toolpath_operations.size(); i++) {
     LOG_F(INFO,
-          "Posting toolpath operation: %lu on layer: %s",
+          "Generating toolpath operation: %lu on layer: %s",
           i,
-          view->m_toolpath_operations[i].layer.c_str());
+          m_toolpath_operations[i].layer.c_str());
 
-    view->forEachVisiblePart([&](Part* part) {
+    forEachVisiblePart([&](Part* part) {
       std::vector<std::vector<Point2d>> tool_paths =
         part->getOrderedToolpaths();
 
-      if (view->m_tool_library.size() >
-          view->m_toolpath_operations[i].tool_number) {
-        const auto& tool =
-          view->m_tool_library[view->m_toolpath_operations[i].tool_number];
+      if (m_tool_library.size() > m_toolpath_operations[i].tool_number) {
+        const auto& tool = m_tool_library[m_toolpath_operations[i].tool_number];
 
-        // Output tool-specific THC target
         if (tool.thc > 0) {
-          gcode_file << "$T=" << tool.thc << "\n";
+          lines.push_back("$T=" + std::to_string(tool.thc));
         }
 
         for (size_t x = 0; x < tool_paths.size(); x++) {
-          gcode_file << "G0 X" << tool_paths[x][0].x << " Y"
-                     << tool_paths[x][0].y << "\n";
-          gcode_file << "fire_torch " << tool.pierce_height << " "
-                     << tool.pierce_delay << " " << tool.cut_height << "\n";
+          lines.push_back("G0 X" + std::to_string(-tool_paths[x][0].x) + " Y" +
+                          std::to_string(-tool_paths[x][0].y));
+          lines.push_back("fire_torch " + std::to_string(tool.pierce_height) +
+                          " " + std::to_string(tool.pierce_delay) + " " +
+                          std::to_string(tool.cut_height));
           for (size_t z = 0; z < tool_paths[x].size(); z++) {
-            gcode_file << "G1 X" << tool_paths[x][z].x << " Y"
-                       << tool_paths[x][z].y << " F" << tool.feed_rate << "\n";
+            lines.push_back("G1 X" + std::to_string(-tool_paths[x][z].x) +
+                            " Y" + std::to_string(-tool_paths[x][z].y) + " F" +
+                            std::to_string(tool.feed_rate));
           }
-          gcode_file << "torch_off\n";
+          lines.push_back("torch_off");
         }
       }
     });
   }
 
-  gcode_file << "M30\n";
+  lines.push_back("M30");
+  return lines;
+}
+
+// PostProcessAction implementation
+void NcCamView::PostProcessAction::execute(NcCamView* view)
+{
+  if (!view->m_app)
+    return;
+
+  std::ofstream gcode_file(m_file);
+  if (!gcode_file.is_open()) {
+    LOG_F(WARNING, "Could not open gcode file for writing!");
+    return;
+  }
+
+  for (const auto& line : view->generateGCode()) {
+    gcode_file << line << "\n";
+  }
+
   gcode_file.close();
   LOG_F(INFO, "Finished writing gcode file!");
 }
@@ -1268,47 +1321,7 @@ void NcCamView::SendToControllerAction::execute(NcCamView* view)
   if (!view->m_app)
     return;
 
-  std::vector<std::string> lines;
-
-  for (size_t i = 0; i < view->m_toolpath_operations.size(); i++) {
-    LOG_F(INFO,
-          "Sending toolpath operation: %lu on layer: %s",
-          i,
-          view->m_toolpath_operations[i].layer.c_str());
-
-    view->forEachVisiblePart([&](Part* part) {
-      std::vector<std::vector<Point2d>> tool_paths =
-        part->getOrderedToolpaths();
-
-      if (view->m_tool_library.size() >
-          view->m_toolpath_operations[i].tool_number) {
-        const auto& tool =
-          view->m_tool_library[view->m_toolpath_operations[i].tool_number];
-
-        if (tool.thc > 0) {
-          lines.push_back("$T=" + std::to_string(tool.thc));
-        }
-
-        for (size_t x = 0; x < tool_paths.size(); x++) {
-          lines.push_back("G0 X" + std::to_string(tool_paths[x][0].x) +
-                          " Y" + std::to_string(tool_paths[x][0].y));
-          lines.push_back("fire_torch " +
-                          std::to_string(tool.pierce_height) + " " +
-                          std::to_string(tool.pierce_delay) + " " +
-                          std::to_string(tool.cut_height));
-          for (size_t z = 0; z < tool_paths[x].size(); z++) {
-            lines.push_back("G1 X" + std::to_string(tool_paths[x][z].x) +
-                            " Y" + std::to_string(tool_paths[x][z].y) +
-                            " F" + std::to_string(tool.feed_rate));
-          }
-          lines.push_back("torch_off");
-        }
-      }
-    });
-  }
-
-  lines.push_back("M30");
-  view->m_app->getControlView().loadGCodeFromLines(std::move(lines));
+  view->m_app->getControlView().loadGCodeFromLines(view->generateGCode());
   LOG_F(INFO, "Sent G-code to controller!");
 }
 
@@ -1466,8 +1479,8 @@ void NcCamView::DuplicatePartAction::execute(NcCamView* view)
 
   // Set initial position
   if (dup_count > 1) {
-    Part* prev_dup = view->findPartByName(
-      m_part_name + ":" + std::to_string(dup_count - 1));
+    Part* prev_dup =
+      view->findPartByName(m_part_name + ":" + std::to_string(dup_count - 1));
     if (prev_dup) {
       new_part->m_control.offset = prev_dup->m_control.offset;
     }

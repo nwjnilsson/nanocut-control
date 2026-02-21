@@ -175,7 +175,8 @@ private:
   void renderOperationsViewer(bool& show_create_operation,
                               int&  show_edit_tool_operation);
   void renderLayersViewer();
-  void reevaluateContours();
+  void                    reevaluateContours();
+  std::vector<std::string> generateGCode();
 
   // Iteration helpers for Part management
   template <typename Func> void forEachPart(Func&& func);
