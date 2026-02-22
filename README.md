@@ -1,6 +1,6 @@
 # NanoCut Control
-![Linux Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build.yml/badge.svg?branch=main&event=push)
-![Windows Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build.yml/badge.svg?branch=main&event=push)
+![Linux Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build-linux.yml/badge.svg?branch=main&event=push)
+![Windows Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build-windows.yml/badge.svg?branch=main&event=push)
 
 > No Proma? No problem.
 
