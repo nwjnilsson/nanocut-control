@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NanoCut
+Comment=Control NanoCut Machine
+Exec=NanoCut
+Icon=nanocut
+Terminal=false
+Categories=Utilities

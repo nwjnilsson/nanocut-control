@@ -10,5 +10,9 @@ pkgs.stdenv.mkDerivation {
     zlib
     libGLU
     glfw
+    (python314.withPackages (ps: with ps; [
+      mkdocs
+      mkdocs-material
+    ]))
   ];
 }

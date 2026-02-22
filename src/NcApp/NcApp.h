@@ -125,6 +125,7 @@ private:
   std::unique_ptr<NcAdminView>   m_admin_view;
 
   // Helper methods
+  void setWindowIcon();
   void logUptime();
   void modifierKeyCallback(const nlohmann::json& e);
   void registerModifierKeyEvents();

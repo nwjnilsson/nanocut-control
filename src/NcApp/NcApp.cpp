@@ -11,8 +11,13 @@
 #include <imgui.h>
 #include <loguru.hpp>
 #include <nlohmann/json.hpp>
+#include <stb_image.h>
 #include <stdexcept>
 #include <sys/stat.h>
+
+#include <icons/nanocut_64_png.h>
+#include <icons/nanocut_128_png.h>
+#include <icons/nanocut_256_png.h>
 
 NcApp::NcApp()
   : m_start_timestamp(NcRender::millis()),
@@ -35,6 +40,9 @@ bool NcApp::initializeWindow(int argc, char** argv)
     glfwTerminate();
     return false;
   }
+
+  // Set window icon (no-op on macOS where glfwSetWindowIcon is unsupported)
+  setWindowIcon();
 
   // Set window user pointer to this NcApp instance for callbacks
   glfwSetWindowUserPointer(m_window, reinterpret_cast<void*>(this));
@@ -152,6 +160,45 @@ void NcApp::shutdown()
   }
 
   // Smart pointers automatically handle cleanup
+}
+
+void NcApp::setWindowIcon()
+{
+#ifndef __APPLE__ // glfwSetWindowIcon is not supported on macOS
+  struct IconData {
+    const unsigned char* data;
+    unsigned int         len;
+  };
+
+  const IconData icons[] = {
+    { nanocut_64_png,  nanocut_64_png_len  },
+    { nanocut_128_png, nanocut_128_png_len },
+    { nanocut_256_png, nanocut_256_png_len },
+  };
+
+  GLFWimage images[3];
+  int       loaded = 0;
+
+  for (int i = 0; i < 3; i++) {
+    int w, h, channels;
+    unsigned char* pixels = stbi_load_from_memory(
+      icons[i].data, icons[i].len, &w, &h, &channels, 4);
+    if (pixels) {
+      images[loaded].width  = w;
+      images[loaded].height = h;
+      images[loaded].pixels = pixels;
+      loaded++;
+    }
+  }
+
+  if (loaded > 0) {
+    glfwSetWindowIcon(m_window, loaded, images);
+  }
+
+  for (int i = 0; i < loaded; i++) {
+    stbi_image_free(images[i].pixels);
+  }
+#endif
 }
 
 void NcApp::logUptime()

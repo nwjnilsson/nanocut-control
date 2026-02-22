@@ -8,6 +8,14 @@ endif()
 
 #
 # ------------------------------------------------------------
+# Custom CMake modules
+# ------------------------------------------------------------
+#
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(EmbedResource)
+
+#
+# ------------------------------------------------------------
 # Build type and C++ version
 # ------------------------------------------------------------
 #
@@ -213,6 +221,21 @@ message(STATUS "All third-party dependencies configured successfully")
 
 #
 # ------------------------------------------------------------
+# Embed application icons as C headers
+# ------------------------------------------------------------
+#
+set(GENERATED_ICON_DIR "${CMAKE_BINARY_DIR}/generated/icons")
+file(MAKE_DIRECTORY "${GENERATED_ICON_DIR}")
+
+embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-64.png"
+               "${GENERATED_ICON_DIR}/nanocut_64_png.h" "nanocut_64_png")
+embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-128.png"
+               "${GENERATED_ICON_DIR}/nanocut_128_png.h" "nanocut_128_png")
+embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-256.png"
+               "${GENERATED_ICON_DIR}/nanocut_256_png.h" "nanocut_256_png")
+
+#
+# ------------------------------------------------------------
 # dxflib - DXF file parsing library (local in ext/)
 # ------------------------------------------------------------
 #
@@ -230,11 +253,23 @@ target_compile_options(dxflib PRIVATE -w)  # Suppress warnings
 #
 file(GLOB_RECURSE SRC_FILES src/*.cpp)
 
-add_executable(NanoCut ${SRC_FILES})
+# Windows executable icon via resource file
+if(WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/assets/nanocut.ico")
+    set(WIN32_RESOURCES "${CMAKE_SOURCE_DIR}/assets/nanocut.rc")
+else()
+    set(WIN32_RESOURCES "")
+endif()
+
+add_executable(NanoCut ${SRC_FILES} ${WIN32_RESOURCES})
+
+# Suppress warnings in stb_image implementation
+set_source_files_properties(src/NcApp/stb_image_impl.cpp
+    PROPERTIES COMPILE_FLAGS "-w")
 
 target_include_directories(NanoCut PRIVATE
     src
-    ${stb_SOURCE_DIR}  # stb header-only libraries
+    ${stb_SOURCE_DIR}              # stb header-only libraries
+    ${CMAKE_BINARY_DIR}/generated  # embedded icon headers
 )
 
 #
@@ -303,14 +338,6 @@ target_link_libraries(NanoCut PRIVATE
 
 #
 # ------------------------------------------------------------
-# OpenMP
-# ------------------------------------------------------------
-#
-find_package(OpenMP REQUIRED)
-target_link_libraries(NanoCut PRIVATE OpenMP::OpenMP_CXX)
-
-#
-# ------------------------------------------------------------
 # GLFW (prefer CONFIG, fallback to pkg-config behavior)
 # ------------------------------------------------------------
 #
@@ -366,6 +393,25 @@ install(DIRECTORY assets/fonts/ DESTINATION ${CONFIG_DIR}/fonts)
 
 # Install themes to system data directory
 install(DIRECTORY assets/themes/ DESTINATION ${CONFIG_DIR}/themes)
+
+# Linux desktop integration (freedesktop icons and .desktop entry)
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    install(FILES assets/nanocut-64.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps
+        RENAME nanocut.png)
+    install(FILES assets/nanocut-128.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps
+        RENAME nanocut.png)
+    install(FILES assets/nanocut-256.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+        RENAME nanocut.png)
+    install(FILES assets/nanocut-512.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps
+        RENAME nanocut.png)
+    install(FILES assets/NanoCut.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+endif()
 
 #
 # ------------------------------------------------------------

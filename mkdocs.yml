@@ -1,0 +1,8 @@
+site_name: NanoCut Control
+site_description: Documentation for the NanoCut Control application
+site_author: Johannes Nilsson
+repo_url: https://github.com/nwjnilsson/nanocut-control
+nav:
+  - Home: index.md
+  - Installation: installation.md
+theme: material

@@ -1,5 +1,6 @@
 # NanoCut Control
-![Build](https://github.com/nwjnilsson/nanocut-control/workflows/Build/badge.svg)
+![Linux Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build.yml/badge.svg?branch=main&event=push)
+![Windows Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build.yml/badge.svg?branch=main&event=push)
 
 > No Proma? No problem.
 
@@ -42,7 +43,7 @@ still be traces left of some pretty bizarre code. NanoCut also supports:
 - multilayer .dxf support
 - automatic part arrangement in CAM view to save material
 
-![deer](assets/cam_view.png "High quality DXF importing for gcode generation")
+![deer](assets/images/cam_view.png "High quality DXF importing for gcode generation")
 
 ## Important notes on using this software
 - If you intend to use imperial units for your machine, go into `include/config.h`
