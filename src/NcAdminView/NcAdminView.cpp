@@ -119,7 +119,6 @@ void NcAdminView::makeActive()
 
   m_app->setCurrentActiveView(this); // Register for event delegation
   m_app->getRenderer().setCurrentView("NcAdminView");
-  m_app->getRenderer().setClearColor(0.5f, 0.5f, 0.5f);
 }
 void NcAdminView::close() {}
 

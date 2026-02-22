@@ -22,15 +22,15 @@ public:
     std::map<std::string, std::array<float, 4>> imgui_colors;
 
     // App-specific colors (RGB values 0-1 range, converted to 0-255 in cache)
-    std::array<float, 3> background_color = { 0.13f, 0.13f, 0.13f };
     std::array<float, 3> machine_plane_color = { 0.27f, 0.27f, 0.27f };
     std::array<float, 3> cuttable_plane_color = { 0.58f, 0.03f, 0.03f };
 
-    // Extended app colors (RGBA 0-1 range)
-    std::array<float, 4> backpane_background = { 0.098f, 0.173f, 0.278f, 1.0f };
-
     // Cached color array for O(1) lookup (0-255 range)
     std::array<Color4f, static_cast<int>(ThemeColor::COUNT)> color_cache;
+
+    // ImGui style parameters (using same pattern as colors)
+    std::array<float, static_cast<int>(ThemeStyle::WindowPadding)> style_floats;
+    std::array<ImVec2, static_cast<int>(ThemeStyle::COUNT) - static_cast<int>(ThemeStyle::WindowPadding)> style_vec2s;
 
     // Build the color cache from theme values
     void buildColorCache();
@@ -39,6 +39,19 @@ public:
     Color4f getColor(ThemeColor color) const
     {
       return color_cache[static_cast<int>(color)];
+    }
+
+    // Initialize with defaults
+    Theme() {
+        // Initialize float styles with defaults
+        for (int i = 0; i < static_cast<int>(ThemeStyle::WindowPadding); i++) {
+            style_floats[i] = THEME_STYLE_DEFAULTS[i];
+        }
+
+        // Initialize ImVec2 styles with defaults
+        for (int i = 0; i < static_cast<int>(ThemeStyle::COUNT) - static_cast<int>(ThemeStyle::WindowPadding); i++) {
+            style_vec2s[i] = THEME_STYLE_VEC2_DEFAULTS[i];
+        }
     }
   };
 
@@ -57,7 +70,7 @@ public:
   const Theme* getActiveTheme() const { return m_active_theme; }
 
   // Set active theme by name
-  bool setActiveTheme(const std::string& themeName);
+  bool setActiveTheme(const std::string& theme_name);
 
   // Apply current theme to ImGui
   void applyTheme();
@@ -71,13 +84,10 @@ public:
   // Get theme by name
   const Theme* getThemeByName(const std::string& name) const;
 
-  // O(1) color lookup via active theme (falls back to defaults)
-  Color4f getColor(ThemeColor color) const
+  // O(1) color lookup via stable color cache (pointers into this are stable)
+  const Color4f& getColor(ThemeColor color) const
   {
-    if (m_active_theme) {
-      return m_active_theme->getColor(color);
-    }
-    return THEME_COLOR_DEFAULTS[static_cast<int>(color)];
+    return m_color_cache[static_cast<int>(color)];
   }
 
   // Theme selector UI
@@ -92,6 +102,10 @@ private:
   Theme*             m_active_theme = nullptr;
   std::string        m_active_theme_name;
 
+  // Stable color cache - primitives hold const pointers into this array.
+  // Updated in-place on theme change so all pointers remain valid.
+  std::array<Color4f, static_cast<int>(ThemeColor::COUNT)> m_color_cache;
+
   // UI state
   bool         m_show_theme_selector = false;
   class NcApp* m_app = nullptr;
@@ -104,4 +118,7 @@ private:
 
   // Convert color names to ImGuiCol_ enum
   int colorNameToImGuiCol(const std::string& colorName) const;
+
+  // Apply ImGui style settings from theme
+  void applyImGuiStyle(const Theme& theme);
 };

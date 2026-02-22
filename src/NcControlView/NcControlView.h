@@ -34,13 +34,6 @@ private:
   void renderUI();
 
 public:
-  struct Preferences {
-    // Colors are now managed by the theme system
-    // std::array<float, 3> background_color = { 0.0f, 0.0f, 0.0f };
-    // std::array<float, 3> machine_plane_color = { 0.0f, 0.0f, 0.0f };
-    // std::array<float, 3> cuttable_plane_color = { 0.0f, 0.0f, 0.0f };
-    std::array<int, 2>   window_size = { 0, 0 };
-  };
   struct MachineParameters {
     // GRBL
     float                homing_feed = 0.0f;
@@ -165,7 +158,6 @@ public:
     p.precise_jog_units = j.at("precise_jog_units").get<float>();
   }
 
-  Preferences       m_preferences;
   Box*              m_machine_plane;
   Box*              m_cuttable_plane;
   Circle*           m_torch_pointer;

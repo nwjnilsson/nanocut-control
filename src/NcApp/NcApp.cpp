@@ -5,8 +5,8 @@
 #include "../NcCamView/NcCamView.h"
 #include "../NcControlView/NcControlView.h"
 #include "../NcRender/NcRender.h"
-#include "../ThemeManager/ThemeManager.h"
 #include "../ThemeManager/ThemeColor.h"
+#include "../ThemeManager/ThemeManager.h"
 #include "../WebsocketClient/WebsocketClient.h"
 #include <imgui.h>
 #include <loguru.hpp>
@@ -56,6 +56,41 @@ void NcApp::initialize(int argc, char** argv)
     throw std::runtime_error("Failed to initialize GLFW window");
   }
 
+  // Create NcRender with existing window
+  m_renderer = std::make_unique<NcRender>(this);
+  m_renderer->setWindowTitle("NanoCut");
+  m_renderer->setGuiIniFileName(m_renderer->getConfigDirectory() + "gui.ini");
+  m_renderer->setGuiLogFileName(m_renderer->getConfigDirectory() + "gui.log");
+  m_renderer->setMainLogFileName(m_renderer->getConfigDirectory() +
+                                 "NanoCut.log");
+
+  // Load window size preferences (theme system handles colors now)
+  std::string pref_file = m_renderer->getConfigDirectory() + "preferences.json";
+  nlohmann::json preferences = m_renderer->parseJsonFromFile(pref_file);
+  if (preferences != NULL) {
+    try {
+      LOG_F(INFO, "Found %s!", std::string(pref_file).c_str());
+      m_preferences.window_size[0] = preferences["window_width"].get<int>();
+      m_preferences.window_size[1] = preferences["window_height"].get<int>();
+    }
+    catch (...) {
+      LOG_F(WARNING, "Error parsing preferences file!");
+    }
+  }
+  else {
+    LOG_F(WARNING, "Preferences file does not exist, creating it!");
+    m_renderer->dumpJsonToFile(
+      pref_file,
+      { { "window_width", m_preferences.window_size[0] },
+        { "window_height", m_preferences.window_size[1] } });
+  }
+
+  m_renderer->setWindowSize(m_preferences.window_size[0],
+                            m_preferences.window_size[1]);
+
+  // Initialize renderer
+  m_renderer->init(argc, argv);
+
   // Create services and views with dependency injection
   m_control_view = std::make_unique<NcControlView>(this);
   m_cam_view = std::make_unique<NcCamView>(this);
@@ -65,24 +100,6 @@ void NcApp::initialize(int argc, char** argv)
   m_control_view->preInit();
   m_cam_view->preInit();
 
-  // Update window size from preferences
-  glfwSetWindowSize(m_window,
-                    m_control_view->m_preferences.window_size[0],
-                    m_control_view->m_preferences.window_size[1]);
-
-  // Create NcRender with existing window
-  m_renderer = std::make_unique<NcRender>(this);
-  m_renderer->setWindowTitle("NanoCut");
-  m_renderer->setGuiIniFileName(m_renderer->getConfigDirectory() + "gui.ini");
-  m_renderer->setGuiLogFileName(m_renderer->getConfigDirectory() + "gui.log");
-  m_renderer->setMainLogFileName(m_renderer->getConfigDirectory() +
-                                 "NanoCut.log");
-  m_renderer->setWindowSize(m_control_view->m_preferences.window_size[0],
-                            m_control_view->m_preferences.window_size[1]);
-
-  // Initialize renderer
-  m_renderer->init(argc, argv);
-
   // Create theme manager (after renderer init, needs config directory)
   std::string config_dir = m_renderer->getConfigDirectory();
   std::string theme_dir = config_dir + "themes";
@@ -90,7 +107,7 @@ void NcApp::initialize(int argc, char** argv)
   m_theme_manager->applyTheme();
 
   // Set clear color from theme
-  Color4f bg = m_theme_manager->getColor(ThemeColor::BackgroundColor);
+  Color4f bg = m_theme_manager->getColor(ThemeColor::WindowBg);
   m_renderer->setClearColor(bg.r, bg.g, bg.b);
 
   // Register centralized modifier key events
@@ -172,7 +189,7 @@ void NcApp::logUptime()
   }
 }
 
-Color4f NcApp::getColor(ThemeColor color) const
+const Color4f& NcApp::getColor(ThemeColor color) const
 {
   if (m_theme_manager) {
     return m_theme_manager->getColor(color);

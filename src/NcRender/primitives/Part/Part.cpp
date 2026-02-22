@@ -328,10 +328,10 @@ void Part::render()
     if (!layer.visible) continue;
 
     for (auto& path : layer.paths) {
-      glColor4f(path.color.r / 255,
-                path.color.g / 255,
-                path.color.b / 255,
-                path.color.a / 255);
+      glColor4f(path.color->r / 255,
+                path.color->g / 255,
+                path.color->b / 255,
+                path.color->a / 255);
       if (path.is_closed == true) {
         glBegin(GL_LINE_LOOP);
       }

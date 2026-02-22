@@ -49,28 +49,26 @@ void NcDialogs::renderPreferences()
   ImGui::Begin("Preferences",
                &m_preferences_window_handle->visible,
                ImGuiWindowFlags_AlwaysAutoResize);
-  
+
   // Window size preferences (colors are now handled by theme system)
   ImGui::InputInt2("Default Window Size",
-                   m_app->getControlView().m_preferences.window_size.data());
+                   m_app->m_preferences.window_size.data());
   ImGui::SameLine();
   if (ImGui::Button("<= Current Size")) {
-    m_app->getControlView().m_preferences.window_size[0] =
+    m_app->m_preferences.window_size[0] =
       (int) m_app->getRenderer().getWindowSize().x;
-    m_app->getControlView().m_preferences.window_size[1] =
+    m_app->m_preferences.window_size[1] =
       (int) m_app->getRenderer().getWindowSize().y;
   }
-  
+
   ImGui::Text("Color themes are now managed through the Themes menu.");
-  
+
   ImGui::Spacing();
   if (ImGui::Button("OK")) {
     // Write preferences to file (only window size now)
     nlohmann::json preferences;
-    preferences["window_width"] =
-      m_app->getControlView().m_preferences.window_size[0];
-    preferences["window_height"] =
-      m_app->getControlView().m_preferences.window_size[1];
+    preferences["window_width"] = m_app->m_preferences.window_size[0];
+    preferences["window_height"] = m_app->m_preferences.window_size[1];
 
     std::ofstream out(m_app->getRenderer().getConfigDirectory() +
                       "preferences.json");
@@ -326,8 +324,6 @@ void NcDialogs::showControllerHomingWindow(bool visible)
   m_controller_homing_window_handle->visible = visible;
 }
 
-
-
 void NcDialogs::renderControllerHomingWindow()
 {
   ImGui::Begin("Home Machine",
@@ -386,8 +382,6 @@ void NcDialogs::renderAskWindow()
   }
   ImGui::End();
 }
-
-
 
 void NcDialogs::showThcWindow(bool visible)
 {

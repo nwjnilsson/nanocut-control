@@ -2,12 +2,8 @@
   "name": "Monokai",
   "description": "Monokai-inspired theme with dark background and vibrant colors",
   "app_colors": {
-    "background_color": [0.13, 0.13, 0.13],
     "machine_plane_color": [0.27, 0.27, 0.27],
-    "cuttable_plane_color": [0.58, 0.03, 0.03],
-    "backpane_background": [0.098, 0.173, 0.278, 1.0],
-    "work_readout_text": [0.039, 0.588, 0.039, 1.0],
-    "machine_readout_text": [0.969, 0.408, 0.059, 1.0]
+    "cuttable_plane_color": [0.85, 0.5, 0.15]
   },
   "imgui_colors": {
     "Text": [0.95, 0.95, 0.95, 1.00],
@@ -48,8 +44,8 @@
     "TabActive": [0.35, 0.35, 0.35, 1.00],
     "TabUnfocused": [0.10, 0.10, 0.10, 0.97],
     "TabUnfocusedActive": [0.20, 0.20, 0.20, 1.00],
-    "PlotLines": [0.61, 0.61, 0.61, 1.00],
-    "PlotLinesHovered": [1.00, 0.43, 0.35, 1.00],
+    "PlotLines": [0.039, 0.588, 0.039, 1.00],
+    "PlotLinesHovered": [0.969, 0.408, 0.059, 1.00],
     "PlotHistogram": [0.90, 0.70, 0.00, 1.00],
     "PlotHistogramHovered": [1.00, 0.60, 0.00, 1.00],
     "TableHeaderBg": [0.19, 0.19, 0.20, 1.00],
@@ -63,5 +59,26 @@
     "NavWindowingHighlight": [1.00, 1.00, 1.00, 0.70],
     "NavWindowingDimBg": [0.80, 0.80, 0.80, 0.20],
     "ModalWindowDimBg": [0.80, 0.80, 0.80, 0.35]
+  },
+  "imgui_style": {
+    "WindowRounding": 5.0,
+    "ChildRounding": 5.0,
+    "FrameRounding": 3.0,
+    "PopupRounding": 3.0,
+    "ScrollbarRounding": 7.0,
+    "GrabRounding": 3.0,
+    "TabRounding": 3.0,
+    "WindowPadding": [8.0, 8.0],
+    "FramePadding": [5.0, 3.0],
+    "ItemSpacing": [8.0, 4.0],
+    "ItemInnerSpacing": [4.0, 4.0],
+    "IndentSpacing": 21.0,
+    "ScrollbarSize": 13.0,
+    "GrabMinSize": 9.0,
+    "WindowBorderSize": 1.0,
+    "ChildBorderSize": 1.0,
+    "PopupBorderSize": 1.0,
+    "FrameBorderSize": 0.0,
+    "TabBorderSize": 0.0
   }
 }

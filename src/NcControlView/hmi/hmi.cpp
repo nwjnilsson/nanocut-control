@@ -483,46 +483,51 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
 {
   if (!m_app)
     return;
-  auto& control_view = m_app->getControlView();
-  auto* path = dynamic_cast<Path*>(c);
-  auto* box = dynamic_cast<Box*>(c);
+  auto&   control_view = m_app->getControlView();
+  auto*   path = dynamic_cast<Path*>(c);
+  auto*   box = dynamic_cast<Box*>(c);
+  Point2d screen_pos = m_app->getInputState().getMousePosition();
   if (path && hasFlag(c->flags, PrimitiveFlags::GCode) &&
       !hasFlag(c->flags, PrimitiveFlags::GCodeArrow)) {
     if (std::holds_alternative<MouseHoverEvent>(e)) {
       const auto& hover = std::get<MouseHoverEvent>(e);
       if (hover.event == NcRender::EventType::MouseIn &&
           m_app->isModifierPressed(GLFW_MOD_CONTROL)) {
-        c->color = m_app->getColor(ThemeColor::PlotLines);
+        c->color = &m_app->getColor(ThemeColor::PlotLines);
       }
       else if (hover.event == NcRender::EventType::MouseOut) {
-        c->color = m_app->getColor(ThemeColor::Text);
+        c->color = &m_app->getColor(ThemeColor::Text);
       }
     }
     else if (std::holds_alternative<MouseButtonEvent>(e)) {
       const auto& be = std::get<MouseButtonEvent>(e);
       if (be.button == GLFW_MOUSE_BUTTON_1) {
         if (be.mods & GLFW_MOD_CONTROL) {
-          if (be.action == GLFW_PRESS) {
-            c->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+          if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
+            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
           }
           else if (be.action == GLFW_RELEASE) {
-            c->color = m_app->getColor(ThemeColor::PlotLines);
+            c->color = &m_app->getColor(ThemeColor::PlotLines);
             m_view->getDialogs().askYesNo(
               "Are you sure you want to start the program at this path?",
-              [this, c]() { jumpin(c); });
+              [this, c]() { jumpin(c); },
+              nullptr,
+              screen_pos);
           }
         }
       }
       else if (be.button == GLFW_MOUSE_BUTTON_2) {
         if (be.mods & GLFW_MOD_CONTROL) {
           if (be.action == GLFW_RELEASE) {
-            c->color = m_app->getColor(ThemeColor::PlotLines);
+            c->color = &m_app->getColor(ThemeColor::PlotLines);
             m_view->getDialogs().askYesNo(
               "Are you sure you want to reverse this paths direction?",
-              [this, c]() { reverse(c); });
+              [this, c]() { reverse(c); },
+              nullptr,
+              screen_pos);
           }
-          else if (be.action == GLFW_PRESS) {
-            c->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+          else if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
+            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
           }
         }
       }
@@ -533,20 +538,20 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
     if (std::holds_alternative<MouseHoverEvent>(e)) {
       const auto& hover = std::get<MouseHoverEvent>(e);
       if (hover.event == NcRender::EventType::MouseIn) {
-        c->color = m_app->getColor(ThemeColor::PlotLines);
+        c->color = &m_app->getColor(ThemeColor::ButtonHovered);
       }
       else if (hover.event == NcRender::EventType::MouseOut) {
-        c->color = m_app->getColor(ThemeColor::FrameBg);
+        c->color = &m_app->getColor(ThemeColor::Button);
       }
     }
     else if (std::holds_alternative<MouseButtonEvent>(e)) {
       const auto& be = std::get<MouseButtonEvent>(e);
       if (be.button == GLFW_MOUSE_BUTTON_1) {
-        if (be.action == GLFW_PRESS) {
-          c->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+        if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
+          c->color = &m_app->getColor(ThemeColor::ButtonActive);
         }
         else if (be.action == GLFW_RELEASE) {
-          c->color = m_app->getColor(ThemeColor::PlotLines);
+          c->color = &m_app->getColor(ThemeColor::ButtonHovered);
           handleButton(c->id);
         }
       }
@@ -557,7 +562,6 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
            std::holds_alternative<MouseButtonEvent>(e)) {
     const auto& button = std::get<MouseButtonEvent>(e);
     // Get mouse position in matrix coordinates using view transformation
-    Point2d     screen_pos = m_app->getInputState().getMousePosition();
     Point2d     p = m_view->screenToMatrix(screen_pos);
     const auto* cp = control_view.m_cuttable_plane;
     const auto  bl = cp->m_bottom_left;
@@ -628,19 +632,21 @@ bool NcHmi::updateTimer()
           to_string_strip_zeros((int) runtime.seconds);
       control_view.m_torch_pointer->m_center = { fabs(mcx), fabs(mcy) };
 
-      Color4f base_color = m_app->getColor(ThemeColor::BackgroundColor);
+      const Color4f& base_color = m_app->getColor(ThemeColor::WindowBg);
 
       if (control_view.m_motion_controller->isTorchOn()) {
-        // Dark reddish version of the theme color
-        m_dro_backpane->color.r = std::min(255.0f, base_color.r * 1.2f);
-        m_dro_backpane->color.g = std::max(0.0f, base_color.g * 0.3f);
-        m_dro_backpane->color.b = std::max(0.0f, base_color.b * 0.5f);
+        // Dark reddish version of the theme color - store in owned member
+        m_dro_torch_on_color.r = std::min(255.0f, base_color.r * 1.2f);
+        m_dro_torch_on_color.g = std::max(0.0f, base_color.g * 0.3f);
+        m_dro_torch_on_color.b = std::max(0.0f, base_color.b * 0.5f);
+        m_dro_torch_on_color.a = base_color.a;
+        m_dro_backpane->color = &m_dro_torch_on_color;
       }
       else {
-        m_dro_backpane->color = base_color;
+        m_dro_backpane->color = &m_app->getColor(ThemeColor::WindowBg);
       }
       if (dro_data.arc_ok == false) {
-        m_dro.arc_readout->color = m_app->getColor(ThemeColor::PlotLines);
+        m_dro.arc_readout->color = &m_app->getColor(ThemeColor::PlotLines);
         // Keep adding m_points to current highlight path
         // Negated because this is how gcode is interpreted to be consistent
         // with grbl's machine coordinates
@@ -654,7 +660,7 @@ bool NcHmi::updateTimer()
           m_arc_okay_highlight_path->m_is_closed = false;
           m_arc_okay_highlight_path->m_width = 3;
           m_arc_okay_highlight_path->color =
-            m_app->getColor(ThemeColor::PlotLinesHovered);
+            &m_app->getColor(ThemeColor::PlotLinesHovered);
           m_arc_okay_highlight_path->matrix_callback =
             m_view->getTransformCallback();
         }
@@ -665,7 +671,7 @@ bool NcHmi::updateTimer()
       else {
         m_arc_okay_highlight_path = NULL;
         m_dro.arc_readout->color =
-          m_app->getColor(ThemeColor::PlotLinesHovered);
+          &m_app->getColor(ThemeColor::PlotLinesHovered);
       }
     }
   }
@@ -808,13 +814,13 @@ void NcHmi::pushButtonGroup(const std::string& b1, const std::string& b2)
     [this](Primitive* c, const Primitive::MouseEventData& e) {
       mouseCallback(c, e);
     };
-  group.button_one.object->color = m_app->getColor(ThemeColor::FrameBg);
+  group.button_one.object->color = &m_app->getColor(ThemeColor::Button);
   group.button_one.object->zindex = 200;
   group.button_one.object->id = b1;
   group.button_one.label = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), group.button_one.name, 20);
   group.button_one.label->zindex = 210;
-  group.button_one.label->color = m_app->getColor(ThemeColor::Text);
+  group.button_one.label->color = &m_app->getColor(ThemeColor::Text);
 
   group.button_two.name = b2;
   group.button_two.object =
@@ -823,13 +829,13 @@ void NcHmi::pushButtonGroup(const std::string& b1, const std::string& b2)
     [this](Primitive* c, const Primitive::MouseEventData& e) {
       mouseCallback(c, e);
     };
-  group.button_two.object->color = m_app->getColor(ThemeColor::FrameBg);
+  group.button_two.object->color = &m_app->getColor(ThemeColor::Button);
   group.button_two.object->zindex = 200;
   group.button_two.object->id = b2;
   group.button_two.label = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), group.button_two.name, 20);
   group.button_two.label->zindex = 210;
-  group.button_two.label->color = m_app->getColor(ThemeColor::Text);
+  group.button_two.label->color = &m_app->getColor(ThemeColor::Text);
 
   m_button_groups.push_back(group);
 }
@@ -842,105 +848,8 @@ void NcHmi::clearHighlights()
   m_arc_okay_highlight_path = nullptr;
 }
 
-void NcHmi::invalidateColors()
-{
-  if (!m_app)
-    return;
-
-  // Update all button colors
-  for (auto& group : m_button_groups) {
-    // Button one
-    if (group.button_one.object) {
-      group.button_one.object->color = m_app->getColor(ThemeColor::FrameBg);
-    }
-    if (group.button_one.label) {
-      group.button_one.label->color = m_app->getColor(ThemeColor::Text);
-    }
-
-    // Button two
-    if (group.button_two.object) {
-      group.button_two.object->color = m_app->getColor(ThemeColor::FrameBg);
-    }
-    if (group.button_two.label) {
-      group.button_two.label->color = m_app->getColor(ThemeColor::Text);
-    }
-  }
-
-  // Update background pane colors
-  if (m_backpane) {
-    m_backpane->color = m_app->getColor(ThemeColor::PopupBg);
-  }
-  if (m_dro_backpane) {
-    m_dro_backpane->color = m_app->getColor(ThemeColor::BackgroundColor);
-  }
-  if (m_button_backpane) {
-    m_button_backpane->color = m_app->getColor(ThemeColor::PopupBg);
-  }
-
-  // Update DRO element colors
-  if (m_dro.x.label)
-    m_dro.x.label->color = m_app->getColor(ThemeColor::Text);
-  if (m_dro.y.label)
-    m_dro.y.label->color = m_app->getColor(ThemeColor::Text);
-  if (m_dro.z.label)
-    m_dro.z.label->color = m_app->getColor(ThemeColor::Text);
-
-  if (m_dro.x.work_readout)
-    m_dro.x.work_readout->color = m_app->getColor(ThemeColor::PlotLines);
-  if (m_dro.y.work_readout)
-    m_dro.y.work_readout->color = m_app->getColor(ThemeColor::PlotLines);
-  if (m_dro.z.work_readout)
-    m_dro.z.work_readout->color = m_app->getColor(ThemeColor::PlotLines);
-
-  if (m_dro.x.absolute_readout)
-    m_dro.x.absolute_readout->color =
-      m_app->getColor(ThemeColor::PlotLinesHovered);
-  if (m_dro.y.absolute_readout)
-    m_dro.y.absolute_readout->color =
-      m_app->getColor(ThemeColor::PlotLinesHovered);
-  if (m_dro.z.absolute_readout)
-    m_dro.z.absolute_readout->color =
-      m_app->getColor(ThemeColor::PlotLinesHovered);
-
-  if (m_dro.x.divider)
-    m_dro.x.divider->color = m_app->getColor(ThemeColor::Separator);
-  if (m_dro.y.divider)
-    m_dro.y.divider->color = m_app->getColor(ThemeColor::Separator);
-  if (m_dro.z.divider)
-    m_dro.z.divider->color = m_app->getColor(ThemeColor::Separator);
-
-  if (m_dro.feed)
-    m_dro.feed->color = m_app->getColor(ThemeColor::PlotLinesHovered);
-  if (m_dro.arc_readout)
-    m_dro.arc_readout->color = m_app->getColor(ThemeColor::PlotLinesHovered);
-  if (m_dro.arc_set)
-    m_dro.arc_set->color = m_app->getColor(ThemeColor::PlotLinesHovered);
-  if (m_dro.run_time)
-    m_dro.run_time->color = m_app->getColor(ThemeColor::PlotLinesHovered);
-
-  // Update machine and cuttable plane colors from control view
-  auto& control_view = m_app->getControlView();
-  if (control_view.m_machine_plane) {
-    control_view.m_machine_plane->color =
-      m_app->getColor(ThemeColor::MachinePlaneColor);
-  }
-  if (control_view.m_cuttable_plane) {
-    control_view.m_cuttable_plane->color =
-      m_app->getColor(ThemeColor::CuttablePlaneColor);
-  }
-
-  // Update torch pointer color
-  if (control_view.m_torch_pointer) {
-    control_view.m_torch_pointer->color =
-      m_app->getColor(ThemeColor::PlotLinesHovered);
-  }
-
-  // Update waypoint pointer color
-  if (control_view.m_waypoint_pointer) {
-    control_view.m_waypoint_pointer->color =
-      m_app->getColor(ThemeColor::DragDropTarget);
-  }
-}
+// invalidateColors() removed - primitives now hold const Color4f* pointers
+// into ThemeManager's stable color cache, which auto-updates on theme change.
 
 void NcHmi::tabKeyUpCallback(const KeyEvent& e)
 {
@@ -1291,7 +1200,7 @@ void NcHmi::init()
   control_view.m_machine_plane->flags = PrimitiveFlags::MachinePlane;
   control_view.m_machine_plane->zindex = -20;
   control_view.m_machine_plane->color =
-    m_app->getColor(ThemeColor::MachinePlaneColor);
+    &m_app->getColor(ThemeColor::MachinePlaneColor);
   control_view.m_machine_plane->matrix_callback =
     m_view->getTransformCallback();
   control_view.m_machine_plane->mouse_callback =
@@ -1313,23 +1222,23 @@ void NcHmi::init()
   control_view.m_cuttable_plane->flags = PrimitiveFlags::CuttablePlane;
   control_view.m_cuttable_plane->zindex = -10;
   control_view.m_cuttable_plane->color =
-    m_app->getColor(ThemeColor::CuttablePlaneColor);
+    &m_app->getColor(ThemeColor::CuttablePlaneColor);
   control_view.m_cuttable_plane->matrix_callback =
     m_view->getTransformCallback();
 
   m_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_backpane->color = m_app->getColor(ThemeColor::PopupBg);
+  m_backpane->color = &m_app->getColor(ThemeColor::PopupBg);
   m_backpane->zindex = 100;
 
   m_dro_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_dro_backpane->color = m_app->getColor(ThemeColor::BackgroundColor);
+  m_dro_backpane->color = &m_app->getColor(ThemeColor::WindowBg);
   m_dro_backpane->zindex = 110;
 
   m_button_backpane =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_button_backpane->color = m_app->getColor(ThemeColor::PopupBg);
+  m_button_backpane->color = &m_app->getColor(ThemeColor::PopupBg);
   m_button_backpane->zindex = 115;
 
   pushButtonGroup("Zero X", "Zero Y");
@@ -1342,76 +1251,76 @@ void NcHmi::init()
   m_dro.x.label =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "X", 50);
   m_dro.x.label->zindex = 210;
-  m_dro.x.label->color = m_app->getColor(ThemeColor::Text);
+  m_dro.x.label->color = &m_app->getColor(ThemeColor::Text);
   m_dro.x.work_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
   m_dro.x.work_readout->zindex = 210;
-  m_dro.x.work_readout->color = m_app->getColor(ThemeColor::PlotLines);
+  m_dro.x.work_readout->color = &m_app->getColor(ThemeColor::PlotLines);
   m_dro.x.absolute_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
   m_dro.x.absolute_readout->zindex = 210;
   m_dro.x.absolute_readout->color =
-    m_app->getColor(ThemeColor::PlotLinesHovered);
+    &m_app->getColor(ThemeColor::PlotLinesHovered);
   m_dro.x.divider =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
   m_dro.x.divider->zindex = 150;
-  m_dro.x.divider->color = m_app->getColor(ThemeColor::Separator);
+  m_dro.x.divider->color = &m_app->getColor(ThemeColor::Separator);
 
   m_dro.y.label =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "Y", 50);
   m_dro.y.label->zindex = 210;
-  m_dro.y.label->color = m_app->getColor(ThemeColor::Text);
+  m_dro.y.label->color = &m_app->getColor(ThemeColor::Text);
   m_dro.y.work_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
   m_dro.y.work_readout->zindex = 210;
-  m_dro.y.work_readout->color = m_app->getColor(ThemeColor::PlotLines);
+  m_dro.y.work_readout->color = &m_app->getColor(ThemeColor::PlotLines);
   m_dro.y.absolute_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
   m_dro.y.absolute_readout->zindex = 210;
   m_dro.y.absolute_readout->color =
-    m_app->getColor(ThemeColor::PlotLinesHovered);
+    &m_app->getColor(ThemeColor::PlotLinesHovered);
   m_dro.y.divider =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
   m_dro.y.divider->zindex = 150;
-  m_dro.y.divider->color = m_app->getColor(ThemeColor::Separator);
+  m_dro.y.divider->color = &m_app->getColor(ThemeColor::Separator);
 
   m_dro.z.label =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "Z", 50);
   m_dro.z.label->zindex = 210;
-  m_dro.z.label->color = m_app->getColor(ThemeColor::Text);
+  m_dro.z.label->color = &m_app->getColor(ThemeColor::Text);
   m_dro.z.work_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
   m_dro.z.work_readout->zindex = 210;
-  m_dro.z.work_readout->color = m_app->getColor(ThemeColor::PlotLines);
+  m_dro.z.work_readout->color = &m_app->getColor(ThemeColor::PlotLines);
   m_dro.z.absolute_readout =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
   m_dro.z.absolute_readout->zindex = 210;
   m_dro.z.absolute_readout->color =
-    m_app->getColor(ThemeColor::PlotLinesHovered);
+    &m_app->getColor(ThemeColor::PlotLinesHovered);
   m_dro.z.divider =
     m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
   m_dro.z.divider->zindex = 150;
-  m_dro.z.divider->color = m_app->getColor(ThemeColor::Separator);
+  m_dro.z.divider->color = &m_app->getColor(ThemeColor::Separator);
 
   m_dro.feed =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "FEED: 0", 12);
   m_dro.feed->zindex = 210;
-  m_dro.feed->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+  m_dro.feed->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
 
   m_dro.arc_readout = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), "ARC: 0.0V", 12);
   m_dro.arc_readout->zindex = 210;
-  m_dro.arc_readout->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+  m_dro.arc_readout->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
 
   m_dro.arc_set =
     m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "SET: 0", 12);
   m_dro.arc_set->zindex = 210;
-  m_dro.arc_set->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+  m_dro.arc_set->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
 
   m_dro.run_time = m_app->getRenderer().pushPrimitive<Text>(
     Point2d::infNeg(), "RUN: 0:0:0", 12);
   m_dro.run_time->zindex = 210;
-  m_dro.run_time->color = m_app->getColor(ThemeColor::PlotLinesHovered);
+  m_dro.run_time->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
 
   control_view.m_torch_pointer =
     m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 5);
@@ -1419,7 +1328,7 @@ void NcHmi::init()
   control_view.m_torch_pointer->id = "torch_pointer";
   control_view.m_torch_pointer->flags = PrimitiveFlags::TorchPointer;
   control_view.m_torch_pointer->color =
-    m_app->getColor(ThemeColor::PlotLinesHovered);
+    &m_app->getColor(ThemeColor::PlotLinesHovered);
   control_view.m_torch_pointer->matrix_callback =
     m_view->getTransformCallback();
 
@@ -1429,7 +1338,7 @@ void NcHmi::init()
   control_view.m_waypoint_pointer->id = "waypoint_pointer";
   control_view.m_waypoint_pointer->flags = PrimitiveFlags::WaypointPointer;
   control_view.m_waypoint_pointer->color =
-    m_app->getColor(ThemeColor::DragDropTarget);
+    &m_app->getColor(ThemeColor::DragDropTarget);
   control_view.m_waypoint_pointer->matrix_callback =
     m_view->getTransformCallback();
   control_view.m_waypoint_pointer->visible = false;

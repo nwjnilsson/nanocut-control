@@ -165,6 +165,7 @@ void NcRender::setWindowSize(int width, int height)
 {
   m_window_size[0] = width;
   m_window_size[1] = height;
+  glfwSetWindowSize(m_window, width, height);
 }
 
 void NcRender::setShowCursor(bool s) { m_show_cursor = s; }
@@ -488,7 +489,7 @@ bool NcRender::poll(bool should_quit)
       m_fps_label->visible = false;
       m_fps_label->id = "FPS";
       m_fps_label->flags = PrimitiveFlags::SystemUI;
-      m_fps_label->color = m_app->getColor(ThemeColor::Text);
+      m_fps_label->color = &m_app->getColor(ThemeColor::Text);
     }
     else {
       m_fps_average.push_back(getFramesPerSecond());

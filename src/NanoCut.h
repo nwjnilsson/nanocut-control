@@ -68,11 +68,15 @@ struct Color4f {
 
   Color4f& operator=(const ImVec4& col)
   {
-    r = col.x;
-    g = col.y;
-    b = col.z;
-    a = col.w;
+    r = col.x * 255.0f;
+    g = col.y * 255.0f;
+    b = col.z * 255.0f;
+    a = col.w * 255.0f;
     return *this;
+  }
+  operator ImVec4() const
+  {
+    return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
   }
 };
 

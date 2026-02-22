@@ -15,7 +15,7 @@ public:
     std::vector<Point2d> built_points;
     bool                 is_closed;
     bool                 is_inside_contour;
-    Color4f              color;
+    const Color4f*       color = &Primitive::s_default_color;
   };
 
   struct Layer {

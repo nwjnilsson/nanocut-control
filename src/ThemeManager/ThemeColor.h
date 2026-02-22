@@ -1,6 +1,7 @@
 #pragma once
 
 #include <NanoCut.h>
+#include <imgui.h>
 
 /**
  * ThemeColor - Unified color enum for the entire application.
@@ -68,14 +69,82 @@ enum class ThemeColor : int {
   ModalWindowDimBg,
 
   // App-specific UI colors
-  BackpaneBackground, // Side panel background (was hardcoded 25,44,71)
-  BackgroundColor,    // GL clear color (from theme background_color)
-  MachinePlaneColor,  // Machine plane box (from theme machine_plane_color)
-  CuttablePlaneColor, // Cuttable/material plane box (from theme
-                      // cuttable_plane_color)
+  MachinePlaneColor,
+  CuttablePlaneColor,
+
+  COUNT
+};
+
+/**
+ * ThemeStyle - Unified style enum for ImGui styling parameters.
+ */
+enum class ThemeStyle : int {
+  // Float style parameters
+  WindowRounding,
+  ChildRounding,
+  FrameRounding,
+  PopupRounding,
+  ScrollbarRounding,
+  GrabRounding,
+  TabRounding,
+  WindowBorderSize,
+  ChildBorderSize,
+  PopupBorderSize,
+  FrameBorderSize,
+  TabBorderSize,
+  ScrollbarSize,
+  GrabMinSize,
+  IndentSpacing,
+  DockingSeparatorSize,
+  SeparatorTextBorderSize,
+
+  // ImVec2 style parameters (must come after float parameters)
+  WindowPadding,
+  FramePadding,
+  ItemSpacing,
+  ItemInnerSpacing,
 
   COUNT // Must be last
 };
+
+// Default style values matching Dear ImGui defaults
+constexpr float THEME_STYLE_DEFAULTS[] = {
+  0.0f,  // WindowRounding
+  0.0f,  // ChildRounding
+  0.0f,  // FrameRounding
+  0.0f,  // PopupRounding
+  0.0f,  // ScrollbarRounding
+  0.0f,  // GrabRounding
+  4.0f,  // TabRounding
+  1.0f,  // WindowBorderSize
+  1.0f,  // ChildBorderSize
+  1.0f,  // PopupBorderSize
+  0.0f,  // FrameBorderSize
+  0.0f,  // TabBorderSize
+  14.0f, // ScrollbarSize
+  10.0f, // GrabMinSize
+  21.0f, // IndentSpacing
+  2.0f,  // DockingSeparatorSize
+  1.0f   // SeparatorTextBorderSize
+};
+
+// Default ImVec2 style values
+constexpr ImVec2 THEME_STYLE_VEC2_DEFAULTS[] = {
+  ImVec2(8.0f, 8.0f), // WindowPadding
+  ImVec2(4.0f, 3.0f), // FramePadding
+  ImVec2(8.0f, 4.0f), // ItemSpacing
+  ImVec2(4.0f, 4.0f)  // ItemInnerSpacing
+};
+
+static_assert(sizeof(THEME_STYLE_DEFAULTS) / sizeof(THEME_STYLE_DEFAULTS[0]) ==
+                static_cast<int>(ThemeStyle::WindowPadding),
+              "THEME_STYLE_DEFAULTS must match float ThemeStyle count");
+
+static_assert(sizeof(THEME_STYLE_VEC2_DEFAULTS) /
+                  sizeof(THEME_STYLE_VEC2_DEFAULTS[0]) ==
+                static_cast<int>(ThemeStyle::COUNT) -
+                  static_cast<int>(ThemeStyle::WindowPadding),
+              "THEME_STYLE_VEC2_DEFAULTS must match ImVec2 ThemeStyle count");
 
 // Default color values (0-255 range) used when no theme is loaded
 // These match the original hardcoded values in the codebase
@@ -134,8 +203,6 @@ constexpr Color4f THEME_COLOR_DEFAULTS[] = {
   { 20.0f, 20.0f, 20.0f, 200.0f },    // NavWindowingDimBg
   { 20.0f, 20.0f, 20.0f, 150.0f },    // ModalWindowDimBg
 
-  { 25.0f, 44.0f, 71.0f, 255.0f }, // BackpaneBackground
-  { 33.0f, 33.0f, 33.0f, 255.0f }, // BackgroundColor
   { 69.0f, 69.0f, 69.0f, 255.0f }, // MachinePlaneColor
   { 148.0f, 8.0f, 8.0f, 255.0f },  // CuttablePlaneColor
 };

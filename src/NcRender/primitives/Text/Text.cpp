@@ -151,7 +151,7 @@ void Text::render()
   glPushMatrix();
   glTranslatef(offset[0], offset[1], offset[2]);
   glScalef(scale, scale, scale);
-  glColor4f(color.r / 255, color.g / 255, color.b / 255, color.a / 255);
+  glColor4f(color->r / 255, color->g / 255, color->b / 255, color->a / 255);
   if (m_texture == -1) {
     bool ret = InitFontFromFile(m_font_file.c_str(), m_font_size);
     if (ret == false) {

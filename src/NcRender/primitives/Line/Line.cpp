@@ -52,7 +52,7 @@ void Line::render()
     glPushMatrix();
     glTranslatef(offset[0], offset[1], offset[2]);
     glScalef(scale, scale, scale);
-    glColor4f(color.r / 255, color.g / 255, color.b / 255, color.a / 255);
+    glColor4f(color->r / 255, color->g / 255, color->b / 255, color->a / 255);
     glLineWidth(m_width);
     if (m_style == "dashed") {
       glPushAttrib(GL_ENABLE_BIT);

@@ -1129,7 +1129,7 @@ void DXFParsePathAdaptor::finish()
       path.is_closed = true;
     }
 
-    path.color = m_cam_view->m_app->getColor(m_cam_view->m_outside_contour_color);
+    path.color = &m_cam_view->m_app->getColor(m_cam_view->m_outside_contour_color);
 
     // Adjust coordinates relative to bounding box
     for (size_t j = 0; j < all_chains[i].size(); j++) {
@@ -1189,10 +1189,10 @@ void DXFParsePathAdaptor::finish()
       if (checkIfPathIsInsidePath(path_x.points, path_i.points)) {
         path_x.is_inside_contour = true;
         if (path_x.is_closed) {
-          path_x.color = m_cam_view->m_app->getColor(m_cam_view->m_inside_contour_color);
+          path_x.color = &m_cam_view->m_app->getColor(m_cam_view->m_inside_contour_color);
         }
         else {
-          path_x.color = m_cam_view->m_app->getColor(m_cam_view->m_open_contour_color);
+          path_x.color = &m_cam_view->m_app->getColor(m_cam_view->m_open_contour_color);
         }
         break;
       }

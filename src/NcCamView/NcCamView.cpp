@@ -104,7 +104,7 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
           for (auto& [layer_name, layer] : part->m_layers) {
             for (auto& path : layer.paths) {
               if (current_index == global_index) {
-                path.color = m_app->getColor(m_mouse_over_color);
+                path.color = &m_app->getColor(m_mouse_over_color);
                 return; // Found it, exit early
               }
               current_index++;
@@ -117,14 +117,14 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
             for (auto& path : layer.paths) {
               if (path.is_inside_contour == true) {
                 if (path.is_closed == true) {
-                  path.color = m_app->getColor(m_inside_contour_color);
+                  path.color = &m_app->getColor(m_inside_contour_color);
                 }
                 else {
-                  path.color = m_app->getColor(m_open_contour_color);
+                  path.color = &m_app->getColor(m_open_contour_color);
                 }
               }
               else {
-                path.color = m_app->getColor(m_outside_contour_color);
+                path.color = &m_app->getColor(m_outside_contour_color);
               }
             }
           }
@@ -139,7 +139,7 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
           part->m_is_part_selected = true;
           for (auto& [layer_name, layer] : part->m_layers) {
             for (auto& path : layer.paths) {
-              path.color = m_app->getColor(m_mouse_over_color);
+              path.color = &m_app->getColor(m_mouse_over_color);
             }
           }
         }
@@ -149,14 +149,14 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
             for (auto& path : layer.paths) {
               if (path.is_inside_contour == true) {
                 if (path.is_closed == true) {
-                  path.color = m_app->getColor(m_inside_contour_color);
+                  path.color = &m_app->getColor(m_inside_contour_color);
                 }
                 else {
-                  path.color = m_app->getColor(m_open_contour_color);
+                  path.color = &m_app->getColor(m_open_contour_color);
                 }
               }
               else {
-                path.color = m_app->getColor(m_outside_contour_color);
+                path.color = &m_app->getColor(m_outside_contour_color);
               }
             }
           }
@@ -455,8 +455,9 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
     ImGui::RadioButton("Contour Tool", (int*) &m_current_tool, 0);
     ImGui::SameLine();
     ImGui::RadioButton("Nesting Tool", (int*) &m_current_tool, 1);
-    ImGui::SameLine();
-    ImGui::RadioButton("Point Tool", (int*) &m_current_tool, 2);
+    // Note: I'm not sure what the Point Tool was for, so it's disabled for now
+    // ImGui::SameLine();
+    // ImGui::RadioButton("Point Tool", (int*) &m_current_tool, 2);
     ImGui::EndMainMenuBar();
   }
 }
@@ -864,7 +865,8 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   // Main left pane
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(ImVec2(300, renderer.getWindowSize().y));
-  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(1.0f, 1.0f, 1.0f, 0.8f));
+  ImGui::PushStyleColor(ImGuiCol_WindowBg,
+                        m_app->getColor(ThemeColor::PopupBg));
   ImGui::Begin("LeftPane",
                NULL,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
@@ -882,30 +884,29 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
                                    m_toolpath_operations.end(),
                                    [](const auto& op) { return op.enabled; });
 
-  // Calculate height needed for bottom section
+  // Calculate fixed button area height (buttons never move)
   int   failed = m_operation.failed_count.load();
   bool  operation_in_progress = m_operation.in_progress.load();
   float button_area_height =
     ImGui::GetFrameHeightWithSpacing() * 3 + ImGui::GetStyle().ItemSpacing.y;
 
-  // Add space for progress bar if operation is running
+  // Extra height for progress/warning rendered above the fixed buttons
+  float extra_height = 0;
   if (operation_in_progress) {
-    button_area_height += ImGui::GetFrameHeightWithSpacing() * 2.0f;
+    extra_height += ImGui::GetFrameHeightWithSpacing() * 3.0f;
   }
-
-  // Add space for warning text if needed (approximately 2-3 lines of wrapped
-  // text)
   if (failed > 0) {
-    button_area_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f;
+    extra_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f;
   }
 
-  float target_y = ImGui::GetWindowHeight() - button_area_height -
-                   ImGui::GetStyle().WindowPadding.y;
-  if (ImGui::GetCursorPosY() < target_y) {
-    ImGui::SetCursorPosY(target_y);
+  float buttons_y = ImGui::GetWindowHeight() - button_area_height -
+                    ImGui::GetStyle().WindowPadding.y;
+  float content_end_y = buttons_y - extra_height;
+  if (ImGui::GetCursorPosY() < content_end_y) {
+    ImGui::SetCursorPosY(content_end_y);
   }
 
-  // Show progress bar for background operations
+  // Show progress bar for background operations (above buttons)
   if (operation_in_progress) {
     // Get operation title
     const char* operation_title = "Progress";
@@ -940,6 +941,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
       failed == 1 ? "" : "s");
     ImGui::PopStyleColor();
   }
+
+  // Force buttons to fixed bottom position regardless of progress bar
+  ImGui::SetCursorPosY(buttons_y);
 
   bool has_parts = false;
   forEachPart([&](Part*) { has_parts = true; });
@@ -1279,7 +1283,7 @@ void NcCamView::reevaluateContours()
     Part::path_t& path =
       ref.part->m_layers[ref.layer_name].paths[ref.path_index];
     path.is_inside_contour = false;
-    path.color = m_app->getColor(m_outside_contour_color);
+    path.color = &m_app->getColor(m_outside_contour_color);
   }
 
   // Re-evaluate inside/outside relationships considering only visible layers
@@ -1320,10 +1324,10 @@ void NcCamView::reevaluateContours()
                                                          path_i.points)) {
         path_x.is_inside_contour = true;
         if (all_path_refs[x].is_closed) {
-          path_x.color = m_app->getColor(m_inside_contour_color);
+          path_x.color = &m_app->getColor(m_inside_contour_color);
         }
         else {
-          path_x.color = m_app->getColor(m_open_contour_color);
+          path_x.color = &m_app->getColor(m_open_contour_color);
         }
         break;
       }
@@ -1785,8 +1789,8 @@ void NcCamView::init()
   m_material_plane->id = "material_plane";
   m_material_plane->flags = PrimitiveFlags::MaterialPlane;
   m_material_plane->zindex = -20;
-  m_material_plane->color = m_app->getColor(ThemeColor::CuttablePlaneColor);
-  
+  m_material_plane->color = &m_app->getColor(ThemeColor::CuttablePlaneColor);
+
   m_material_plane->matrix_callback = getTransformCallback();
   m_material_plane->mouse_callback =
     [this](Primitive* c, const Primitive::MouseEventData& e) {
@@ -1858,9 +1862,6 @@ void NcCamView::makeActive()
 
   m_app->setCurrentActiveView(this); // Register for event delegation
   m_app->getRenderer().setCurrentView("NcCamView");
-  
-  Color4f bg = m_app->getColor(ThemeColor::BackgroundColor);
-  m_app->getRenderer().setClearColor(bg.r, bg.g, bg.b);
 }
 void NcCamView::close()
 {

@@ -1,6 +1,5 @@
 #include "ThemeManager.h"
 #include "NcApp/NcApp.h"
-#include "NcControlView/NcControlView.h"
 #include "NcRender/NcRender.h"
 #include <algorithm>
 #include <filesystem>
@@ -86,6 +85,41 @@ static int imguiColorNameToThemeColor(const std::string& colorName)
   return -1;
 }
 
+static int styleNameToThemeStyle(const std::string& styleName)
+{
+  static const std::map<std::string, ThemeStyle> style_map = {
+    { "WindowRounding", ThemeStyle::WindowRounding },
+    { "ChildRounding", ThemeStyle::ChildRounding },
+    { "FrameRounding", ThemeStyle::FrameRounding },
+    { "PopupRounding", ThemeStyle::PopupRounding },
+    { "ScrollbarRounding", ThemeStyle::ScrollbarRounding },
+    { "GrabRounding", ThemeStyle::GrabRounding },
+    { "TabRounding", ThemeStyle::TabRounding },
+    { "WindowBorderSize", ThemeStyle::WindowBorderSize },
+    { "ChildBorderSize", ThemeStyle::ChildBorderSize },
+    { "PopupBorderSize", ThemeStyle::PopupBorderSize },
+    { "FrameBorderSize", ThemeStyle::FrameBorderSize },
+    { "TabBorderSize", ThemeStyle::TabBorderSize },
+    { "ScrollbarSize", ThemeStyle::ScrollbarSize },
+    { "GrabMinSize", ThemeStyle::GrabMinSize },
+    { "IndentSpacing", ThemeStyle::IndentSpacing },
+    { "DockingSeparatorSize", ThemeStyle::DockingSeparatorSize },
+    { "SeparatorTextBorderSize", ThemeStyle::SeparatorTextBorderSize },
+    { "WindowPadding", ThemeStyle::WindowPadding },
+    { "FramePadding", ThemeStyle::FramePadding },
+    { "ItemSpacing", ThemeStyle::ItemSpacing },
+    { "ItemInnerSpacing", ThemeStyle::ItemInnerSpacing }
+  };
+
+  auto it = style_map.find(styleName);
+  if (it != style_map.end()) {
+    return static_cast<int>(it->second);
+  }
+
+  LOG_F(WARNING, "Unknown ImGui style name: %s", styleName.c_str());
+  return -1;
+}
+
 void ThemeManager::Theme::buildColorCache()
 {
   // Start with defaults
@@ -103,17 +137,6 @@ void ThemeManager::Theme::buildColorCache()
   }
 
   // App-specific colors from theme fields
-  color_cache[static_cast<int>(ThemeColor::BackpaneBackground)] =
-    toColor255(backpane_background[0],
-               backpane_background[1],
-               backpane_background[2],
-               backpane_background[3]);
-
-  // PanelBackground is now mapped to PopupBg, so it will be handled by the ImGui color mapping
-
-  color_cache[static_cast<int>(ThemeColor::BackgroundColor)] =
-    toColor255(background_color[0], background_color[1], background_color[2]);
-
   color_cache[static_cast<int>(ThemeColor::MachinePlaneColor)] = toColor255(
     machine_plane_color[0], machine_plane_color[1], machine_plane_color[2]);
 
@@ -126,7 +149,11 @@ ThemeManager::ThemeManager(NcApp*             app,
                            const std::string& config_dir)
   : m_app(app), m_theme_directory(theme_dir), m_config_directory(config_dir)
 {
-  // Constructor
+  // Initialize color cache with defaults
+  for (int i = 0; i < static_cast<int>(ThemeColor::COUNT); i++) {
+    m_color_cache[i] = THEME_COLOR_DEFAULTS[i];
+  }
+
   loadThemes();
   loadActiveTheme();
 }
@@ -236,38 +263,15 @@ bool ThemeManager::loadThemeFromFile(const std::string& filename)
         }
       };
 
-      auto load_rgba = [&](const std::string&    key,
-                           std::array<float, 4>& target) {
-        if (app_colors.contains(key) && app_colors[key].is_array() &&
-            app_colors[key].size() >= 4) {
-          target = { app_colors[key][0].get<float>(),
-                     app_colors[key][1].get<float>(),
-                     app_colors[key][2].get<float>(),
-                     app_colors[key][3].get<float>() };
-        }
-      };
-
-      // Load background colors from app_colors
-      load_rgb("background_color", theme.background_color);
+      // Load app-specific colors
       load_rgb("machine_plane_color", theme.machine_plane_color);
       load_rgb("cuttable_plane_color", theme.cuttable_plane_color);
-
-      // Load other app colors
-      load_rgba("backpane_background", theme.backpane_background);
     }
     else {
       // Fallback to old structure for backward compatibility
-      LOG_F(WARNING, "Theme file uses deprecated structure. Please move background colors to app_colors section.");
-
-      if (json_data.contains("background_color") &&
-          json_data["background_color"].is_array()) {
-        auto& bg_color = json_data["background_color"];
-        if (bg_color.size() >= 3) {
-          theme.background_color = { bg_color[0].get<float>(),
-                                     bg_color[1].get<float>(),
-                                     bg_color[2].get<float>() };
-        }
-      }
+      LOG_F(WARNING,
+            "Theme file uses deprecated structure. Please move background "
+            "colors to app_colors section.");
 
       if (json_data.contains("machine_plane_color") &&
           json_data["machine_plane_color"].is_array()) {
@@ -286,6 +290,35 @@ bool ThemeManager::loadThemeFromFile(const std::string& filename)
           theme.cuttable_plane_color = { cp_color[0].get<float>(),
                                          cp_color[1].get<float>(),
                                          cp_color[2].get<float>() };
+        }
+      }
+    }
+
+    // Load ImGui style parameters
+    if (json_data.contains("imgui_style") &&
+        json_data["imgui_style"].is_object()) {
+      auto& style_data = json_data["imgui_style"];
+
+      for (auto& [style_name, style_value] : style_data.items()) {
+        int style_enum = styleNameToThemeStyle(style_name);
+        if (style_enum >= 0) {
+          if (style_value.is_number()) {
+            // Float style parameter
+            if (style_enum < static_cast<int>(ThemeStyle::WindowPadding)) {
+              theme.style_floats[style_enum] = style_value.get<float>();
+            }
+          }
+          else if (style_value.is_array() && style_value.size() == 2) {
+            // ImVec2 style parameter
+            int vec2_index =
+              style_enum - static_cast<int>(ThemeStyle::WindowPadding);
+            if (vec2_index >= 0 &&
+                vec2_index < static_cast<int>(ThemeStyle::COUNT) -
+                               static_cast<int>(ThemeStyle::WindowPadding)) {
+              theme.style_vec2s[vec2_index] = ImVec2(
+                style_value[0].get<float>(), style_value[1].get<float>());
+            }
+          }
         }
       }
     }
@@ -321,16 +354,22 @@ ThemeManager::getThemeByName(const std::string& name) const
   return nullptr;
 }
 
-bool ThemeManager::setActiveTheme(const std::string& themeName)
+bool ThemeManager::setActiveTheme(const std::string& theme_name)
 {
-  const Theme* theme = getThemeByName(themeName);
+  const Theme* theme = getThemeByName(theme_name);
   if (!theme) {
-    LOG_F(WARNING, "Theme not found: %s", themeName.c_str());
+    LOG_F(WARNING, "Theme not found: %s", theme_name.c_str());
     return false;
   }
 
   m_active_theme = const_cast<Theme*>(theme); // Remove const for internal use
-  m_active_theme_name = themeName;
+  m_active_theme_name = theme_name;
+
+  // Copy active theme's color cache into the stable manager cache.
+  // All const Color4f* pointers held by primitives point into m_color_cache,
+  // so updating in-place automatically updates every primitive's color.
+  m_color_cache = theme->color_cache;
+
   saveActiveTheme();
   return true;
 }
@@ -346,13 +385,7 @@ void ThemeManager::applyTheme()
   applyImGuiColors(*m_active_theme);
 
   // Apply ImGui style settings
-  ImGuiStyle& style = ImGui::GetStyle();
-  style.ChildBorderSize = 1.0f;
-  style.FrameBorderSize = 0.0f;
-  style.PopupBorderSize = 1.0f;
-  style.WindowBorderSize = 0.0f;
-  style.FrameRounding = 3.0f;
-  style.Alpha = 1.0f;
+  applyImGuiStyle(*m_active_theme);
 }
 
 void ThemeManager::applyImGuiColors(const Theme& theme)
@@ -364,6 +397,95 @@ void ThemeManager::applyImGuiColors(const Theme& theme)
     int imgui_col = colorNameToImGuiCol(color_name);
     if (imgui_col >= 0 && imgui_col < ImGuiCol_COUNT) {
       style.Colors[imgui_col] = ImVec4(color[0], color[1], color[2], color[3]);
+    }
+  }
+}
+
+void ThemeManager::applyImGuiStyle(const Theme& theme)
+{
+  ImGuiStyle& style = ImGui::GetStyle();
+
+  // Apply float style parameters
+  for (int i = 0; i < static_cast<int>(ThemeStyle::WindowPadding); i++) {
+    float value = theme.style_floats[i];
+    switch (static_cast<ThemeStyle>(i)) {
+      case ThemeStyle::WindowRounding:
+        style.WindowRounding = value;
+        break;
+      case ThemeStyle::ChildRounding:
+        style.ChildRounding = value;
+        break;
+      case ThemeStyle::FrameRounding:
+        style.FrameRounding = value;
+        break;
+      case ThemeStyle::PopupRounding:
+        style.PopupRounding = value;
+        break;
+      case ThemeStyle::ScrollbarRounding:
+        style.ScrollbarRounding = value;
+        break;
+      case ThemeStyle::GrabRounding:
+        style.GrabRounding = value;
+        break;
+      case ThemeStyle::TabRounding:
+        style.TabRounding = value;
+        break;
+      case ThemeStyle::WindowBorderSize:
+        style.WindowBorderSize = value;
+        break;
+      case ThemeStyle::ChildBorderSize:
+        style.ChildBorderSize = value;
+        break;
+      case ThemeStyle::PopupBorderSize:
+        style.PopupBorderSize = value;
+        break;
+      case ThemeStyle::FrameBorderSize:
+        style.FrameBorderSize = value;
+        break;
+      case ThemeStyle::TabBorderSize:
+        style.TabBorderSize = value;
+        break;
+      case ThemeStyle::ScrollbarSize:
+        style.ScrollbarSize = value;
+        break;
+      case ThemeStyle::GrabMinSize:
+        style.GrabMinSize = value;
+        break;
+      case ThemeStyle::IndentSpacing:
+        style.IndentSpacing = value;
+        break;
+      case ThemeStyle::DockingSeparatorSize:
+        style.DockingSeparatorSize = value;
+        break;
+      case ThemeStyle::SeparatorTextBorderSize:
+        style.SeparatorTextBorderSize = value;
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Apply ImVec2 style parameters
+  for (int i = 0; i < static_cast<int>(ThemeStyle::COUNT) -
+                        static_cast<int>(ThemeStyle::WindowPadding);
+       i++) {
+    ImVec2 value = theme.style_vec2s[i];
+    switch (static_cast<ThemeStyle>(
+      i + static_cast<int>(ThemeStyle::WindowPadding))) {
+      case ThemeStyle::WindowPadding:
+        style.WindowPadding = value;
+        break;
+      case ThemeStyle::FramePadding:
+        style.FramePadding = value;
+        break;
+      case ThemeStyle::ItemSpacing:
+        style.ItemSpacing = value;
+        break;
+      case ThemeStyle::ItemInnerSpacing:
+        style.ItemInnerSpacing = value;
+        break;
+      default:
+        break;
     }
   }
 }
@@ -533,22 +655,13 @@ void ThemeManager::renderThemeSelector()
         if (setActiveTheme(theme.name)) {
           applyTheme();
 
-          // Update app colors from theme via color cache
+          // Update GL clear color from theme
           if (m_app) {
-            auto&   renderer = m_app->getRenderer();
-            Color4f bg = getColor(ThemeColor::BackgroundColor);
-            renderer.setClearColor(bg.r, bg.g, bg.b);
-
-            // Update machine plane colors
-            auto& control_view = m_app->getControlView();
-            control_view.m_machine_plane->color =
-              getColor(ThemeColor::MachinePlaneColor);
-            control_view.m_cuttable_plane->color =
-              getColor(ThemeColor::CuttablePlaneColor);
-
-            // Invalidate HMI colors to force update of all UI elements
-            control_view.getHmi().invalidateColors();
+            const Color4f& bg = getColor(ThemeColor::WindowBg);
+            m_app->getRenderer().setClearColor(bg.r, bg.g, bg.b);
           }
+          // All primitive colors auto-update via const Color4f* pointers
+          // into the stable m_color_cache (updated in setActiveTheme).
         }
       }
 

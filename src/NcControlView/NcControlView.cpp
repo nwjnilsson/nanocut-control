@@ -17,28 +17,6 @@ void NcControlView::preInit()
     return;
   auto& renderer = m_app->getRenderer();
 
-  // Load window size preferences (theme system handles colors now)
-  nlohmann::json preferences = renderer.parseJsonFromFile(
-    renderer.getConfigDirectory() + "preferences.json");
-  if (preferences != NULL) {
-    try {
-      LOG_F(INFO,
-            "Found %s!",
-            std::string(renderer.getConfigDirectory() + "preferences.json")
-              .c_str());
-      m_preferences.window_size[0] = (double) preferences["window_width"];
-      m_preferences.window_size[1] = (double) preferences["window_height"];
-    }
-    catch (...) {
-      LOG_F(WARNING, "Error parsing preferences file!");
-    }
-  }
-  else {
-    LOG_F(WARNING, "Preferences file does not exist, creating it!");
-    m_preferences.window_size[0] = 1280;
-    m_preferences.window_size[1] = 720;
-  }
-
   // Clear color is now handled by renderer initialization based on active theme
 
   nlohmann::json parameters = renderer.parseJsonFromFile(

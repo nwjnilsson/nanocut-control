@@ -103,7 +103,6 @@ public:
   void getBoundingBox(Point2d* bbox_min, Point2d* bbox_max);
 
   void clearHighlights();
-  void invalidateColors();
 
 private:
   // Application context
@@ -119,6 +118,9 @@ private:
   Path*                           m_arc_okay_highlight_path = nullptr;
   dro_group_data_t                m_dro;
   std::vector<hmi_button_group_t> m_button_groups;
+
+  // Computed color for DRO backpane when torch is on (can't use theme pointer)
+  Color4f m_dro_torch_on_color = { 0.0f, 0.0f, 0.0f, 255.0f };
 
   // Private helper methods
   bool checkPathBounds();

@@ -150,7 +150,7 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
           arrow_path.push_back({ p2.x, p2.y });
           Path* direction_indicator = renderer.pushPrimitive<Path>(arrow_path);
           direction_indicator->m_is_closed = false; // V shaped
-          direction_indicator->color = m_app->getColor(ThemeColor::TextSelectedBg);
+          direction_indicator->color = &m_app->getColor(ThemeColor::TextSelectedBg);
           direction_indicator->id = "gcode_arrows";
           direction_indicator->flags =
             PrimitiveFlags::GCode | PrimitiveFlags::GCodeArrow;
@@ -168,7 +168,7 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
       g->id = "gcode";
       g->flags = PrimitiveFlags::GCode;
       g->user_data = rapid_line; // Store rapid_line index as type-safe int
-      g->color = m_app->getColor(ThemeColor::Text);
+      g->color = &m_app->getColor(ThemeColor::Text);
       g->matrix_callback = m_view->getTransformCallback();
       g->mouse_callback = [view = m_view](Primitive*                       c,
                                           const Primitive::MouseEventData& e) {
@@ -215,7 +215,7 @@ bool GCode::parseTimer()
             l->id = "gcode";
             l->flags = PrimitiveFlags::GCode;
             l->m_style = "dashed";
-            l->color = m_app->getColor(ThemeColor::TextDisabled);
+            l->color = &m_app->getColor(ThemeColor::TextDisabled);
             l->matrix_callback = m_view->getTransformCallback();
             l->visible = false;
           }

@@ -80,9 +80,13 @@ public:
   // Theme management
   ThemeManager&       getThemeManager() { return *m_theme_manager; }
   const ThemeManager& getThemeManager() const { return *m_theme_manager; }
-  Color4f             getColor(ThemeColor color) const;
+  const Color4f&      getColor(ThemeColor color) const;
 
   GLFWwindow* getGlfwWindow() const { return m_window; };
+
+  struct Preferences {
+    std::array<int, 2> window_size{ 1280, 720 };
+  } m_preferences;
 
 private:
   // Core application state
