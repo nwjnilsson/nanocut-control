@@ -58,6 +58,8 @@ public:
 
   // THC (Torch Height Control) window
   void showThcWindow(bool visible);
+  
+
 
   // Yes/No question dialog
   void askYesNo(const std::string&       question,

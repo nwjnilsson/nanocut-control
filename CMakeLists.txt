@@ -250,9 +250,7 @@ else() # Linux and other Unix-like systems
     set(CONFIG_DIR "$ENV{HOME}/.config/NanoCut")
 endif()
 
-target_compile_definitions(NanoCut PRIVATE 
-    CONFIG_DIRECTORY="${CONFIG_DIR_DEFINE}"
-)
+target_compile_definitions(NanoCut PRIVATE)
 
 #
 # ------------------------------------------------------------
@@ -365,6 +363,9 @@ install(TARGETS NanoCut DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 
 # Install fonts to system data directory
 install(DIRECTORY assets/fonts/ DESTINATION ${CONFIG_DIR}/fonts)
+
+# Install themes to system data directory
+install(DIRECTORY assets/themes/ DESTINATION ${CONFIG_DIR}/themes)
 
 #
 # ------------------------------------------------------------

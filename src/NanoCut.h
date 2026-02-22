@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <fstream>
 #include <ftw.h>
+#include <imgui.h>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -64,40 +65,16 @@ template <typename T> static constexpr T inf()
 // Type-safe color system
 struct Color4f {
   float r, g, b, a;
-};
 
-enum class Color {
-  White,
-  Black,
-  Grey,
-  LightRed,
-  Red,
-  LightGreen,
-  Green,
-  LightBlue,
-  Blue,
-  Yellow
+  Color4f& operator=(const ImVec4& col)
+  {
+    r = col.x;
+    g = col.y;
+    b = col.z;
+    a = col.w;
+    return *this;
+  }
 };
-
-// Constexpr color palette (values 0-255 range)
-constexpr Color4f COLOR_PALETTE[] = {
-  { 255.0f, 255.0f, 255.0f, 255.0f }, // White
-  { 0.0f, 0.0f, 0.0f, 255.0f },       // Black
-  { 100.0f, 100.0f, 100.0f, 255.0f }, // Grey
-  { 190.0f, 0.0f, 0.0f, 255.0f },     // LightRed
-  { 255.0f, 0.0f, 0.0f, 255.0f },     // Red
-  { 0.0f, 190.0f, 0.0f, 255.0f },     // LightGreen
-  { 0.0f, 255.0f, 0.0f, 255.0f },     // Green
-  { 0.0f, 0.0f, 190.0f, 255.0f },     // LightBlue
-  { 0.0f, 0.0f, 255.0f, 255.0f },     // Blue
-  { 255.0f, 255.0f, 0.0f, 255.0f }    // Yellow
-};
-
-// Helper function to get color from enum
-constexpr Color4f getColor(Color color)
-{
-  return COLOR_PALETTE[static_cast<int>(color)];
-}
 
 // Forward declarations moved to NcApp.h as needed
 

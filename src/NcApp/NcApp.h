@@ -3,6 +3,7 @@
 
 #include <GLFW/glfw3.h>
 #include <NcRender/geometry/geometry.h>
+#include <ThemeManager/ThemeColor.h>
 #include <memory>
 
 // Forward declarations
@@ -11,6 +12,7 @@ class WebsocketClient;
 class NcControlView;
 class NcCamView;
 class NcAdminView;
+class ThemeManager;
 class View;
 class InputState;
 
@@ -75,6 +77,13 @@ public:
   const NcCamView&       getCamView() const { return *m_cam_view; }
   const NcAdminView&     getAdminView() const { return *m_admin_view; }
 
+  // Theme management
+  ThemeManager&       getThemeManager() { return *m_theme_manager; }
+  const ThemeManager& getThemeManager() const { return *m_theme_manager; }
+  Color4f             getColor(ThemeColor color) const;
+
+  GLFWwindow* getGlfwWindow() const { return m_window; };
+
 private:
   // Core application state
   bool m_quit{ false };
@@ -103,6 +112,7 @@ private:
 
   // Services and subsystems (owned by this context)
   std::unique_ptr<NcRender>        m_renderer;
+  std::unique_ptr<ThemeManager>    m_theme_manager;
   std::unique_ptr<WebsocketClient> m_websocket;
 
   // Views (owned by this context)

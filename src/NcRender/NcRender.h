@@ -48,6 +48,8 @@
 #  pragma comment(lib, "legacy_stdio_definitions")
 #endif
 
+class NcApp;
+
 class NcRender {
 private:
   struct NcRenderTimer {
@@ -56,6 +58,7 @@ private:
     unsigned long         interval;
     std::function<bool()> callback;
   };
+  NcApp*             m_app;
   GLFWwindow*        m_window;
   unsigned long      m_render_performance;
   float              m_clear_color[3];
@@ -98,25 +101,8 @@ public:
   std::deque<NcRenderGui> m_gui_stack;
 
   // Constructor accepting existing GLFW window (NcApp owns window)
-  explicit NcRender(GLFWwindow* window)
-  {
-    m_window = window;
-    // Load Defaults
-    setWindowTitle("NcRender");
-    int w, h;
-    glfwGetFramebufferSize(window, &w, &h);
-    setWindowSize(w, h);
-    setShowCursor(true);
-    setAutoMaximize(false);
-    setGuiIniFileName("NcRenderGui.ini");
-    setGuiLogFileName("NcRenderGui.log");
-    setMainLogFileName("NcRender.log");
-    setGuiStyle("light");
-    setClearColor(21, 22, 34);
-    setShowFPS(false);
-    setCurrentView("main");
-    m_fps_label = NULL;
-  };
+  explicit NcRender(NcApp* app);
+
   /* Primitive Creation */
   template <typename T, typename... Ts> T* pushPrimitive(Ts&&... args)
   {

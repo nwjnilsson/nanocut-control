@@ -5,6 +5,8 @@
 #include "../NcCamView/NcCamView.h"
 #include "../NcControlView/NcControlView.h"
 #include "../NcRender/NcRender.h"
+#include "../ThemeManager/ThemeManager.h"
+#include "../ThemeManager/ThemeColor.h"
 #include "../WebsocketClient/WebsocketClient.h"
 #include <imgui.h>
 #include <loguru.hpp>
@@ -69,7 +71,7 @@ void NcApp::initialize(int argc, char** argv)
                     m_control_view->m_preferences.window_size[1]);
 
   // Create NcRender with existing window
-  m_renderer = std::make_unique<NcRender>(m_window);
+  m_renderer = std::make_unique<NcRender>(this);
   m_renderer->setWindowTitle("NanoCut");
   m_renderer->setGuiIniFileName(m_renderer->getConfigDirectory() + "gui.ini");
   m_renderer->setGuiLogFileName(m_renderer->getConfigDirectory() + "gui.log");
@@ -80,6 +82,16 @@ void NcApp::initialize(int argc, char** argv)
 
   // Initialize renderer
   m_renderer->init(argc, argv);
+
+  // Create theme manager (after renderer init, needs config directory)
+  std::string config_dir = m_renderer->getConfigDirectory();
+  std::string theme_dir = config_dir + "themes";
+  m_theme_manager = std::make_unique<ThemeManager>(this, theme_dir, config_dir);
+  m_theme_manager->applyTheme();
+
+  // Set clear color from theme
+  Color4f bg = m_theme_manager->getColor(ThemeColor::BackgroundColor);
+  m_renderer->setClearColor(bg.r, bg.g, bg.b);
 
   // Register centralized modifier key events
   registerModifierKeyEvents();
@@ -158,6 +170,14 @@ void NcApp::logUptime()
     m_renderer->dumpJsonToFile(m_renderer->getConfigDirectory() + "uptime.json",
                                uptime);
   }
+}
+
+Color4f NcApp::getColor(ThemeColor color) const
+{
+  if (m_theme_manager) {
+    return m_theme_manager->getColor(color);
+  }
+  return THEME_COLOR_DEFAULTS[static_cast<int>(color)];
 }
 
 void NcApp::setModifierPressed(int modifier_bit, bool pressed)

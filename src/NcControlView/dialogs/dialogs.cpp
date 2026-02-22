@@ -49,15 +49,8 @@ void NcDialogs::renderPreferences()
   ImGui::Begin("Preferences",
                &m_preferences_window_handle->visible,
                ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::ColorEdit3(
-    "Background Color",
-    m_app->getControlView().m_preferences.background_color.data());
-  ImGui::ColorEdit3(
-    "Machine Plane Color",
-    m_app->getControlView().m_preferences.machine_plane_color.data());
-  ImGui::ColorEdit3(
-    "Cuttable Plane Color",
-    m_app->getControlView().m_preferences.cuttable_plane_color.data());
+  
+  // Window size preferences (colors are now handled by theme system)
   ImGui::InputInt2("Default Window Size",
                    m_app->getControlView().m_preferences.window_size.data());
   ImGui::SameLine();
@@ -67,50 +60,13 @@ void NcDialogs::renderPreferences()
     m_app->getControlView().m_preferences.window_size[1] =
       (int) m_app->getRenderer().getWindowSize().y;
   }
+  
+  ImGui::Text("Color themes are now managed through the Themes menu.");
+  
   ImGui::Spacing();
   if (ImGui::Button("OK")) {
-    m_app->getRenderer().setClearColor(
-      m_app->getControlView().m_preferences.background_color[0] * 255.0f,
-      m_app->getControlView().m_preferences.background_color[1] * 255.0f,
-      m_app->getControlView().m_preferences.background_color[2] * 255.0f);
-
-    m_app->getControlView().m_machine_plane->color.r =
-      m_app->getControlView().m_preferences.machine_plane_color[0] * 255.0f;
-    m_app->getControlView().m_machine_plane->color.g =
-      m_app->getControlView().m_preferences.machine_plane_color[1] * 255.0f;
-    m_app->getControlView().m_machine_plane->color.b =
-      m_app->getControlView().m_preferences.machine_plane_color[2] * 255.0f;
-
-    m_app->getControlView().m_cuttable_plane->color.r =
-      m_app->getControlView().m_preferences.cuttable_plane_color[0] * 255.0f;
-    m_app->getControlView().m_cuttable_plane->color.g =
-      m_app->getControlView().m_preferences.cuttable_plane_color[1] * 255.0f;
-    m_app->getControlView().m_cuttable_plane->color.b =
-      m_app->getControlView().m_preferences.cuttable_plane_color[2] * 255.0f;
-
-    // Write preferences to file
+    // Write preferences to file (only window size now)
     nlohmann::json preferences;
-    preferences["background_color"]["r"] =
-      m_app->getControlView().m_preferences.background_color[0];
-    preferences["background_color"]["g"] =
-      m_app->getControlView().m_preferences.background_color[1];
-    preferences["background_color"]["b"] =
-      m_app->getControlView().m_preferences.background_color[2];
-
-    preferences["machine_plane_color"]["r"] =
-      m_app->getControlView().m_preferences.machine_plane_color[0];
-    preferences["machine_plane_color"]["g"] =
-      m_app->getControlView().m_preferences.machine_plane_color[1];
-    preferences["machine_plane_color"]["b"] =
-      m_app->getControlView().m_preferences.machine_plane_color[2];
-
-    preferences["cuttable_plane_color"]["r"] =
-      m_app->getControlView().m_preferences.cuttable_plane_color[0];
-    preferences["cuttable_plane_color"]["g"] =
-      m_app->getControlView().m_preferences.cuttable_plane_color[1];
-    preferences["cuttable_plane_color"]["b"] =
-      m_app->getControlView().m_preferences.cuttable_plane_color[2];
-
     preferences["window_width"] =
       m_app->getControlView().m_preferences.window_size[0];
     preferences["window_height"] =
@@ -370,6 +326,8 @@ void NcDialogs::showControllerHomingWindow(bool visible)
   m_controller_homing_window_handle->visible = visible;
 }
 
+
+
 void NcDialogs::renderControllerHomingWindow()
 {
   ImGui::Begin("Home Machine",
@@ -428,6 +386,8 @@ void NcDialogs::renderAskWindow()
   }
   ImGui::End();
 }
+
+
 
 void NcDialogs::showThcWindow(bool visible)
 {

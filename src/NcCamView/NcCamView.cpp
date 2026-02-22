@@ -8,6 +8,7 @@
 #include <ImGuiFileDialog.h>
 #include <NcControlView/util.h>
 #include <NcRender/NcRender.h>
+#include <ThemeManager/ThemeManager.h>
 #include <dxflib/dl_dxf.h>
 #include <imgui.h>
 #include <loguru.hpp>
@@ -103,7 +104,7 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
           for (auto& [layer_name, layer] : part->m_layers) {
             for (auto& path : layer.paths) {
               if (current_index == global_index) {
-                path.color = getColor(m_mouse_over_color);
+                path.color = m_app->getColor(m_mouse_over_color);
                 return; // Found it, exit early
               }
               current_index++;
@@ -116,14 +117,14 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
             for (auto& path : layer.paths) {
               if (path.is_inside_contour == true) {
                 if (path.is_closed == true) {
-                  path.color = getColor(m_inside_contour_color);
+                  path.color = m_app->getColor(m_inside_contour_color);
                 }
                 else {
-                  path.color = getColor(m_open_contour_color);
+                  path.color = m_app->getColor(m_open_contour_color);
                 }
               }
               else {
-                path.color = getColor(m_outside_contour_color);
+                path.color = m_app->getColor(m_outside_contour_color);
               }
             }
           }
@@ -138,7 +139,7 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
           part->m_is_part_selected = true;
           for (auto& [layer_name, layer] : part->m_layers) {
             for (auto& path : layer.paths) {
-              path.color = getColor(m_mouse_over_color);
+              path.color = m_app->getColor(m_mouse_over_color);
             }
           }
         }
@@ -148,14 +149,14 @@ void NcCamView::mouseEventCallback(Primitive*                       c,
             for (auto& path : layer.paths) {
               if (path.is_inside_contour == true) {
                 if (path.is_closed == true) {
-                  path.color = getColor(m_inside_contour_color);
+                  path.color = m_app->getColor(m_inside_contour_color);
                 }
                 else {
-                  path.color = getColor(m_open_contour_color);
+                  path.color = m_app->getColor(m_open_contour_color);
                 }
               }
               else {
-                path.color = getColor(m_outside_contour_color);
+                path.color = m_app->getColor(m_outside_contour_color);
               }
             }
           }
@@ -425,6 +426,13 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
       if (ImGui::MenuItem("CAM Toolpaths", "")) {
         LOG_F(INFO, "Workbench->CAM Toolpaths");
         makeActive();
+      }
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Themes")) {
+      if (ImGui::MenuItem("Select Theme", "")) {
+        LOG_F(INFO, "Themes->Select Theme");
+        m_app->getThemeManager().showThemeSelector(true);
       }
       ImGui::EndMenu();
     }
@@ -875,8 +883,8 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
                                    [](const auto& op) { return op.enabled; });
 
   // Calculate height needed for bottom section
-  int failed = m_operation.failed_count.load();
-  bool operation_in_progress = m_operation.in_progress.load();
+  int   failed = m_operation.failed_count.load();
+  bool  operation_in_progress = m_operation.in_progress.load();
   float button_area_height =
     ImGui::GetFrameHeightWithSpacing() * 3 + ImGui::GetStyle().ItemSpacing.y;
 
@@ -885,7 +893,8 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     button_area_height += ImGui::GetFrameHeightWithSpacing() * 2.0f;
   }
 
-  // Add space for warning text if needed (approximately 2-3 lines of wrapped text)
+  // Add space for warning text if needed (approximately 2-3 lines of wrapped
+  // text)
   if (failed > 0) {
     button_area_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f;
   }
@@ -934,7 +943,8 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
   bool has_parts = false;
   forEachPart([&](Part*) { has_parts = true; });
-  bool nesting_active = (m_operation.type == BackgroundOperationType::Nesting && m_operation.in_progress);
+  bool nesting_active = (m_operation.type == BackgroundOperationType::Nesting &&
+                         m_operation.in_progress);
   ImGui::BeginDisabled(!has_parts || nesting_active);
   if (ImGui::Button("Arrange", ImVec2(-1, 0))) {
     m_action_stack.push_back(std::make_unique<ArrangePartsAction>());
@@ -1269,7 +1279,7 @@ void NcCamView::reevaluateContours()
     Part::path_t& path =
       ref.part->m_layers[ref.layer_name].paths[ref.path_index];
     path.is_inside_contour = false;
-    path.color = getColor(m_outside_contour_color);
+    path.color = m_app->getColor(m_outside_contour_color);
   }
 
   // Re-evaluate inside/outside relationships considering only visible layers
@@ -1310,10 +1320,10 @@ void NcCamView::reevaluateContours()
                                                          path_i.points)) {
         path_x.is_inside_contour = true;
         if (all_path_refs[x].is_closed) {
-          path_x.color = getColor(m_inside_contour_color);
+          path_x.color = m_app->getColor(m_inside_contour_color);
         }
         else {
-          path_x.color = getColor(m_open_contour_color);
+          path_x.color = m_app->getColor(m_open_contour_color);
         }
         break;
       }
@@ -1579,7 +1589,8 @@ void NcCamView::startNestingThread()
     if (std::this_thread::get_id() == m_background_thread->get_id()) {
       // Detach the current thread so it can finish independently
       m_background_thread->detach();
-    } else {
+    }
+    else {
       // Join from a different thread (normal case)
       m_background_thread->join();
     }
@@ -1625,7 +1636,8 @@ void NcCamView::startImportThread()
     auto& renderer = m_app->getRenderer();
 
     // Parse DXF file (blocking while loop reading groups)
-    while (m_dl_dxf->readDxfGroups(m_dxf_fp.get(), m_dxf_creation_interface.get())) {
+    while (
+      m_dl_dxf->readDxfGroups(m_dxf_fp.get(), m_dxf_creation_interface.get())) {
       // Progress updates happen in finish() method
     }
     LOG_F(INFO, "Successfully parsed DXF groups.");
@@ -1725,17 +1737,13 @@ void NcCamView::preInit()
   if (!m_app)
     return;
   auto& renderer = m_app->getRenderer();
-  m_mouse_over_color = Color::Blue;
-  m_outside_contour_color = Color::White;
-  m_inside_contour_color = Color::Grey;
-  m_open_contour_color = Color::Yellow;
+  m_mouse_over_color = ThemeColor::HeaderHovered;
+  m_outside_contour_color = ThemeColor::Text;
+  m_inside_contour_color = ThemeColor::TextDisabled;
+  m_open_contour_color = ThemeColor::DragDropTarget;
 
   m_show_viewer_context_menu.x = -inf<double>();
   m_show_viewer_context_menu.y = -inf<double>();
-
-  m_preferences.background_color[0] = 58 / 255.0f;
-  m_preferences.background_color[1] = 58 / 255.0;
-  m_preferences.background_color[2] = 58 / 255.0f;
 
   m_current_tool = JetCamTool::Contour;
   m_left_click_pressed = false;
@@ -1777,9 +1785,8 @@ void NcCamView::init()
   m_material_plane->id = "material_plane";
   m_material_plane->flags = PrimitiveFlags::MaterialPlane;
   m_material_plane->zindex = -20;
-  m_material_plane->color.r = 100;
-  m_material_plane->color.g = 0;
-  m_material_plane->color.b = 0;
+  m_material_plane->color = m_app->getColor(ThemeColor::CuttablePlaneColor);
+  
   m_material_plane->matrix_callback = getTransformCallback();
   m_material_plane->mouse_callback =
     [this](Primitive* c, const Primitive::MouseEventData& e) {
@@ -1851,10 +1858,9 @@ void NcCamView::makeActive()
 
   m_app->setCurrentActiveView(this); // Register for event delegation
   m_app->getRenderer().setCurrentView("NcCamView");
-  m_app->getRenderer().setClearColor(m_preferences.background_color[0] * 255.0f,
-                                     m_preferences.background_color[1] * 255.0f,
-                                     m_preferences.background_color[2] *
-                                       255.0f);
+  
+  Color4f bg = m_app->getColor(ThemeColor::BackgroundColor);
+  m_app->getRenderer().setClearColor(bg.r, bg.g, bg.b);
 }
 void NcCamView::close()
 {

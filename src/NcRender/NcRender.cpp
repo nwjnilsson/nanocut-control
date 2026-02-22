@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "NcRender.h"
+#include <NcApp/NcApp.h>
+#include <ThemeManager/ThemeManager.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -52,6 +54,25 @@
 #endif
 
 const auto NcRenderProgramStartTime = std::chrono::steady_clock::now();
+
+NcRender::NcRender(NcApp* app) : m_window(app->getGlfwWindow()), m_app(app)
+{
+  // Load Defaults
+  setWindowTitle("NcRender");
+  int w, h;
+  glfwGetFramebufferSize(m_window, &w, &h);
+  setWindowSize(w, h);
+  setShowCursor(true);
+  setAutoMaximize(false);
+  setGuiIniFileName("NcRenderGui.ini");
+  setGuiLogFileName("NcRenderGui.log");
+  setMainLogFileName("NcRender.log");
+  setGuiStyle("light");
+  setClearColor(21, 22, 34);
+  setShowFPS(false);
+  setCurrentView("main");
+  m_fps_label = NULL;
+};
 
 // Event delegation methods (called by NcApp)
 void NcRender::handleKeyEvent(const KeyEvent& ev)
@@ -214,7 +235,7 @@ std::string NcRender::getEnvironmentVariable(const std::string& var)
 std::string NcRender::getConfigDirectory()
 {
   struct stat info;
-  std::string path = CONFIG_DIRECTORY;
+  std::string path;
 
   // Expand environment variables in the path
 #ifdef _WIN32
@@ -360,17 +381,15 @@ bool NcRender::init(int argc, char** argv)
   io.LogFilename = m_gui_log_filename;
   io.ConfigFlags |=
     ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-  if (m_gui_style == "light") {
-    ImGui::StyleColorsLight();
-  }
-  else if (m_gui_style == "dark") {
-    ImGui::StyleColorsDark();
-  }
+  // Theme system now handles styling
+  // m_gui_style is kept for backward compatibility but not used
   ImGui_ImplGlfw_InitForOpenGL(m_window, true);
   ImGui_ImplOpenGL2_Init();
 
   // Setup fonts
   setupFonts();
+
+  // Theme is applied by NcApp after renderer init
 
   return true;
 }
@@ -399,6 +418,9 @@ bool NcRender::poll(bool should_quit)
       }
     }
   }
+
+  // Render theme selector (view-independent)
+  m_app->getThemeManager().renderThemeSelector();
   ImGui::Render();
   /*********/
   glMatrixMode(GL_PROJECTION);
@@ -466,7 +488,7 @@ bool NcRender::poll(bool should_quit)
       m_fps_label->visible = false;
       m_fps_label->id = "FPS";
       m_fps_label->flags = PrimitiveFlags::SystemUI;
-      m_fps_label->color = getColor(Color::White);
+      m_fps_label->color = m_app->getColor(ThemeColor::Text);
     }
     else {
       m_fps_average.push_back(getFramesPerSecond());

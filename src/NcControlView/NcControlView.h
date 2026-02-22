@@ -35,9 +35,10 @@ private:
 
 public:
   struct Preferences {
-    std::array<float, 3> background_color = { 0.0f, 0.0f, 0.0f };
-    std::array<float, 3> machine_plane_color = { 0.0f, 0.0f, 0.0f };
-    std::array<float, 3> cuttable_plane_color = { 0.0f, 0.0f, 0.0f };
+    // Colors are now managed by the theme system
+    // std::array<float, 3> background_color = { 0.0f, 0.0f, 0.0f };
+    // std::array<float, 3> machine_plane_color = { 0.0f, 0.0f, 0.0f };
+    // std::array<float, 3> cuttable_plane_color = { 0.0f, 0.0f, 0.0f };
     std::array<int, 2>   window_size = { 0, 0 };
   };
   struct MachineParameters {

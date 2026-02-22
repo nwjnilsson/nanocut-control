@@ -1,8 +1,8 @@
 #ifndef PRIMITIVE_BASE_
 #define PRIMITIVE_BASE_
 
-#include "NanoCut.h"
 #include "Input/InputEvents.h"
+#include "NanoCut.h"
 
 #include <nlohmann/json.hpp>
 

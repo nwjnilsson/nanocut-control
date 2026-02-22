@@ -103,6 +103,7 @@ public:
   void getBoundingBox(Point2d* bbox_min, Point2d* bbox_max);
 
   void clearHighlights();
+  void invalidateColors();
 
 private:
   // Application context

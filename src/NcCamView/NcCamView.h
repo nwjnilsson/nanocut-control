@@ -13,6 +13,7 @@
 // Project includes
 #include <NanoCut.h>
 #include <NcApp/View.h>
+#include <ThemeManager/ThemeColor.h>
 #include <dxflib/dl_dxf.h>
 
 // Local includes
@@ -66,9 +67,7 @@ struct BackgroundOperationState {
 
 class NcCamView : public View {
 private:
-  struct Preferences {
-    float background_color[3] = { 0.0f, 0.0f, 0.0f };
-  };
+
   struct JobOptions {
     float material_size[2] = { DEFAULT_MATERIAL_SIZE, DEFAULT_MATERIAL_SIZE };
     int   origin_corner = 2;
@@ -247,12 +246,11 @@ public:
   size_t m_mouse_over_path;
   size_t m_edit_contour_path;
 
-  Color m_mouse_over_color;
-  Color m_outside_contour_color;
-  Color m_inside_contour_color;
-  Color m_open_contour_color;
+  ThemeColor m_mouse_over_color;
+  ThemeColor m_outside_contour_color;
+  ThemeColor m_inside_contour_color;
+  ThemeColor m_open_contour_color;
 
-  Preferences                m_preferences;
   JobOptions                 m_job_options;
   std::vector<ToolData>      m_tool_library;
   std::vector<ToolOperation> m_toolpath_operations;

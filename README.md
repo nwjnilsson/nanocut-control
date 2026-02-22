@@ -69,7 +69,7 @@ Building should be roughly the same for all platforms when using CMake. See
 `shell.nix` for a list of what you will (roughly) need to build.
 ```
 mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=<..> -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
 make install
 ./NanoCut
 ```

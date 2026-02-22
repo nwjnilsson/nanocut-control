@@ -2,6 +2,7 @@
 #include "../Input/InputState.h"
 #include "../NcApp/NcApp.h"
 #include "NcCamView/NcCamView.h"
+#include "ThemeManager/ThemeManager.h"
 #include "gcode/gcode.h"
 #include "hmi/hmi.h"
 #include <ImGuiFileDialog.h>
@@ -16,6 +17,7 @@ void NcControlView::preInit()
     return;
   auto& renderer = m_app->getRenderer();
 
+  // Load window size preferences (theme system handles colors now)
   nlohmann::json preferences = renderer.parseJsonFromFile(
     renderer.getConfigDirectory() + "preferences.json");
   if (preferences != NULL) {
@@ -24,24 +26,6 @@ void NcControlView::preInit()
             "Found %s!",
             std::string(renderer.getConfigDirectory() + "preferences.json")
               .c_str());
-      m_preferences.background_color[0] =
-        (double) preferences["background_color"]["r"];
-      m_preferences.background_color[1] =
-        (double) preferences["background_color"]["g"];
-      m_preferences.background_color[2] =
-        (double) preferences["background_color"]["b"];
-      m_preferences.machine_plane_color[0] =
-        (double) preferences["machine_plane_color"]["r"];
-      m_preferences.machine_plane_color[1] =
-        (double) preferences["machine_plane_color"]["g"];
-      m_preferences.machine_plane_color[2] =
-        (double) preferences["machine_plane_color"]["b"];
-      m_preferences.cuttable_plane_color[0] =
-        (double) preferences["cuttable_plane_color"]["r"];
-      m_preferences.cuttable_plane_color[1] =
-        (double) preferences["cuttable_plane_color"]["g"];
-      m_preferences.cuttable_plane_color[2] =
-        (double) preferences["cuttable_plane_color"]["b"];
       m_preferences.window_size[0] = (double) preferences["window_width"];
       m_preferences.window_size[1] = (double) preferences["window_height"];
     }
@@ -51,18 +35,11 @@ void NcControlView::preInit()
   }
   else {
     LOG_F(WARNING, "Preferences file does not exist, creating it!");
-    m_preferences.background_color[0] = 0.f;
-    m_preferences.background_color[1] = 0.f;
-    m_preferences.background_color[2] = 0.f;
-    m_preferences.machine_plane_color[0] = 100.0f / 255.0f;
-    m_preferences.machine_plane_color[1] = 100.0f / 255.0f;
-    m_preferences.machine_plane_color[2] = 100.0f / 255.0f;
-    m_preferences.cuttable_plane_color[0] = 151.0f / 255.0f;
-    m_preferences.cuttable_plane_color[1] = 5.0f / 255.0f;
-    m_preferences.cuttable_plane_color[2] = 5.0f / 255.0f;
     m_preferences.window_size[0] = 1280;
     m_preferences.window_size[1] = 720;
   }
+
+  // Clear color is now handled by renderer initialization based on active theme
 
   nlohmann::json parameters = renderer.parseJsonFromFile(
     renderer.getConfigDirectory() + "machine_parameters.json");
@@ -211,6 +188,23 @@ void NcControlView::renderUI()
       }
       ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Themes")) {
+      if (ImGui::MenuItem("Select Theme", "")) {
+        LOG_F(INFO, "Themes->Select Theme");
+        m_app->getThemeManager().showThemeSelector(true);
+      }
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Help")) {
+      if (ImGui::MenuItem("Documentation", "")) {
+        LOG_F(INFO, "Help->Documentation");
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("About", "")) {
+        LOG_F(INFO, "Help->About");
+      }
+      ImGui::EndMenu();
+    }
 
     ImGui::EndMainMenuBar();
   }
@@ -262,9 +256,8 @@ void NcControlView::makeActive()
   auto& renderer = m_app->getRenderer();
 
   renderer.setCurrentView("NcControlView");
-  renderer.setClearColor(m_preferences.background_color[0] * 255.0f,
-                         m_preferences.background_color[1] * 255.0f,
-                         m_preferences.background_color[2] * 255.0f);
+
+  // Clear color is handled by renderer initialization
 }
 void NcControlView::loadGCodeFromLines(std::vector<std::string>&& lines)
 {
