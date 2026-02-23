@@ -1,3 +1,7 @@
+<div align="center" margin="20">
+  <img src="assets/logo.png" alt="NanoCut Logo" width="350" radius="8">
+</div>
+
 <div align="center">
 
 ![Linux Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build-linux.yml/badge.svg?branch=main&event=push)
@@ -8,7 +12,7 @@
 
 <div align="center">
 
-> No Proma? No problem.
+> _No Proma? No problem._
 
 </div>
 

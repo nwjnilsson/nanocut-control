@@ -4,8 +4,6 @@
 // define something for Windows (32-bit and 64-bit, this part is common)
 #  include <windef.h>
 
-#  include <GL/glew.h>
-
 #  include <GL/gl.h>
 
 #  include <GL/glu.h>
