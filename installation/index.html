@@ -410,10 +410,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-non-nixos" class="md-nav__link">
+  <a href="#linux-apt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux (Non-NixOS)
+        Linux (APT)
       
     </span>
   </a>
@@ -421,10 +421,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#macos-todo" class="md-nav__link">
+  <a href="#macos" class="md-nav__link">
     <span class="md-ellipsis">
       
-        macOS (TODO..)
+        macOS
       
     </span>
   </a>
@@ -644,10 +644,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-non-nixos" class="md-nav__link">
+  <a href="#linux-apt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux (Non-NixOS)
+        Linux (APT)
       
     </span>
   </a>
@@ -655,10 +655,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#macos-todo" class="md-nav__link">
+  <a href="#macos" class="md-nav__link">
     <span class="md-ellipsis">
       
-        macOS (TODO..)
+        macOS
       
     </span>
   </a>
@@ -844,20 +844,19 @@ ninja
 <h3 id="linux-nixos">Linux (NixOS)</h3>
 <ol>
 <li>
-<p>Enter the development environment:</p>
+<p>A <code>shell.nix</code> is provided, enter the environment:</p>
 <pre><code> nix-shell
 </code></pre>
 </li>
 <li>
 <p>Configure and build:</p>
 <pre><code> mkdir build &amp;&amp; cd build
- cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
+ cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
  make
 </code></pre>
 </li>
 </ol>
-<p>You can of course install it to wherever you want.</p>
-<h3 id="linux-non-nixos">Linux (Non-NixOS)</h3>
+<h3 id="linux-apt">Linux (APT)</h3>
 <ol>
 <li>
 <p>Install required dependencies:</p>
@@ -875,22 +874,23 @@ ninja
 <li>
 <p>Configure and build:</p>
 <pre><code> mkdir build &amp;&amp; cd build
- cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
+ cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
  make
 </code></pre>
 </li>
 </ol>
-<h3 id="macos-todo">macOS (TODO..)</h3>
+<h3 id="macos">macOS</h3>
+<p>I have not tested ono macOS myself but the process should look something like this. I'm sure you'll figure it out :)</p>
 <ol>
 <li>
 <p>Install dependencies using Homebrew:</p>
-<pre><code> brew install cmake
+<pre><code> brew install cmake glfw3 ...
 </code></pre>
 </li>
 <li>
 <p>Configure and build:</p>
 <pre><code> mkdir build &amp;&amp; cd build
- cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
+ cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
  make
 </code></pre>
 </li>
@@ -898,6 +898,9 @@ ninja
 <h3 id="installation">Installation</h3>
 <p>To install the application (Linux users need to <code>sudo</code> if installing to protected directories):</p>
 <pre><code class="language-bash">make install
+</code></pre>
+<p>Alternatively,</p>
+<pre><code class="language-bash">cmake --install . --prefix &quot;%APPDATA%\NanoCut&quot;
 </code></pre>
 <p>This will install:</p>
 <ul>
@@ -947,8 +950,8 @@ NanoCut
 <p>If you encounter build issues, try a clean build:</p>
 <pre><code class="language-bash">rm -rf build
 mkdir build &amp;&amp; cd build
-cmake ..
-make
+cmake [same parameters as the first time]
+make/ninja/......
 </code></pre>
 
 
