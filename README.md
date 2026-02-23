@@ -52,7 +52,7 @@ The codebase has changed quite a bit since then, with many new features having b
 - Customizable color themes!
 
 <div align="center">
-  <img src="assets/images/cam_view.png" alt="High quality DXF importing for gcode generation" width="450" radius="8">
+  <img src="assets/images/themes.gif" alt="Themes" width="512">
 </div>
 
 ## Important notes on using this software
