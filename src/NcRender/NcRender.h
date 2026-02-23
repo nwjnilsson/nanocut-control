@@ -19,9 +19,6 @@
 #ifdef __APPLE__
 #  define GL_SILENCE_DEPRECATION
 #endif
-#include <GLFW/glfw3.h>
-
-#include <GL/glu.h>
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) &&                                 \
   !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
@@ -29,6 +26,7 @@
 #endif
 
 class NcApp;
+struct GLFWwindow;
 
 class NcRender {
 private:

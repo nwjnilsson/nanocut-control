@@ -3,7 +3,7 @@
 #include <NcRender/NcRender.h>
 #include <loguru.hpp>
 
-#include <GL/glu.h>
+#include <NcRender/gl.h>
 
 std::string Line::getTypeName() { return "line"; }
 void        Line::processMouse(float mpos_x, float mpos_y)

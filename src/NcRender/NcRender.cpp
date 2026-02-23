@@ -24,9 +24,12 @@
 #ifdef __APPLE__
 #  define GL_SILENCE_DEPRECATION
 #endif
-#include <GLFW/glfw3.h>
 
-#include <GL/glu.h>
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#  include "gl.h"
+#endif
+
+#include <GLFW/glfw3.h>
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) &&                                 \
   !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)

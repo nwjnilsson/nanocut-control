@@ -1,9 +1,9 @@
 #include "Box.h"
 #include "../../geometry/geometry.h"
-#include <NcRender/NcRender.h>
-#include <loguru.hpp>
 
-#include <GL/glu.h>
+#include <NcRender/NcRender.h>
+#include <NcRender/gl.h>
+#include <loguru.hpp>
 
 std::string Box::getTypeName() { return "box"; }
 void        Box::processMouse(float mpos_x, float mpos_y)

@@ -6,7 +6,7 @@
 #include <stb_truetype.h>
 #include <string>
 
-#include <GL/glu.h>
+#include <NcRender/gl.h>
 
 class Text : public Primitive {
 public:

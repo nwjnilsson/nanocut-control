@@ -10,8 +10,6 @@
 #include <NcRender/NcRender.h>
 #include <loguru.hpp>
 
-#include <GL/glu.h>
-
 std::string Text::getTypeName() { return "text"; }
 void        Text::processMouse(float mpos_x, float mpos_y)
 {

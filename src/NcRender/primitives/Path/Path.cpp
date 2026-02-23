@@ -3,7 +3,7 @@
 #include <NcRender/NcRender.h>
 #include <loguru.hpp>
 
-#include <GL/glu.h>
+#include <NcRender/gl.h>
 
 std::string Path::getTypeName() { return "path"; }
 void        Path::processMouse(float mpos_x, float mpos_y)

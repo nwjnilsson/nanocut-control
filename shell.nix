@@ -13,6 +13,7 @@ pkgs.stdenv.mkDerivation {
     (python314.withPackages (ps: with ps; [
       mkdocs
       mkdocs-material
+      grip
     ]))
   ];
 }

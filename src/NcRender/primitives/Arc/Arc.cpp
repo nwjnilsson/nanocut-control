@@ -2,7 +2,7 @@
 #include <NcRender/NcRender.h>
 #include <loguru.hpp>
 
-#include <GL/glu.h>
+#include <NcRender/gl.h>
 
 std::string Arc::getTypeName() { return "arc"; }
 void        Arc::processMouse(float mpos_x, float mpos_y)

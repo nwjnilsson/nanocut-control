@@ -6,7 +6,7 @@
 
 #include <loguru.hpp>
 
-#include <GL/glu.h>
+#include <NcRender/gl.h>
 
 std::string Part::getTypeName() { return "part"; }
 void        Part::processMouse(float mpos_x, float mpos_y)

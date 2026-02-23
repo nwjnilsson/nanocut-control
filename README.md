@@ -1,8 +1,18 @@
-# NanoCut Control
+<div align="center">
+
 ![Linux Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build-linux.yml/badge.svg?branch=main&event=push)
 ![Windows Build](https://github.com/nwjnilsson/nanocut-control/actions/workflows/build-windows.yml/badge.svg?branch=main&event=push)
+![Docs](https://github.com/nwjnilsson/nanocut-control/actions/workflows/docs.yml/badge.svg?branch=main&event=push)
+
+</div>
+
+<div align="center">
 
 > No Proma? No problem.
+
+</div>
+
+# NanoCut Control
 
 Front-End Control Software for NanoCut CNC Controller (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)).
 NanoCut was forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine.
