@@ -2,11 +2,14 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 // define something for Windows (32-bit and 64-bit, this part is common)
-#  include <windef.h>
+#  define NOMINMAX
+#  include <windows.h>
 
 #  include <GL/gl.h>
 
 #  include <GL/glu.h>
+
+#  include <GLFW/glfw3.h>
 
 #  define GL_CLAMP_TO_EDGE 0x812F
 #  ifdef _WIN64
