@@ -383,7 +383,7 @@ if(APPLE)
         "-framework IOKit"
         "-framework OpenGL"
     )
-elif(WIN32)
+elseif(WIN32)
     # Corresponds to NT block in Makefile
     target_link_libraries(NanoCut PRIVATE
         ${OPENGL_LIBRARIES}
