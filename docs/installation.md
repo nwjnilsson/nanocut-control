@@ -73,19 +73,17 @@ You specify where to install the program with e.g<br>
 
 ### Linux (NixOS)
 
-1. Enter the development environment:
+1. A `shell.nix` is provided, enter the environment:
 
          nix-shell
 
 2. Configure and build:
 
          mkdir build && cd build
-         cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
+         cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
          make
 
-You can of course install it to wherever you want.
-
-### Linux (Non-NixOS)
+### Linux (APT)
 
 1. Install required dependencies:
 
@@ -102,19 +100,21 @@ You can of course install it to wherever you want.
 2. Configure and build:
 
          mkdir build && cd build
-         cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
+         cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
          make
 
-### macOS (TODO..)
+### macOS
+
+I have not tested ono macOS myself but the process should look something like this. I'm sure you'll figure it out :)
 
 1. Install dependencies using Homebrew:
 
-         brew install cmake
+         brew install cmake glfw3 ...
 
 2. Configure and build:
 
          mkdir build && cd build
-         cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
+         cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
          make
 
 ### Installation
@@ -123,6 +123,12 @@ To install the application (Linux users need to `sudo` if installing to protecte
 
 ```bash
 make install
+```
+
+Alternatively,
+
+```bash
+cmake --install . --prefix "%APPDATA%\NanoCut"
 ```
 
 This will install:
@@ -191,6 +197,6 @@ If you encounter build issues, try a clean build:
 ```bash
 rm -rf build
 mkdir build && cd build
-cmake ..
-make
+cmake [same parameters as the first time]
+make/ninja/......
 ```

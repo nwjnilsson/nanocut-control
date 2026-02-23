@@ -39,9 +39,9 @@ The codebase has changed quite a bit since then, with many new features having b
 - Point-and-click GCode jump-in: hold control and click on the contour you would like to start from
 - Reversible contour direction: useful when a cut fails mid contour, restart in the other direction
 - Built-in torch control routines/macros:
-  * fire_torch [pierce_height] [pierce_delay] [cut_height]
-  * torch_off
-  * touch_torch
+  * `fire_torch [pierce_height] [pierce_delay] [cut_height]`
+  * `torch_off`
+  * `touch_torch`
 - Setting THC target voltage with e.g `$T=100.0`
 - Built-in Toolpath workbench:
   * Setup job options such as material size
@@ -94,7 +94,9 @@ M30
 
 # Building
 Building should be roughly the same for all platforms when using CMake. See
-`shell.nix` for a list of what you will (roughly) need to build.
+`shell.nix` for a list of what libraries you will (roughly) need. For more detailed
+instructions, refer to the installation [instructions](https://nwjnilsson.github.io/nanocut-control)
+
 ```
 mkdir build && cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
