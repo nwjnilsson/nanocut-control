@@ -2,7 +2,6 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 // define something for Windows (32-bit and 64-bit, this part is common)
-#  define NOMINMAX
 #  include <windows.h>
 
 #  include <GL/gl.h>

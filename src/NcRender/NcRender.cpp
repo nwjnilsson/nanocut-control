@@ -21,6 +21,13 @@
 #include <imgui_impl_opengl2.h>
 #include <loguru.hpp>
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
+#  include <direct.h>
+#  define __mkdir(path, mode) _mkdir(path)
+#else
+#  define __mkdir(path, mode) mkdir(path, mode)
+#endif
+
 #ifdef __APPLE__
 #  define GL_SILENCE_DEPRECATION
 #endif
@@ -234,7 +241,7 @@ std::string NcRender::getConfigDirectory()
     LOG_F(INFO,
           "(NcRender::getConfigDirectory) %s does not exist, creating it!",
           path.c_str());
-    mkdir(path.c_str(), (mode_t) 0733);
+    __mkdir(path.c_str(), (mode_t) 0733);
   }
   return path;
 }
