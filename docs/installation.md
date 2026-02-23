@@ -96,7 +96,6 @@ You can of course install it to wherever you want.
           libglfw3-dev \
           mesa-common-dev \
           libglu1-mesa-dev \
-          freeglut3-dev \
           libgl1-mesa-dev \
           zlib1g-dev
 

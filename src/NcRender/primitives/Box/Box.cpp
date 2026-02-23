@@ -1,47 +1,27 @@
 #include "Box.h"
 #include "../../geometry/geometry.h"
-#include <loguru.hpp>
 #include <NcRender/NcRender.h>
+#include <loguru.hpp>
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-// define something for Windows (32-bit and 64-bit, this part is common)
-#  include <GL/freeglut.h>
-#  include <GL/gl.h>
-#  define GL_CLAMP_TO_EDGE 0x812F
-#  ifdef _WIN64
-// define something for Windows (64-bit only)
-#  else
-// define something for Windows (32-bit only)
-#  endif
-#elif __APPLE__
-#  include <OpenGL/glu.h>
-#elif __linux__
-#  include <GL/glu.h>
-#elif __unix__
-#  include <GL/glu.h>
-#elif defined(_POSIX_VERSION)
-// POSIX
-#else
-#  error "Unknown compiler"
-#endif
+#include <GL/glu.h>
 
 std::string Box::getTypeName() { return "box"; }
 void        Box::processMouse(float mpos_x, float mpos_y)
 {
   mpos_x = (mpos_x - offset[0]) / scale;
   mpos_y = (mpos_y - offset[1]) / scale;
-  if (mpos_x > m_bottom_left.x &&
-      mpos_x < (m_bottom_left.x + m_width) &&
-      mpos_y < (m_bottom_left.y + m_height) &&
-      mpos_y > m_bottom_left.y) {
+  if (mpos_x > m_bottom_left.x && mpos_x < (m_bottom_left.x + m_width) &&
+      mpos_y < (m_bottom_left.y + m_height) && mpos_y > m_bottom_left.y) {
     if (mouse_over == false) {
-      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
+      m_mouse_event =
+        MouseHoverEvent(NcRender::EventType::MouseIn, mpos_x, mpos_y);
       mouse_over = true;
     }
   }
   else {
     if (mouse_over == true) {
-      m_mouse_event = MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
+      m_mouse_event =
+        MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
       mouse_over = false;
     }
   }
@@ -62,8 +42,8 @@ void Box::render_rectangle_with_radius(
   float x_offset, y_offset;
   float step = (2.0f * 3.14159265359) / (ROUNDING_POINT_COUNT * 4),
         angle = 0.0f;
-  unsigned int   index = 0, segment_count = ROUNDING_POINT_COUNT;
-  Point2d bottom_left_corner = { x + radius, y - height + radius };
+  unsigned int index = 0, segment_count = ROUNDING_POINT_COUNT;
+  Point2d      bottom_left_corner = { x + radius, y - height + radius };
   while (i != segment_count) {
     x_offset = cosf(angle);
     y_offset = sinf(angle);
@@ -114,21 +94,14 @@ void Box::render()
 {
   if (visible == true) {
     glPushMatrix();
-    glTranslatef(offset[0],
-                 offset[1],
-                 offset[2]);
-    glScalef(scale,
-             scale,
-             scale);
-    glColor4f(color->r / 255,
-              color->g / 255,
-              color->b / 255,
-              color->a / 255);
+    glTranslatef(offset[0], offset[1], offset[2]);
+    glScalef(scale, scale, scale);
+    glColor4f(color->r / 255, color->g / 255, color->b / 255, color->a / 255);
     render_rectangle_with_radius(m_bottom_left.x,
-                                       m_bottom_left.y + m_height,
-                                       m_width,
-                                       m_height,
-                                       m_corner_radius);
+                                 m_bottom_left.y + m_height,
+                                 m_width,
+                                 m_height,
+                                 m_corner_radius);
     glPopMatrix();
   }
 }

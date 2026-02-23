@@ -24,7 +24,7 @@ jobs:
       run: |
         git clone https://github.com/microsoft/vcpkg.git
         .\vcpkg\bootstrap-vcpkg.bat
-        .\vcpkg\vcpkg install glfw3 zlib
+        .\vcpkg\vcpkg install glfw3 zlib opengl
 
     - name: Configure CMake with vcpkg toolchain
       run: |

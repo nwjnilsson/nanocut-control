@@ -28,7 +28,7 @@ endif()
 
 #
 # ------------------------------------------------------------
-# Output folders (matching Makefile)
+# Output folders
 # ------------------------------------------------------------
 #
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE})
@@ -346,6 +346,9 @@ if(glfw3_FOUND)
     target_link_libraries(NanoCut PRIVATE glfw)
     target_link_libraries(imgui PUBLIC glfw)  # ImGui backends need GLFW
 else()
+    if(WIN32)
+        message(FATAL_ERROR "glfw3 not found, but is required to build. Install with e.g 'vcpkg install glfw3'")
+    endif()
     # fallback to pkg-config
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GLFW REQUIRED glfw3)
@@ -357,25 +360,37 @@ endif()
 
 #
 # ------------------------------------------------------------
-# Platform-specific linker settings (exact Makefile ports)
+# OpenGL
+# ------------------------------------------------------------
+#
+# Check for OpenGL headers and libraries
+find_package(OpenGL QUIET)
+if(NOT OPENGL_FOUND)
+    message(FATAL_ERROR "OpenGL not found, but is required to build. Install OpenGL development packages.")
+endif()
+
+target_include_directories(NanoCut PRIVATE ${OPENGL_INCLUDE_DIRS})
+
+#
+# ------------------------------------------------------------
+# Platform-specific linker settings
 # ------------------------------------------------------------
 #
 if(APPLE)
+    # macOS uses frameworks for OpenGL
     target_link_libraries(NanoCut PRIVATE
         "-framework Cocoa"
         "-framework IOKit"
         "-framework OpenGL"
     )
-elseif(WIN32)
+elif(WIN32)
     # Corresponds to NT block in Makefile
-    target_compile_definitions(NanoCut PRIVATE FREEGLUT_STATIC)
     target_link_libraries(NanoCut PRIVATE
-        opengl32
-        glu32
+        ${OPENGL_LIBRARIES}
         ws2_32 ole32 oleaut32 comdlg32 hid setupapi pthread
     )
 else() # Linux
-    target_link_libraries(NanoCut PRIVATE GL GLU dl pthread)
+    target_link_libraries(NanoCut PRIVATE ${OPENGL_LIBRARIES} dl pthread)
 endif()
 
 # Always link z and m like the Makefile
@@ -383,7 +398,7 @@ target_link_libraries(NanoCut PRIVATE z m)
 
 #
 # ------------------------------------------------------------
-# Installation (matches Makefile)
+# Installation
 # ------------------------------------------------------------
 #
 install(TARGETS NanoCut DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

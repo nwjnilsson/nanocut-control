@@ -6,27 +6,7 @@
 
 #include <loguru.hpp>
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-// define something for Windows (32-bit and 64-bit, this part is common)
-#  include <GL/freeglut.h>
-#  include <GL/gl.h>
-#  define GL_CLAMP_TO_EDGE 0x812F
-#  ifdef _WIN64
-// define something for Windows (64-bit only)
-#  else
-// define something for Windows (32-bit only)
-#  endif
-#elif __APPLE__
-#  include <OpenGL/glu.h>
-#elif __linux__
-#  include <GL/glu.h>
-#elif __unix__
-#  include <GL/glu.h>
-#elif defined(_POSIX_VERSION)
-// POSIX
-#else
-#  error "Unknown compiler"
-#endif
+#include <GL/glu.h>
 
 std::string Part::getTypeName() { return "part"; }
 void        Part::processMouse(float mpos_x, float mpos_y)
@@ -36,7 +16,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
     mpos_y = (mpos_y - offset[1]) / scale;
     size_t path_index = -1;
     if (m_control.mouse_mode == 0) {
-      bool mouse_is_over_path = false;
+      bool   mouse_is_over_path = false;
       size_t global_index = 0;
       for (auto& [layer_name, layer] : m_layers) {
         for (auto& path : layer.paths) {
@@ -44,8 +24,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
             if (geo::lineIntersectsWithCircle(
                   { { path.built_points.at(i - 1).x,
                       path.built_points.at(i - 1).y },
-                    { path.built_points.at(i).x,
-                      path.built_points.at(i).y } },
+                    { path.built_points.at(i).x, path.built_points.at(i).y } },
                   { mpos_x, mpos_y },
                   mouse_over_padding / scale)) {
               path_index = global_index;
@@ -55,8 +34,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
           }
           if (path.is_closed == true) {
             if (geo::lineIntersectsWithCircle(
-                  { { path.built_points.at(0).x,
-                      path.built_points.at(0).y },
+                  { { path.built_points.at(0).x, path.built_points.at(0).y },
                     { path.built_points.at(path.built_points.size() - 1).x,
                       path.built_points.at(path.built_points.size() - 1).y } },
                   { mpos_x, mpos_y },
@@ -65,10 +43,12 @@ void        Part::processMouse(float mpos_x, float mpos_y)
               mouse_is_over_path = true;
             }
           }
-          if (mouse_is_over_path) break;
+          if (mouse_is_over_path)
+            break;
           global_index++;
         }
-        if (mouse_is_over_path) break;
+        if (mouse_is_over_path)
+          break;
       }
       if (mouse_is_over_path == true) {
         if (mouse_over == false) {
@@ -86,7 +66,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
       }
     }
     else if (m_control.mouse_mode == 1) { // nesting
-      bool mouse_is_inside_perimeter = false;
+      bool   mouse_is_inside_perimeter = false;
       size_t global_index = 0;
       for (auto& [layer_name, layer] : m_layers) {
         for (auto& path : layer.paths) {
@@ -100,7 +80,8 @@ void        Part::processMouse(float mpos_x, float mpos_y)
           }
           global_index++;
         }
-        if (mouse_is_inside_perimeter) break;
+        if (mouse_is_inside_perimeter)
+          break;
       }
       if (mouse_is_inside_perimeter == true) {
         if (mouse_over == false) {
@@ -233,7 +214,8 @@ void Part::render()
     m_tool_paths.clear();
     for (auto& [layer_name, layer] : m_layers) {
       // Skip invisible layers
-      if (!layer.visible) continue;
+      if (!layer.visible)
+        continue;
 
       for (auto& path : layer.paths) {
         path.built_points.clear();
@@ -325,7 +307,8 @@ void Part::render()
   glLineWidth(m_width);
   for (auto& [layer_name, layer] : m_layers) {
     // Skip invisible layers
-    if (!layer.visible) continue;
+    if (!layer.visible)
+      continue;
 
     for (auto& path : layer.paths) {
       glColor4f(path.color->r / 255,
@@ -500,8 +483,8 @@ std::vector<std::vector<Point2d>> Part::getOrderedToolpaths()
       bool has_paths_inside = false;
       for (size_t i = 0; i < ret.size(); i++) {
         if (i != x) {
-          // Bounding box pre-check: if ret[i]'s bbox isn't inside ret[x]'s bbox,
-          // skip expensive check
+          // Bounding box pre-check: if ret[i]'s bbox isn't inside ret[x]'s
+          // bbox, skip expensive check
           if (!geo::extentsContain(bboxes[x], bboxes[i])) {
             continue;
           }
