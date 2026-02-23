@@ -8,8 +8,6 @@
 
 #  include <GL/glu.h>
 
-#  include <GL/glfw.h>
-
 #  define GL_CLAMP_TO_EDGE 0x812F
 #  ifdef _WIN64
 // define something for Windows (64-bit only)
