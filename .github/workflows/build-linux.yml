@@ -3,6 +3,12 @@ name: Linux
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'ext/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build-linux.yml'
   schedule:
     # Run every Sunday at 00:00 UTC
     - cron: '0 0 * * 0'
