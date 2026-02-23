@@ -2,6 +2,9 @@
 #define WEBSOCKET_CLIENT_
 
 extern "C" {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#  include <winsock2.h>
+#endif
 #include <mongoose.h>
 }
 #include <nlohmann/json.hpp>

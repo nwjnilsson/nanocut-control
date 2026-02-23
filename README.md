@@ -16,6 +16,8 @@
 
 > _No Proma? No problem._
 
+  [Documentation](https://nwjnilsson.github.io/nanocut-control)
+
 </div>
 
 # NanoCut Control
@@ -23,6 +25,11 @@
 Cross-platform front-end control software for NanoCut firmware (see [NanoCut CNC firmware](https://github.com/nwjnilsson/nanocut-firmware)).
 NanoCut was originally forked from [ncPilot](https://github.com/UnfinishedBusiness/ncPilot/) to continue development for my own plasma machine.
 The codebase has changed quite a bit since then, with many new features having been added.
+
+<div align="center">
+
+
+</div>
 
 ## Features
 - 2D GCode and machine viewer

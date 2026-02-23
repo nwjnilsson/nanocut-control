@@ -387,9 +387,9 @@ elif(WIN32)
     # Corresponds to NT block in Makefile
     target_link_libraries(NanoCut PRIVATE
         ${OPENGL_LIBRARIES}
-        ws2_32 ole32 oleaut32 comdlg32 hid setupapi pthread
+        ws2_32 ole32 oleaut32 comdlg32 hid setupapi
     )
-else() # Linux
+else() # Linux and other Unix-like systems
     target_link_libraries(NanoCut PRIVATE ${OPENGL_LIBRARIES} dl pthread)
 endif()
 
