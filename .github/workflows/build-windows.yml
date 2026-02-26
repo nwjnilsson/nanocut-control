@@ -8,6 +8,7 @@ on:
       - 'ext/**'
       - 'cmake/**'
       - 'CMakeLists.txt'
+      - 'scripts/build-windows.ps1'
       - '.github/workflows/build-windows.yml'
   schedule:
     # Run every Sunday at 00:00 UTC
@@ -20,25 +21,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install build tools
+    - name: Build NanoCut
       run: |
-        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-        choco install ninja -y
-        choco install git -y
-
-    - name: Setup vcpkg and install dependencies
-      run: |
-        git clone https://github.com/microsoft/vcpkg.git
-        .\vcpkg\bootstrap-vcpkg.bat
-        .\vcpkg\vcpkg install glfw3 zlib opengl
-
-    - name: Configure CMake with vcpkg toolchain
-      run: |
-        mkdir build
-        cd build
-        cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="..\vcpkg\scripts\buildsystems\vcpkg.cmake" -DCMAKE_BUILD_TYPE=Release ..
-
-    - name: Build
-      run: |
-        cd build
-        ninja
+        .\scripts\build-windows.ps1 -Yes

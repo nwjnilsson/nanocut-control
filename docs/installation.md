@@ -5,73 +5,50 @@
 NanoCut Control requires the following dependencies:
 
 ### Required Dependencies
-- **CMake 3.21+** (required for FetchContent improvements)
+- **Git** (for version information and dependency fetching)
+- **CMake 3.21+**
 - **C++20 compatible compiler** (GCC 11+, Clang 14+, MSVC 2022+)
 - **OpenGL** development libraries
 - **GLFW** development libraries
-- **Git** (for version information and dependency fetching)
-
-### Optional Dependencies
-- **pkg-config** (fallback for GLFW detection)
 
 ## Building from Source
 Building is similar for all platforms thanks to CMake. An installation step is
-provided via CMake, which will install the themes and fonts used by the program.
-You specify where to install the program with e.g<br>
-`-DCMAKE_INSTALL_PREFIX="C:\Users\MyNameJeff\AppData\Local\NanoCut"`
+provided via CMake, which will install the executable, themes, and fonts.
+
+### Pre-requisites
+Downloading/updating is done with Git. Windows users can run `winget install Git.Git`, then restart your terminal.
+
+#### First-time setup
+
+Clone the repository and check out the desired release:
+
+    git clone https://github.com/nwjnilsson/nanocut-control.git
+    cd nanocut-control
+    git checkout v1.0.0
+
+#### Updating
+
+Fetch the latest tags and update the source:
+
+    git fetch --tags
+    git checkout latest
+
+I don't recommend staying on `main`.
 
 ### Windows
+A powershell helper script is provided to help Windows users build from source.
+The script will check for CMake, Ninja, and Visual Studio Build Tools —
+offering to install any that are missing via `winget` — then configure, build,
+and install the executable to `bin\NanoCut.exe` inside the repository.
 
-#### Option 1: Using MSVC with Ninja (Lightweight)
+Simply run:
 
-1. **Install build tools via winget:**
+    .\scripts\build-windows.ps1
 
-        winget install --id Kitware.CMake --accept-package-agreements --accept-source-agreements
-        winget install --id Git.Git --accept-package-agreements --accept-source-agreements
-        winget install --id Microsoft.VisualStudio.2022.BuildTools --accept-package-agreements --accept-source-agreements
-        winget install --id Ninja-build.Ninja --accept-package-agreements --accept-source-agreements
+If you already have vcpkg, you can point to it with e.g `-VcpkgPath C:\vcpkg`
 
-2. **Install dependencies via vcpkg:**
-
-        git clone https://github.com/microsoft/vcpkg.git
-        .\vcpkg\bootstrap-vcpkg.bat
-        .\vcpkg\vcpkg install glfw3 zlib
-
-3. **Configure CMake with Ninja generator:**
-
-        mkdir build
-        cd build
-        cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=..\vcpkg\scripts\buildsystems\vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
-
-4. **Build:**
-
-        ninja
-
-5. **Install (optional):**
-
-        cmake --install . --prefix "%APPDATA%\NanoCut"
-
-#### Option 2: Using MSYS2 (Alternative)
-
-1. **Install MSYS2:**
-
-        winget install --id MSYS2.MSYS2 --accept-package-agreements --accept-source-agreements
-
-2. **Update and install dependencies:**
-
-        pacman -Syu
-        pacman -S --needed base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja git mingw-w64-x86_64-glfw
-
-3. **Configure and build:**
-
-        mkdir build
-        cd build
-        cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
-        ninja
-
-**Note:** For both options, ensure all tools are in your PATH before running CMake commands.
-
-### Linux (NixOS)
+### Linux
+#### NixOS
 
 1. A `shell.nix` is provided, enter the environment:
 
@@ -83,7 +60,7 @@ You specify where to install the program with e.g<br>
          cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
          make
 
-### Linux (APT)
+#### APT-based
 
 1. Install required dependencies:
 
@@ -100,7 +77,7 @@ You specify where to install the program with e.g<br>
 2. Configure and build:
 
          mkdir build && cd build
-         cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
+         cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
          make
 
 ### macOS
@@ -114,7 +91,7 @@ I have not tested on macOS myself but the process should look something like thi
 2. Configure and build:
 
          mkdir build && cd build
-         cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
+         cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
          make
 
 ### Installation
@@ -125,15 +102,8 @@ To install the application (Linux users need to `sudo` if installing to protecte
 make install
 ```
 
-Alternatively,
-
-```bash
-cmake --install . --prefix "%APPDATA%\NanoCut"
-```
-
 This will install:
 
-- The `NanoCut` executable to e.g `/usr/local/bin/` (your CMAKE_INSTALL_PREFIX)
 - Fonts to `~/.config/NanoCut/fonts/`
 - Themes to `~/.config/NanoCut/themes/`
 
