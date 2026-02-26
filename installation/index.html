@@ -331,17 +331,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#optional-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional Dependencies
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -360,22 +349,22 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#windows" class="md-nav__link">
+  <a href="#pre-requisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Windows
+        Pre-requisites
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Windows">
+    <nav class="md-nav" aria-label="Pre-requisites">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-1-using-msvc-with-ninja-lightweight" class="md-nav__link">
+  <a href="#first-time-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Using MSVC with Ninja (Lightweight)
+        First-time setup
       
     </span>
   </a>
@@ -383,10 +372,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-using-msys2-alternative" class="md-nav__link">
+  <a href="#updating" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Using MSYS2 (Alternative)
+        Updating
       
     </span>
   </a>
@@ -399,10 +388,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-nixos" class="md-nav__link">
+  <a href="#windows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux (NixOS)
+        Windows
       
     </span>
   </a>
@@ -410,13 +399,41 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-apt" class="md-nav__link">
+  <a href="#linux" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux (APT)
+        Linux
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Linux">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nixos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NixOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apt-based" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APT-based
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -565,17 +582,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#optional-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional Dependencies
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -594,22 +600,22 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#windows" class="md-nav__link">
+  <a href="#pre-requisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Windows
+        Pre-requisites
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Windows">
+    <nav class="md-nav" aria-label="Pre-requisites">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-1-using-msvc-with-ninja-lightweight" class="md-nav__link">
+  <a href="#first-time-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Using MSVC with Ninja (Lightweight)
+        First-time setup
       
     </span>
   </a>
@@ -617,10 +623,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-using-msys2-alternative" class="md-nav__link">
+  <a href="#updating" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Using MSYS2 (Alternative)
+        Updating
       
     </span>
   </a>
@@ -633,10 +639,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-nixos" class="md-nav__link">
+  <a href="#windows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux (NixOS)
+        Windows
       
     </span>
   </a>
@@ -644,13 +650,41 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#linux-apt" class="md-nav__link">
+  <a href="#linux" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Linux (APT)
+        Linux
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Linux">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nixos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NixOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apt-based" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APT-based
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -767,81 +801,40 @@
 <p>NanoCut Control requires the following dependencies:</p>
 <h3 id="required-dependencies">Required Dependencies</h3>
 <ul>
-<li><strong>CMake 3.21+</strong> (required for FetchContent improvements)</li>
+<li><strong>Git</strong> (for version information and dependency fetching)</li>
+<li><strong>CMake 3.21+</strong></li>
 <li><strong>C++20 compatible compiler</strong> (GCC 11+, Clang 14+, MSVC 2022+)</li>
 <li><strong>OpenGL</strong> development libraries</li>
 <li><strong>GLFW</strong> development libraries</li>
-<li><strong>Git</strong> (for version information and dependency fetching)</li>
-</ul>
-<h3 id="optional-dependencies">Optional Dependencies</h3>
-<ul>
-<li><strong>pkg-config</strong> (fallback for GLFW detection)</li>
 </ul>
 <h2 id="building-from-source">Building from Source</h2>
 <p>Building is similar for all platforms thanks to CMake. An installation step is
-provided via CMake, which will install the themes and fonts used by the program.
-You specify where to install the program with e.g<br>
-<code>-DCMAKE_INSTALL_PREFIX="C:\Users\MyNameJeff\AppData\Local\NanoCut"</code></p>
+provided via CMake, which will install the executable, themes, and fonts.</p>
+<h3 id="pre-requisites">Pre-requisites</h3>
+<p>Downloading/updating is done with Git. Windows users can run <code>winget install Git.Git</code>, then restart your terminal.</p>
+<h4 id="first-time-setup">First-time setup</h4>
+<p>Clone the repository and check out the desired release:</p>
+<pre><code>git clone https://github.com/nwjnilsson/nanocut-control.git
+cd nanocut-control
+git checkout v1.0.0
+</code></pre>
+<h4 id="updating">Updating</h4>
+<p>Fetch the latest tags and update the source:</p>
+<pre><code>git fetch --tags
+git checkout latest
+</code></pre>
+<p>I don't recommend staying on <code>main</code>.</p>
 <h3 id="windows">Windows</h3>
-<h4 id="option-1-using-msvc-with-ninja-lightweight">Option 1: Using MSVC with Ninja (Lightweight)</h4>
-<ol>
-<li>
-<p><strong>Install build tools via winget:</strong></p>
-<pre><code>winget install --id Kitware.CMake --accept-package-agreements --accept-source-agreements
-winget install --id Git.Git --accept-package-agreements --accept-source-agreements
-winget install --id Microsoft.VisualStudio.2022.BuildTools --accept-package-agreements --accept-source-agreements
-winget install --id Ninja-build.Ninja --accept-package-agreements --accept-source-agreements
+<p>A powershell helper script is provided to help Windows users build from source.
+The script will check for CMake, Ninja, and Visual Studio Build Tools —
+offering to install any that are missing via <code>winget</code> — then configure, build,
+and install the executable to <code>bin\NanoCut.exe</code> inside the repository.</p>
+<p>Simply run:</p>
+<pre><code>.\scripts\build-windows.ps1
 </code></pre>
-</li>
-<li>
-<p><strong>Install dependencies via vcpkg:</strong></p>
-<pre><code>git clone https://github.com/microsoft/vcpkg.git
-.\vcpkg\bootstrap-vcpkg.bat
-.\vcpkg\vcpkg install glfw3 zlib
-</code></pre>
-</li>
-<li>
-<p><strong>Configure CMake with Ninja generator:</strong></p>
-<pre><code>mkdir build
-cd build
-cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=..\vcpkg\scripts\buildsystems\vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
-</code></pre>
-</li>
-<li>
-<p><strong>Build:</strong></p>
-<pre><code>ninja
-</code></pre>
-</li>
-<li>
-<p><strong>Install (optional):</strong></p>
-<pre><code>cmake --install . --prefix "%APPDATA%\NanoCut"
-</code></pre>
-</li>
-</ol>
-<h4 id="option-2-using-msys2-alternative">Option 2: Using MSYS2 (Alternative)</h4>
-<ol>
-<li>
-<p><strong>Install MSYS2:</strong></p>
-<pre><code>winget install --id MSYS2.MSYS2 --accept-package-agreements --accept-source-agreements
-</code></pre>
-</li>
-<li>
-<p><strong>Update and install dependencies:</strong></p>
-<pre><code>pacman -Syu
-pacman -S --needed base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja git mingw-w64-x86_64-glfw
-</code></pre>
-</li>
-<li>
-<p><strong>Configure and build:</strong></p>
-<pre><code>mkdir build
-cd build
-cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja
-</code></pre>
-</li>
-</ol>
-<p><strong>Note:</strong> For both options, ensure all tools are in your PATH before running CMake commands.</p>
-<h3 id="linux-nixos">Linux (NixOS)</h3>
+<p>If you already have vcpkg, you can point to it with e.g <code>-VcpkgPath C:\vcpkg</code></p>
+<h3 id="linux">Linux</h3>
+<h4 id="nixos">NixOS</h4>
 <ol>
 <li>
 <p>A <code>shell.nix</code> is provided, enter the environment:</p>
@@ -856,7 +849,7 @@ ninja
 </code></pre>
 </li>
 </ol>
-<h3 id="linux-apt">Linux (APT)</h3>
+<h4 id="apt-based">APT-based</h4>
 <ol>
 <li>
 <p>Install required dependencies:</p>
@@ -874,7 +867,7 @@ ninja
 <li>
 <p>Configure and build:</p>
 <pre><code> mkdir build &amp;&amp; cd build
- cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
+ cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
  make
 </code></pre>
 </li>
@@ -890,7 +883,7 @@ ninja
 <li>
 <p>Configure and build:</p>
 <pre><code> mkdir build &amp;&amp; cd build
- cmake .. -DCMAKE_INSTALL_PREFIX=.... -DCMAKE_BUILD_TYPE=Release
+ cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=Release
  make
 </code></pre>
 </li>
@@ -899,12 +892,8 @@ ninja
 <p>To install the application (Linux users need to <code>sudo</code> if installing to protected directories):</p>
 <pre><code class="language-bash">make install
 </code></pre>
-<p>Alternatively,</p>
-<pre><code class="language-bash">cmake --install . --prefix &quot;%APPDATA%\NanoCut&quot;
-</code></pre>
 <p>This will install:</p>
 <ul>
-<li>The <code>NanoCut</code> executable to e.g <code>/usr/local/bin/</code> (your CMAKE_INSTALL_PREFIX)</li>
 <li>Fonts to <code>~/.config/NanoCut/fonts/</code></li>
 <li>Themes to <code>~/.config/NanoCut/themes/</code></li>
 </ul>
