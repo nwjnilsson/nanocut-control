@@ -119,9 +119,9 @@ private:
   std::vector<double>                                       m_allowed_rotations;
 
   // SA parameters
-  double m_sa_initial_temp = SCALE(1000.0);
+  double m_sa_initial_temp = 1000.0;
   double m_sa_cooling_rate = 0.9995;
-  int    m_sa_max_iterations = 15000;
+  int    m_sa_max_iterations = 20000;
 
   // Part building helpers (kept from original)
   bool   checkIfPointIsInsidePath(std::vector<PolyPoint> path, PolyPoint point);
@@ -161,16 +161,7 @@ private:
   double          evaluateFitness(const NestingSolution& sol);
 
 public:
-  PolyNest()
-  {
-    m_min_extents = PolyPoint(0, 0);
-    m_max_extents = PolyPoint(SCALE(1000), SCALE(1000));
-    m_closed_tolerance = SCALE(0.1);
-    constexpr int step_size = 5;
-    for (int i = 0; i < 360 / step_size; ++i) {
-      m_allowed_rotations.push_back(i * step_size);
-    }
-  };
+  PolyNest();
   void setExtents(PolyPoint min, PolyPoint max);
   void pushUnplacedPolyPart(std::vector<std::vector<PolyPoint>> p,
                             double*                             offset_x,

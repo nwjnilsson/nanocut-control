@@ -1,5 +1,5 @@
 <div align="center" margin="20">
-  <img src="assets/logo.png" alt="NanoCut Logo" width="350" radius="8">
+  <img src="assets/logo_feathered.png" alt="NanoCut Logo" width="350">
 </div>
 
 <br>

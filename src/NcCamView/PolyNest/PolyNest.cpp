@@ -4,7 +4,20 @@
 
 // ---------- PolyPart methods (unchanged) ----------
 
-PolyNest::PolyPoint PolyNest::PolyPart::rotatePoint(PolyPoint p, double a)
+namespace PolyNest {
+PolyNest::PolyNest()
+{
+
+  m_min_extents = PolyPoint(0, 0);
+  m_max_extents = PolyPoint(SCALE(1000), SCALE(1000));
+  m_closed_tolerance = SCALE(0.1);
+  constexpr int step_size = 5;
+  for (int i = 0; i < 360 / step_size; ++i) {
+    m_allowed_rotations.push_back(i * step_size);
+  }
+}
+
+PolyPoint PolyPart::rotatePoint(PolyPoint p, double a)
 {
   PolyPoint return_point;
   double    radians = (M_PI / 180.0) * a;
@@ -15,8 +28,7 @@ PolyNest::PolyPoint PolyNest::PolyPart::rotatePoint(PolyPoint p, double a)
   return return_point;
 }
 
-void PolyNest::PolyPart::getBoundingBox(PolyPoint* bbox_min,
-                                        PolyPoint* bbox_max)
+void PolyPart::getBoundingBox(PolyPoint* bbox_min, PolyPoint* bbox_max)
 {
   bbox_max->x = -std::numeric_limits<double>::infinity();
   bbox_max->y = -std::numeric_limits<double>::infinity();
@@ -39,7 +51,7 @@ void PolyNest::PolyPart::getBoundingBox(PolyPoint* bbox_min,
   }
 }
 
-void PolyNest::PolyPart::moveOutsidePolyGonToBack()
+void PolyPart::moveOutsidePolyGonToBack()
 {
   PolyGon outside;
   for (size_t x = 0; x < m_polygons.size(); x++) {
@@ -52,7 +64,7 @@ void PolyNest::PolyPart::moveOutsidePolyGonToBack()
   m_polygons.push_back(outside);
 }
 
-void PolyNest::PolyPart::build()
+void PolyPart::build()
 {
   m_built_polygons.clear();
   for (size_t x = 0; x < m_polygons.size(); x++) {
@@ -111,12 +123,11 @@ bool PolyNest::PolyNest::checkIfPathIsInsidePath(std::vector<PolyPoint> path1,
   return false;
 }
 
-PolyNest::PolyPart
-PolyNest::PolyNest::buildPart(std::vector<std::vector<PolyPoint>> p,
-                              double*                             offset_x,
-                              double*                             offset_y,
-                              double*                             angle,
-                              bool*                               visible)
+PolyPart PolyNest::PolyNest::buildPart(std::vector<std::vector<PolyPoint>> p,
+                                       double* offset_x,
+                                       double* offset_y,
+                                       double* angle,
+                                       bool*   visible)
 {
   PolyPart part;
   for (size_t x = 0; x < p.size(); x++) {
@@ -507,9 +518,8 @@ PolyNest::PolyNest::findBottomLeftPoint(const ClipperLib::Paths& feasible)
   return best;
 }
 
-PolyNest::NestingSolution
-PolyNest::PolyNest::runBLF(const std::vector<size_t>& order,
-                           const std::vector<double>& angles)
+NestingSolution PolyNest::runBLF(const std::vector<size_t>& order,
+                                 const std::vector<double>& angles)
 {
   const size_t    n = m_unplaced_parts.size();
   NestingSolution sol;
@@ -636,7 +646,7 @@ double PolyNest::PolyNest::evaluateFitness(const NestingSolution& sol)
   return sol.parts_placed * 1000.0 + utilization * 100.0;
 }
 
-PolyNest::NestingSolution
+NestingSolution
 PolyNest::PolyNest::runSimulatedAnnealing(std::atomic<float>* progress)
 {
   const size_t n = m_unplaced_parts.size();
@@ -786,15 +796,14 @@ int PolyNest::PolyNest::placeAllUnplacedParts(std::atomic<float>* progress)
   int failed_count = 0;
   for (size_t i = 0; i < n; i++) {
     auto& part = m_unplaced_parts[i];
+    *part.m_offset_x = sol.placed_x[i];
+    *part.m_offset_y = sol.placed_y[i];
+    *part.m_angle = sol.part_angles[i];
+    *part.m_visible = true;
     if (sol.placed_ok[i]) {
-      *part.m_offset_x = sol.placed_x[i];
-      *part.m_offset_y = sol.placed_y[i];
-      *part.m_angle = sol.part_angles[i];
-      *part.m_visible = true;
       part.build();
     }
     else {
-      *part.m_visible = true;
       failed_count++;
       LOG_F(WARNING,
             "Could not place part %zu ('%s') — not enough material",
@@ -807,3 +816,4 @@ int PolyNest::PolyNest::placeAllUnplacedParts(std::atomic<float>* progress)
     progress->store(1.0f);
   return failed_count;
 }
+} // namespace PolyNest

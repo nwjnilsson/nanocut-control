@@ -10,8 +10,8 @@
 
 // Windows header for ShellExecuteA
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
-#include <windows.h>
-#include <shellapi.h>
+#  include <shellapi.h>
+#  include <windows.h>
 #endif
 
 NcDialogs::NcDialogs(NcApp* app) : m_app(app), m_pimpl(std::make_unique<Impl>())
@@ -221,10 +221,10 @@ void NcDialogs::renderAboutWindow()
   float about_window_height = window_size.y * 0.5f;
 
   ImGui::SetNextWindowPos(ImVec2(window_size.x * 0.5f, window_size.y * 0.5f),
-                          ImGuiCond_Appearing,
+                          ImGuiCond_Always,
                           ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowSize(ImVec2(about_window_width, about_window_height),
-                           ImGuiCond_Appearing);
+                           ImGuiCond_Always);
 
   ImGui::Begin("About NanoCut",
                &m_about_visible,
@@ -268,11 +268,6 @@ void NcDialogs::renderAboutWindow()
                         ImGui::CalcTextSize("NanoCut Control Software").x) *
                        0.5f);
   ImGui::Text("NanoCut Control Software");
-  ImGui::SetCursorPosX(
-    (ImGui::GetContentRegionAvail().x -
-     ImGui::CalcTextSize("Advanced CNC Plasma Cutting System").x) *
-    0.5f);
-  ImGui::Text("Advanced CNC Plasma Cutting System");
   ImGui::Spacing();
 
   char version_text[64];
