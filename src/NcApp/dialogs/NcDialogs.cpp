@@ -297,19 +297,6 @@ void NcDialogs::renderAboutWindow()
     "applications. It provides precise motion and Torch Height Control, "
     "advanced toolpath generation, and real-time monitoring capabilities.");
   ImGui::PopTextWrapPos();
-
-  // Position close button at bottom of bottom section
-  ImGui::SetCursorPosY(top_section_height + bottom_section_height);
-
-  // Center the close button at the bottom
-  float button_width =
-    ImGui::CalcTextSize("Close").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-  ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - button_width) *
-                       0.5f);
-  if (ImGui::Button("Close")) {
-    m_about_visible = false;
-  }
-
   ImGui::End();
 }
 

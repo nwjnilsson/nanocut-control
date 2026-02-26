@@ -76,6 +76,18 @@
     "ScrollbarSize": 10.0,
     "GrabMinSize": 10.0,
     "DockingSeparatorSize": 1.0,
-    "SeparatorTextBorderSize": 2.0
+    "SeparatorTextBorderSize": 2.0,
+    "ChildRounding": 0.0,
+    "ScrollbarRounding": 0.0,
+    "WindowBorderSize": 1.0,
+    "ChildBorderSize": 1.0,
+    "PopupBorderSize": 1.0,
+    "FrameBorderSize": 0.0,
+    "TabBorderSize": 0.0,
+    "IndentSpacing": 21.0,
+    "WindowPadding": [8.0, 8.0],
+    "FramePadding": [4.0, 3.0],
+    "ItemSpacing": [8.0, 4.0],
+    "ItemInnerSpacing": [4.0, 4.0]
   }
 }

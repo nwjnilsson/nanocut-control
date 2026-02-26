@@ -29,7 +29,7 @@
     "SliderGrabActive": [0.478, 0.478, 0.478, 1.00],
     "Button": [0.208, 0.227, 0.255, 1.00],
     "ButtonHovered": [0.329, 0.341, 0.365, 1.00],
-    "ButtonActive": [0.329, 0.341, 0.365, 1.00],
+    "ButtonActive": [0.369, 0.381, 0.405, 1.00],
     "Header": [0.129, 0.145, 0.169, 1.00],
     "HeaderHovered": [0.208, 0.227, 0.255, 1.00],
     "HeaderActive": [0.329, 0.341, 0.365, 1.00],
@@ -72,6 +72,21 @@
     "PopupRounding": 3.0,
     "ScrollbarRounding": 3.0,
     "GrabRounding": 3.0,
-    "DockingSeparatorSize": 3.0
+    "DockingSeparatorSize": 3.0,
+    "WindowRounding": 0.0,
+    "ChildRounding": 0.0,
+    "TabRounding": 4.0,
+    "ChildBorderSize": 1.0,
+    "PopupBorderSize": 1.0,
+    "FrameBorderSize": 0.0,
+    "TabBorderSize": 0.0,
+    "ScrollbarSize": 14.0,
+    "GrabMinSize": 10.0,
+    "IndentSpacing": 21.0,
+    "SeparatorTextBorderSize": 1.0,
+    "WindowPadding": [8.0, 8.0],
+    "FramePadding": [4.0, 3.0],
+    "ItemSpacing": [8.0, 4.0],
+    "ItemInnerSpacing": [4.0, 4.0]
   }
 }
