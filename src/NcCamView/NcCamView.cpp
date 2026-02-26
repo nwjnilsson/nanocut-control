@@ -411,10 +411,10 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
         show_tool_library = true;
       }
       ImGui::Separator();
-      /*if (ImGui::MenuItem("Preferences", ""))
-      {
-          LOG_F(INFO, "Edit->Preferences");
-      }*/
+      if (ImGui::MenuItem("Preferences", "")) {
+        LOG_F(INFO, "Edit->Preferences");
+        m_app->getDialogs().showPreferences(true);
+      }
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Workbench")) {
@@ -429,27 +429,16 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
       }
       ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("Themes")) {
-      if (ImGui::MenuItem("Select Theme", "")) {
-        LOG_F(INFO, "Themes->Select Theme");
-        m_app->getThemeManager().showThemeSelector(true);
-      }
-      ImGui::EndMenu();
-    }
     if (ImGui::BeginMenu("Help")) {
+#ifdef DEBUG
       if (ImGui::MenuItem("Dump Stack", "")) {
         LOG_F(INFO, "Help->Dump Stack");
         auto& renderer = m_app->getRenderer();
         renderer.dumpJsonToFile("stack.json", renderer.dumpPrimitiveStack());
       }
       ImGui::Separator();
-      if (ImGui::MenuItem("Documentation", "")) {
-        LOG_F(INFO, "Help->Documentation");
-      }
-      ImGui::Separator();
-      if (ImGui::MenuItem("About", "")) {
-        LOG_F(INFO, "Help->About");
-      }
+#endif
+      m_app->getDialogs().renderHelpMenuItem();
       ImGui::EndMenu();
     }
     ImGui::RadioButton("Contour Tool", (int*) &m_current_tool, 0);
@@ -550,8 +539,14 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
   // Job Options Dialog
   if (show_job_options == true) {
-    ImGui::Begin(
-      "Job Options", &show_job_options, ImGuiWindowFlags_AlwaysAutoResize);
+    ImVec2 window_size = ImGui::GetIO().DisplaySize;
+    float  menu_bar_height = ImGui::GetFrameHeightWithSpacing() * 1.0f;
+    ImGui::SetNextWindowPos(ImVec2(300, menu_bar_height));
+    ImGui::SetNextWindowSize(ImVec2(window_size.x - 300, 0));
+    ImGui::Begin("Job Options",
+                 &show_job_options,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoCollapse);
     ImGui::Text("Material Size");
     ImGui::InputFloat("Width", &m_job_options.material_size[0]);
     ImGui::SameLine();
@@ -592,91 +587,6 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     }
     if (ImGui::Button("Close")) {
       show_job_options = false;
-    }
-    ImGui::End();
-  }
-
-  // Create Operation Dialog
-  if (show_create_operation == true) {
-    ImGui::Begin("Create Operation",
-                 &show_create_operation,
-                 ImGuiWindowFlags_AlwaysAutoResize);
-    static ToolOperation operation;
-    static int           operation_tool = -1;
-
-    // Auto-set lead in/out based on tool kerf width
-    if (m_tool_library.size() > static_cast<size_t>(operation_tool) &&
-        operation_tool != -1 && operation.lead_in_length == DEFAULT_LEAD_IN &&
-        operation.lead_out_length == DEFAULT_LEAD_OUT) {
-      operation.lead_in_length =
-        m_tool_library[operation_tool].kerf_width * 1.5;
-      operation.lead_out_length =
-        m_tool_library[operation_tool].kerf_width * 1.5;
-    }
-
-    // Tool selection combo
-    if (ImGui::BeginCombo("Choose Tool",
-                          operation_tool >= 0 &&
-                              operation_tool <
-                                static_cast<int>(m_tool_library.size())
-                            ? m_tool_library[operation_tool].tool_name.c_str()
-                            : "Select...")) {
-      for (size_t i = 0; i < m_tool_library.size(); i++) {
-        bool is_selected = (operation_tool == static_cast<int>(i));
-        if (ImGui::Selectable(m_tool_library[i].tool_name.c_str(),
-                              is_selected)) {
-          operation_tool = i;
-        }
-        if (is_selected) {
-          ImGui::SetItemDefaultFocus();
-        }
-      }
-      ImGui::EndCombo();
-    }
-
-    // Layer selection combo
-    static int               layer_selection = -1;
-    std::vector<std::string> layers = getAllLayers();
-    if (ImGui::BeginCombo("Choose Layer",
-                          layer_selection >= 0 &&
-                              layer_selection < static_cast<int>(layers.size())
-                            ? layers[layer_selection].c_str()
-                            : "Select...")) {
-      for (size_t i = 0; i < layers.size(); i++) {
-        bool is_selected = (layer_selection == static_cast<int>(i));
-        if (ImGui::Selectable(layers[i].c_str(), is_selected)) {
-          layer_selection = i;
-        }
-        if (is_selected) {
-          ImGui::SetItemDefaultFocus();
-        }
-      }
-      ImGui::EndCombo();
-    }
-
-    // Lead in/out settings
-    if (operation_tool != -1) {
-      ImGui::InputDouble("Lead In Length", &operation.lead_in_length);
-      ImGui::InputDouble("Lead Out Length", &operation.lead_out_length);
-    }
-
-    if (ImGui::Button("OK")) {
-      if (operation_tool != -1 && layer_selection != -1) {
-        if (operation.lead_in_length < 0)
-          operation.lead_in_length = 0;
-        if (operation.lead_out_length < 0)
-          operation.lead_out_length = 0;
-        operation.enabled = true;
-        operation.layer = layers[layer_selection];
-        operation.tool_number = operation_tool;
-        operation.type = OpType::Cut;
-        m_toolpath_operations.push_back(operation);
-        operation.lead_in_length = DEFAULT_LEAD_IN;
-        operation.lead_out_length = DEFAULT_LEAD_OUT;
-        operation_tool = -1;
-        layer_selection = -1;
-        show_create_operation = false;
-      }
     }
     ImGui::End();
   }
@@ -797,8 +707,22 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
   // Tool Library Dialog
   if (show_tool_library == true) {
-    ImGui::Begin(
-      "Tool Library", &show_tool_library, ImGuiWindowFlags_AlwaysAutoResize);
+    ImVec2 window_size = ImGui::GetIO().DisplaySize;
+    float  tool_library_height = 300;
+    ImGui::SetNextWindowPos(ImVec2(300, window_size.y - tool_library_height));
+    ImGui::SetNextWindowSize(ImVec2(window_size.x - 300, tool_library_height));
+    ImGui::Begin("Tool Library",
+                 &show_tool_library,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoCollapse);
+
+    // Calculate button area height
+    float button_height = ImGui::GetFrameHeightWithSpacing();
+    float table_height = tool_library_height - button_height -
+                         ImGui::GetStyle().ItemSpacing.y * 12;
+
+    // Scrollable table area
+    ImGui::BeginChild("ScrollingTools", ImVec2(0, table_height), true);
     if (ImGui::BeginTable(
           "Tools", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
       ImGui::TableSetupColumn("Tool Name");
@@ -836,28 +760,16 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
       }
       ImGui::EndTable();
     }
+    ImGui::EndChild();
+
+    // Fixed button area at bottom
+    ImGui::Separator();
     if (ImGui::Button("New Tool")) {
       show_new_tool = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("Close")) {
       show_tool_library = false;
-    }
-    ImGui::End();
-  }
-
-  // Edit Tool Operation Dialog
-  if (show_edit_tool_operation != -1) {
-    ImGui::Begin("Edit Operation", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::InputDouble(
-      "Lead In Length",
-      &m_toolpath_operations[show_edit_tool_operation].lead_in_length);
-    ImGui::InputDouble(
-      "Lead Out Length",
-      &m_toolpath_operations[show_edit_tool_operation].lead_out_length);
-    if (ImGui::Button("OK")) {
-      m_toolpath_operations[show_edit_tool_operation].last_enabled = false;
-      show_edit_tool_operation = -1;
     }
     ImGui::End();
   }
@@ -878,6 +790,120 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   renderPartsViewer(selected_part);
   ImGui::Separator();
   renderOperationsViewer(show_create_operation, show_edit_tool_operation);
+
+  // Create Operation Dialog (integrated into left pane)
+  if (show_create_operation == true) {
+    ImGui::Separator();
+    ImGui::Text("Create New Operation");
+    ImGui::Separator();
+
+    static ToolOperation operation;
+    static int           operation_tool = -1;
+
+    // Auto-set lead in/out based on tool kerf width
+    if (m_tool_library.size() > static_cast<size_t>(operation_tool) &&
+        operation_tool != -1 && operation.lead_in_length == DEFAULT_LEAD_IN &&
+        operation.lead_out_length == DEFAULT_LEAD_OUT) {
+      operation.lead_in_length =
+        m_tool_library[operation_tool].kerf_width * 1.5;
+      operation.lead_out_length =
+        m_tool_library[operation_tool].kerf_width * 1.5;
+    }
+
+    // Tool selection combo
+    if (ImGui::BeginCombo("Tool",
+                          operation_tool >= 0 &&
+                              operation_tool <
+                                static_cast<int>(m_tool_library.size())
+                            ? m_tool_library[operation_tool].tool_name.c_str()
+                            : "Select...")) {
+      for (size_t i = 0; i < m_tool_library.size(); i++) {
+        bool is_selected = (operation_tool == static_cast<int>(i));
+        if (ImGui::Selectable(m_tool_library[i].tool_name.c_str(),
+                              is_selected)) {
+          operation_tool = i;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    // Layer selection combo
+    static int               layer_selection = -1;
+    std::vector<std::string> layers = getAllLayers();
+    if (ImGui::BeginCombo("Layer",
+                          layer_selection >= 0 &&
+                              layer_selection < static_cast<int>(layers.size())
+                            ? layers[layer_selection].c_str()
+                            : "Select...")) {
+      for (size_t i = 0; i < layers.size(); i++) {
+        bool is_selected = (layer_selection == static_cast<int>(i));
+        if (ImGui::Selectable(layers[i].c_str(), is_selected)) {
+          layer_selection = i;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    // Lead in/out settings
+    if (operation_tool != -1) {
+      ImGui::InputDouble("Lead-in", &operation.lead_in_length);
+      ImGui::InputDouble("Lead-out", &operation.lead_out_length);
+    }
+
+    if (ImGui::Button("Create")) {
+      if (operation_tool != -1 && layer_selection != -1) {
+        if (operation.lead_in_length < 0)
+          operation.lead_in_length = 0;
+        if (operation.lead_out_length < 0)
+          operation.lead_out_length = 0;
+        operation.enabled = true;
+        operation.layer = layers[layer_selection];
+        operation.tool_number = operation_tool;
+        operation.type = OpType::Cut;
+        m_toolpath_operations.push_back(operation);
+        operation.lead_in_length = DEFAULT_LEAD_IN;
+        operation.lead_out_length = DEFAULT_LEAD_OUT;
+        operation_tool = -1;
+        layer_selection = -1;
+        show_create_operation = false;
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+      show_create_operation = false;
+      operation_tool = -1;
+      layer_selection = -1;
+    }
+  }
+
+  // Edit Operation Dialog (integrated into left pane)
+  if (show_edit_tool_operation != -1) {
+    ImGui::Separator();
+    ImGui::Text("Edit Operation");
+    ImGui::Separator();
+
+    ImGui::InputDouble(
+      "Lead-in",
+      &m_toolpath_operations[show_edit_tool_operation].lead_in_length);
+    ImGui::InputDouble(
+      "Lead-out",
+      &m_toolpath_operations[show_edit_tool_operation].lead_out_length);
+
+    if (ImGui::Button("Save")) {
+      m_toolpath_operations[show_edit_tool_operation].last_enabled = false;
+      show_edit_tool_operation = -1;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+      show_edit_tool_operation = -1;
+    }
+  }
 
   // Action buttons pinned to bottom of pane
   bool has_toolpaths = std::any_of(m_toolpath_operations.begin(),

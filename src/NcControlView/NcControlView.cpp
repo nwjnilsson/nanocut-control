@@ -2,7 +2,6 @@
 #include "../Input/InputState.h"
 #include "../NcApp/NcApp.h"
 #include "NcCamView/NcCamView.h"
-#include "ThemeManager/ThemeManager.h"
 #include "gcode/gcode.h"
 #include "hmi/hmi.h"
 #include <ImGuiFileDialog.h>
@@ -106,7 +105,9 @@ void NcControlView::renderUI()
         m_app->getRenderer().getConfigDirectory() + "last_gcode_open_path.conf",
         filePath + "/");
 
-      // Load the G-code file
+      // Clear old highlights and load the G-code file
+      if (m_hmi)
+        m_hmi->clearHighlights();
       if (m_gcode && m_gcode->openFile(filePathName)) {
         m_app->getRenderer().pushTimer(
           0, [this]() { return m_gcode->parseTimer(); });
@@ -144,12 +145,13 @@ void NcControlView::renderUI()
     if (ImGui::BeginMenu("Edit")) {
       if (ImGui::MenuItem("Preferences", "")) {
         LOG_F(INFO, "Edit->Preferences");
-        m_dialogs->showPreferences(true);
+        m_app->getDialogs().showPreferences(true);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Machine Parameters", "")) {
         LOG_F(INFO, "Edit->Machine Parameters");
-        m_dialogs->showMachineParameters(true);
+        m_controller_dialogs.machine_params_temp = m_machine_parameters;
+        m_controller_dialogs.machine_params_window->show();
       }
       ImGui::EndMenu();
     }
@@ -166,21 +168,8 @@ void NcControlView::renderUI()
       }
       ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("Themes")) {
-      if (ImGui::MenuItem("Select Theme", "")) {
-        LOG_F(INFO, "Themes->Select Theme");
-        m_app->getThemeManager().showThemeSelector(true);
-      }
-      ImGui::EndMenu();
-    }
     if (ImGui::BeginMenu("Help")) {
-      if (ImGui::MenuItem("Documentation", "")) {
-        LOG_F(INFO, "Help->Documentation");
-      }
-      ImGui::Separator();
-      if (ImGui::MenuItem("About", "")) {
-        LOG_F(INFO, "Help->About");
-      }
+      m_app->getDialogs().renderHelpMenuItem();
       ImGui::EndMenu();
     }
 
@@ -212,9 +201,25 @@ void NcControlView::init()
   m_hmi = std::make_unique<NcHmi>(m_app, this);
   m_hmi->init();
 
-  // Create and initialize dialogs
-  m_dialogs = std::make_unique<NcDialogs>(m_app, this);
-  m_dialogs->init();
+  // Register controller-specific dialogs
+  m_controller_dialogs.offline_window = renderer.pushGui(false, [this]() {
+    dialogs::renderControllerOfflineWindow(m_controller_dialogs);
+  });
+  m_controller_dialogs.alarm_window = renderer.pushGui(false, [this]() {
+    dialogs::renderControllerAlarmWindow(m_controller_dialogs, m_app);
+  });
+  m_controller_dialogs.homing_window = renderer.pushGui(false, [this]() {
+    dialogs::renderControllerHomingWindow(m_controller_dialogs, m_app);
+  });
+  m_controller_dialogs.machine_params_window =
+    renderer.pushGui(false, [this]() {
+      dialogs::renderMachineParameters(m_controller_dialogs, m_app, this);
+    });
+  m_controller_dialogs.thc_window = renderer.pushGui(false, [this]() {
+    dialogs::renderThcWindow(m_controller_dialogs, m_app, this);
+  });
+  m_controller_dialogs.thc_new_value =
+    m_machine_parameters.thc_set_value;
 
   // Initialize view state
   setMoveViewActive(false);

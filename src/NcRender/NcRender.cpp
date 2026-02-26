@@ -410,8 +410,8 @@ bool NcRender::poll(bool should_quit)
     }
   }
 
-  // Render theme selector (view-independent)
-  m_app->getThemeManager().renderThemeSelector();
+  // Render app-level dialogs (view-independent)
+  m_app->getDialogs().render();
   ImGui::Render();
   /*********/
   glMatrixMode(GL_PROJECTION);

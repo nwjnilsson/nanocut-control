@@ -75,6 +75,8 @@ public:
     std::string           view;
     bool                  visible;
     std::function<void()> callback;
+    void show() { visible = true; }
+    void hide() { visible = false; }
   };
   std::deque<NcRenderGui> m_gui_stack;
 

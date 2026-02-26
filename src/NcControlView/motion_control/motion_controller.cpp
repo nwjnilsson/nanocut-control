@@ -1,4 +1,5 @@
 #include "motion_controller.h"
+#include "../../NcApp/NcApp.h"
 #include "../util.h"
 #include "NcControlView/NcControlView.h"
 #include <algorithm>
@@ -125,18 +126,16 @@ void MotionController::initialize()
 void MotionController::tick()
 {
   m_serial.tick();
-  m_control_view->getDialogs().showControllerOfflineWindow(
-    !m_serial.m_is_connected);
+  m_control_view->dialogs().offline_window->visible = !m_serial.m_is_connected;
 
   if (m_needs_homed == true &&
       m_control_view->m_machine_parameters.homing_enabled == true &&
       m_serial.m_is_connected == true && m_controller_ready == true &&
-      m_control_view->getDialogs().isControllerAlarmWindowVisible() ==
-        false) {
-    m_control_view->getDialogs().showControllerHomingWindow(true);
+      m_control_view->dialogs().alarm_window->visible == false) {
+    m_control_view->dialogs().homing_window->show();
   }
   else {
-    m_control_view->getDialogs().showControllerHomingWindow(false);
+    m_control_view->dialogs().homing_window->hide();
   }
 
   if (m_serial.m_is_connected == false) {
@@ -357,7 +356,7 @@ void MotionController::lineHandler(std::string line)
 
         if (m_last_checksum_error > 0 &&
             last_error_duration < std::chrono::milliseconds{ 100 }) {
-          m_control_view->getDialogs().setInfoValue(
+          m_control_view->m_app->getDialogs().setInfoValue(
             "Program aborted due to multiple communication "
             "checksum errors in a short period of time!");
           sendCommand("abort");
@@ -393,7 +392,7 @@ void MotionController::lineHandler(std::string line)
 
           if (m_torch_on == true &&
               torch_duration > std::chrono::milliseconds{ 2000 }) {
-            m_control_view->getDialogs().setInfoValue(
+            m_control_view->m_app->getDialogs().setInfoValue(
               "Program was aborted because torch crash was detected!");
             sendCommand("abort");
             m_handling_crash = true;
@@ -498,7 +497,7 @@ void MotionController::runPop()
               "program!");
         m_okay_callback = nullptr;
         m_motion_sync_callback = [this]() { torchOffAndAbort(); };
-        m_control_view->getDialogs().setInfoValue(
+        m_control_view->m_app->getDialogs().setInfoValue(
           "Arc Strike Retry max count expired!\nLikely causes are:\n1. Bad or "
           "worn out consumables.\n2. Faulty work clamp connection or wire\n3. "
           "Inadequate pressure and/or moisture in the air system\n4. Dirty "
@@ -933,7 +932,7 @@ void MotionController::logControllerError(int error)
       break;
   }
   LOG_F(ERROR, "Firmware Error %d => %s", error, ret.c_str());
-  m_control_view->getDialogs().setInfoValue(ret.c_str());
+  m_control_view->m_app->getDialogs().setInfoValue(ret.c_str());
   m_gcode_queue.clear();
 }
 
@@ -990,8 +989,8 @@ void MotionController::handleAlarm(int alarm)
   }
   m_controller_ready = false;
   LOG_F(ERROR, "Alarm %d => %s", alarm, ret.c_str());
-  m_control_view->getDialogs().setControllerAlarmValue(ret);
-  m_control_view->getDialogs().showControllerAlarmWindow(true);
+  m_control_view->dialogs().alarm_text = ret;
+  m_control_view->dialogs().alarm_window->show();
   m_gcode_queue.clear();
 }
 

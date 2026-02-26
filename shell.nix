@@ -4,6 +4,7 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = with pkgs; [
     pkg-config
     cmake
+    xxd
   ];
   buildInputs = with pkgs; [
     libGL
@@ -14,6 +15,9 @@ pkgs.stdenv.mkDerivation {
       mkdocs
       mkdocs-material
       grip
+      pillow
+      numpy
+      scipy
     ]))
   ];
 }

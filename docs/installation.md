@@ -105,7 +105,7 @@ You specify where to install the program with e.g<br>
 
 ### macOS
 
-I have not tested ono macOS myself but the process should look something like this. I'm sure you'll figure it out :)
+I have not tested on macOS myself but the process should look something like this. I'm sure you'll figure it out :)
 
 1. Install dependencies using Homebrew:
 

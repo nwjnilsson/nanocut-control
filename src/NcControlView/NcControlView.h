@@ -14,7 +14,6 @@
 #include <NcApp/View.h>
 
 // Local includes
-#include "dialogs/dialogs.h"
 #include "gcode/gcode.h"
 #include "hmi/hmi.h"
 #include "motion_control/motion_controller.h"
@@ -158,6 +157,18 @@ public:
     p.precise_jog_units = j.at("precise_jog_units").get<float>();
   }
 
+  struct ControllerDialogs {
+    NcRender::NcRenderGui* offline_window = nullptr;
+    NcRender::NcRenderGui* alarm_window = nullptr;
+    NcRender::NcRenderGui* homing_window = nullptr;
+    NcRender::NcRenderGui* machine_params_window = nullptr;
+    NcRender::NcRenderGui* thc_window = nullptr;
+
+    std::string      alarm_text;
+    MachineParameters machine_params_temp{};
+    float            thc_new_value = 0.0f;
+  };
+
   Box*              m_machine_plane;
   Box*              m_cuttable_plane;
   Circle*           m_torch_pointer;
@@ -177,8 +188,8 @@ public:
   // G-code parser and renderer
   std::unique_ptr<GCode> m_gcode;
 
-  // Dialog window manager
-  std::unique_ptr<NcDialogs> m_dialogs;
+  // Controller-specific dialogs
+  ControllerDialogs m_controller_dialogs;
 
   // Application context dependency (injected)
   NcApp* m_app{ nullptr };
@@ -230,8 +241,20 @@ public:
   // GCode access
   GCode& getGCode() { return *m_gcode; }
 
-  // Dialogs access
-  NcDialogs& getDialogs() { return *m_dialogs; }
+  // Controller dialogs access
+  ControllerDialogs& dialogs() { return m_controller_dialogs; }
 };
+
+namespace dialogs {
+void renderControllerOfflineWindow(NcControlView::ControllerDialogs& d);
+void renderControllerAlarmWindow(NcControlView::ControllerDialogs& d,
+                                 NcApp* app);
+void renderControllerHomingWindow(NcControlView::ControllerDialogs& d,
+                                  NcApp* app);
+void renderMachineParameters(NcControlView::ControllerDialogs& d,
+                             NcApp* app, NcControlView* view);
+void renderThcWindow(NcControlView::ControllerDialogs& d,
+                     NcApp* app, NcControlView* view);
+} // namespace dialogs
 
 #endif

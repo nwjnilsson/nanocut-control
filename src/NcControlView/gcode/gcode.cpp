@@ -38,8 +38,8 @@ void GCode::resetParseState()
   m_last_rapid_line = 0;
   m_current_path.points.clear();
   m_paths.clear();
-  m_view->getDialogs().showProgressWindow(true);
-  m_view->getDialogs().setProgressValue(0.0f);
+  m_app->getDialogs().showProgressWindow(true);
+  m_app->getDialogs().setProgressValue(0.0f);
 }
 
 bool GCode::openFile(const std::string& filepath)
@@ -192,7 +192,7 @@ bool GCode::parseTimer()
     if (m_line_index < m_lines.size()) {
       const std::string& line = m_lines[m_line_index++];
       m_lines_consumed++;
-      m_view->getDialogs().setProgressValue((float) m_lines_consumed /
+      m_app->getDialogs().setProgressValue((float) m_lines_consumed /
                                             (float) m_line_count);
       if (line.find("G0") != std::string::npos) {
         Point2d last_path_endpoint = { std::numeric_limits<int>::min(),
@@ -247,8 +247,8 @@ bool GCode::parseTimer()
       if (m_current_path.points.size() > 0)
         m_paths.push_back(m_current_path);
       m_current_path.points.clear();
-      m_view->getDialogs().setProgressValue(1.0f);
-      m_view->getDialogs().showProgressWindow(false);
+      m_app->getDialogs().setProgressValue(1.0f);
+      m_app->getDialogs().showProgressWindow(false);
       auto& stack = renderer.getPrimitiveStack();
       for (size_t x = 0; x < stack.size(); x++) {
         if ((stack.at(x)->flags & PrimitiveFlags::GCode) !=

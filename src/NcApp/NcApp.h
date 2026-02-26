@@ -1,6 +1,7 @@
 #ifndef NC_APP_H
 #define NC_APP_H
 
+#include "dialogs/NcDialogs.h"
 #include <GLFW/glfw3.h>
 #include <NcRender/geometry/geometry.h>
 #include <ThemeManager/ThemeColor.h>
@@ -77,6 +78,10 @@ public:
   const NcCamView&       getCamView() const { return *m_cam_view; }
   const NcAdminView&     getAdminView() const { return *m_admin_view; }
 
+  // App-level dialogs
+  NcDialogs&       getDialogs() { return *m_dialogs; }
+  const NcDialogs& getDialogs() const { return *m_dialogs; }
+
   // Theme management
   ThemeManager&       getThemeManager() { return *m_theme_manager; }
   const ThemeManager& getThemeManager() const { return *m_theme_manager; }
@@ -116,6 +121,7 @@ private:
 
   // Services and subsystems (owned by this context)
   std::unique_ptr<NcRender>        m_renderer;
+  std::unique_ptr<NcDialogs>       m_dialogs;
   std::unique_ptr<ThemeManager>    m_theme_manager;
   std::unique_ptr<WebsocketClient> m_websocket;
 

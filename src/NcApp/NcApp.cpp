@@ -15,9 +15,9 @@
 #include <stdexcept>
 #include <sys/stat.h>
 
-#include <icons/nanocut_64_png.h>
-#include <icons/nanocut_128_png.h>
-#include <icons/nanocut_256_png.h>
+#include <pch/nanocut_128_png.h>
+#include <pch/nanocut_256_png.h>
+#include <pch/nanocut_64_png.h>
 
 NcApp::NcApp()
   : m_start_timestamp(NcRender::millis()),
@@ -99,6 +99,9 @@ void NcApp::initialize(int argc, char** argv)
   // Initialize renderer
   m_renderer->init(argc, argv);
 
+  // Create app-level dialogs (view-independent)
+  m_dialogs = std::make_unique<NcDialogs>(this);
+
   // Create services and views with dependency injection
   m_control_view = std::make_unique<NcControlView>(this);
   m_cam_view = std::make_unique<NcCamView>(this);
@@ -171,20 +174,20 @@ void NcApp::setWindowIcon()
   };
 
   const IconData icons[] = {
-    { nanocut_64_png,  nanocut_64_png_len  },
-    { nanocut_128_png, nanocut_128_png_len },
-    { nanocut_256_png, nanocut_256_png_len },
+    { assets_nanocut_64_png, assets_nanocut_64_png_len },
+    { assets_nanocut_128_png, assets_nanocut_128_png_len },
+    { assets_nanocut_256_png, assets_nanocut_256_png_len },
   };
 
   GLFWimage images[3];
   int       loaded = 0;
 
   for (int i = 0; i < 3; i++) {
-    int w, h, channels;
-    unsigned char* pixels = stbi_load_from_memory(
-      icons[i].data, icons[i].len, &w, &h, &channels, 4);
+    int            w, h, channels;
+    unsigned char* pixels =
+      stbi_load_from_memory(icons[i].data, icons[i].len, &w, &h, &channels, 4);
     if (pixels) {
-      images[loaded].width  = w;
+      images[loaded].width = w;
       images[loaded].height = h;
       images[loaded].pixels = pixels;
       loaded++;

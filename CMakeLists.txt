@@ -12,7 +12,7 @@ endif()
 # ------------------------------------------------------------
 #
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-include(EmbedResource)
+# include(EmbedResource)
 
 #
 # ------------------------------------------------------------
@@ -227,12 +227,13 @@ message(STATUS "All third-party dependencies configured successfully")
 set(GENERATED_ICON_DIR "${CMAKE_BINARY_DIR}/generated/icons")
 file(MAKE_DIRECTORY "${GENERATED_ICON_DIR}")
 
-embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-64.png"
-               "${GENERATED_ICON_DIR}/nanocut_64_png.h" "nanocut_64_png")
-embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-128.png"
-               "${GENERATED_ICON_DIR}/nanocut_128_png.h" "nanocut_128_png")
-embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-256.png"
-               "${GENERATED_ICON_DIR}/nanocut_256_png.h" "nanocut_256_png")
+
+# embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-64.png"
+#                "${GENERATED_ICON_DIR}/nanocut_64_png.h" "nanocut_64_png")
+# embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-128.png"
+#                "${GENERATED_ICON_DIR}/nanocut_128_png.h" "nanocut_128_png")
+# embed_resource("${CMAKE_SOURCE_DIR}/assets/nanocut-256.png"
+#                "${GENERATED_ICON_DIR}/nanocut_256_png.h" "nanocut_256_png")
 
 #
 # ------------------------------------------------------------
@@ -292,6 +293,13 @@ target_compile_definitions(NanoCut PRIVATE)
 # Git versioning (mirrors Makefile)
 # ------------------------------------------------------------
 #
+# Set default version values
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 0)
+set(VERSION_PATCH 0)
+set(VERSION_REVISION 0)
+set(VERSION_HASH "unknown")
+
 find_package(Git QUIET)
 if(GIT_FOUND)
     execute_process(
@@ -301,25 +309,50 @@ if(GIT_FOUND)
         OUTPUT_VARIABLE GIT_DESC
         ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-
-    if(GIT_RESULT EQUAL 0)
+        if(GIT_RESULT EQUAL 0)
+        # Try to match semantic version format first (e.g., v1.2.3-4-gabc1234-dirty)
         string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)-([0-9]+)-(.*)"
-               _ ${GIT_DESC})
-        set(VERSION_MAJOR ${CMAKE_MATCH_1})
-        set(VERSION_MINOR ${CMAKE_MATCH_2})
-        set(VERSION_PATCH ${CMAKE_MATCH_3})
-        set(VERSION_REVISION ${CMAKE_MATCH_4})
-        set(VERSION_HASH ${CMAKE_MATCH_5})
+               VERSION_MATCH ${GIT_DESC})
 
-        target_compile_definitions(NanoCut PRIVATE
-            VERSION_MAJOR=${VERSION_MAJOR}
-            VERSION_MINOR=${VERSION_MINOR}
-            VERSION_PATCH=${VERSION_PATCH}
-            VERSION_REVISION=${VERSION_REVISION}
-            VERSION_HASH="${VERSION_HASH}"
-        )
+        if(VERSION_MATCH)
+            # Semantic version format found
+            set(VERSION_MAJOR ${CMAKE_MATCH_1})
+            set(VERSION_MINOR ${CMAKE_MATCH_2})
+            set(VERSION_PATCH ${CMAKE_MATCH_3})
+            set(VERSION_REVISION ${CMAKE_MATCH_4})
+            set(VERSION_HASH ${CMAKE_MATCH_5})
+        else()
+            # No semantic version tags found, use commit hash format (e.g., abc1234-dirty)
+            string(REGEX MATCH "([^-]+)-(.*)" COMMIT_MATCH ${GIT_DESC})
+            if(COMMIT_MATCH)
+                set(VERSION_MAJOR 0)
+                set(VERSION_MINOR 0)
+                set(VERSION_PATCH 0)
+                set(VERSION_REVISION 0)
+                set(VERSION_HASH ${CMAKE_MATCH_1})
+            else()
+                # Just a plain commit hash
+                set(VERSION_MAJOR 0)
+                set(VERSION_MINOR 0)
+                set(VERSION_PATCH 0)
+                set(VERSION_REVISION 0)
+                set(VERSION_HASH ${GIT_DESC})
+            endif()
+        endif()
     endif()
 endif()
+
+message(STATUS "Version: ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+message(STATUS "Revision: ${VERSION_REVISION}")
+message(STATUS "Hash: ${VERSION_HASH}")
+
+target_compile_definitions(NanoCut PRIVATE
+    VERSION_MAJOR=${VERSION_MAJOR}
+    VERSION_MINOR=${VERSION_MINOR}
+    VERSION_PATCH=${VERSION_PATCH}
+    VERSION_REVISION=${VERSION_REVISION}
+    VERSION_HASH="${VERSION_HASH}"
+)
 
 #
 # ------------------------------------------------------------

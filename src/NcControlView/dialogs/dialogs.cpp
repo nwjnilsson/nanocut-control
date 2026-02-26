@@ -1,104 +1,66 @@
-#include "dialogs.h"
 #include "../../NcApp/NcApp.h"
-#include "../gcode/gcode.h"
 #include "../motion_control/motion_controller.h"
-#include "../util.h"
 #include "NcControlView/NcControlView.h"
-#include <ImGuiFileDialog.h>
 #include <algorithm>
+#include <imgui.h>
+#include <loguru.hpp>
 
-// Constructor
-NcDialogs::NcDialogs(NcApp* app, NcControlView* view) : m_app(app), m_view(view)
-{
-}
+namespace dialogs {
 
-void NcDialogs::renderFileOpen()
+void renderControllerOfflineWindow(NcControlView::ControllerDialogs& d)
 {
-  if (ImGuiFileDialog::Instance()->Display(
-        "ChooseFileDlgKey", ImGuiWindowFlags_NoCollapse, ImVec2(600, 500))) {
-    if (ImGuiFileDialog::Instance()->IsOk()) {
-      std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-      std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
-      LOG_F(INFO,
-            "File Path: %s, File Path Name: %s",
-            filePath.c_str(),
-            filePathName.c_str());
-      std::ofstream out(m_app->getRenderer().getConfigDirectory() +
-                        "last_gcode_open_path.conf");
-      out << filePath;
-      out << "/";
-      out.close();
-      m_view->getHmi().clearHighlights();
-      auto& gcode = m_app->getControlView().getGCode();
-      if (gcode.openFile(filePathName)) {
-        m_app->getRenderer().pushTimer(
-          0, [&gcode]() { return gcode.parseTimer(); });
-      }
-    }
-    ImGuiFileDialog::Instance()->Close();
-  }
-}
-
-void NcDialogs::showPreferences(bool visible)
-{
-  m_preferences_window_handle->visible = visible;
-}
-
-void NcDialogs::renderPreferences()
-{
-  ImGui::Begin("Preferences",
-               &m_preferences_window_handle->visible,
+  ImGui::Begin("Controller Offline",
+               &d.offline_window->visible,
                ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::Text(
+    "The motion controller is offline! Verify that USB connection is secure!");
+  ImGui::End();
+}
 
-  // Window size preferences (colors are now handled by theme system)
-  ImGui::InputInt2("Default Window Size",
-                   m_app->m_preferences.window_size.data());
-  ImGui::SameLine();
-  if (ImGui::Button("<= Current Size")) {
-    m_app->m_preferences.window_size[0] =
-      (int) m_app->getRenderer().getWindowSize().x;
-    m_app->m_preferences.window_size[1] =
-      (int) m_app->getRenderer().getWindowSize().y;
-  }
-
-  ImGui::Text("Color themes are now managed through the Themes menu.");
-
-  ImGui::Spacing();
-  if (ImGui::Button("OK")) {
-    // Write preferences to file (only window size now)
-    nlohmann::json preferences;
-    preferences["window_width"] = m_app->m_preferences.window_size[0];
-    preferences["window_height"] = m_app->m_preferences.window_size[1];
-
-    std::ofstream out(m_app->getRenderer().getConfigDirectory() +
-                      "preferences.json");
-    out << preferences.dump();
-    out.close();
-    showPreferences(false);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Cancel")) {
-    showPreferences(false);
+void renderControllerAlarmWindow(NcControlView::ControllerDialogs& d,
+                                 NcApp* app)
+{
+  ImGui::Begin("Controller Alarm",
+               &d.alarm_window->visible,
+               ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::Text("%s", d.alarm_text.c_str());
+  if (ImGui::Button("Clear Alarm")) {
+    LOG_F(WARNING, "User cleared alarm!");
+    if (app) {
+      app->getControlView().getMotionController().triggerReset();
+    }
+    d.alarm_window->hide();
   }
   ImGui::End();
 }
 
-void NcDialogs::showMachineParameters(bool visible)
+void renderControllerHomingWindow(NcControlView::ControllerDialogs& d,
+                                  NcApp* app)
 {
-  m_machine_parameters_window_handle->visible = visible;
+  ImGui::Begin("Home Machine",
+               &d.homing_window->visible,
+               ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::Text("Machine needs to be homed. Click on Home button when ready!");
+  if (ImGui::Button("Home")) {
+    LOG_F(WARNING, "User initiated homing cycle!");
+    if (app) {
+      app->getControlView().getMotionController().sendCommand("home");
+    }
+    d.homing_window->hide();
+  }
+  ImGui::End();
 }
 
-void NcDialogs::renderMachineParameters()
+void renderMachineParameters(NcControlView::ControllerDialogs& d,
+                             NcApp* app, NcControlView* view)
 {
-  static NcControlView::MachineParameters temp_parameters =
-    m_view->m_machine_parameters;
+  auto& temp_parameters = d.machine_params_temp;
 
-  // Make the window full-screen and modal
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
 
   ImGui::Begin("Machine Parameters",
-               &m_machine_parameters_window_handle->visible,
+               &d.machine_params_window->visible,
                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoCollapse);
   ImGui::Separator();
@@ -192,250 +154,60 @@ void NcDialogs::renderMachineParameters()
     bool skip_save = false;
     if (temp_parameters.arc_voltage_divider < 1.f or
         temp_parameters.arc_voltage_divider > 500.f) {
-      setInfoValue(
+      app->getDialogs().setInfoValue(
         "The arc voltage divider is insane. Pick something reasonable.");
-      showInfoWindow(true);
       skip_save = true;
     }
     for (int i = 0; i < 3; ++i) {
       if (temp_parameters.machine_extents[i] < 0.f) {
-        setInfoValue("Machine extents must not be negative.");
-        showInfoWindow(true);
+        app->getDialogs().setInfoValue(
+          "Machine extents must not be negative.");
         skip_save = true;
         break;
       }
     }
-    // Might want to do other sanity checks here
 
     if (not skip_save) {
-      if (m_app) {
-        m_app->getControlView().m_machine_parameters = temp_parameters;
-        m_app->getControlView().getMotionController().saveParameters();
-        m_app->getControlView()
-          .getMotionController()
-          .writeParametersToController();
-      }
-      showMachineParameters(false);
+      view->m_machine_parameters = temp_parameters;
+      view->getMotionController().saveParameters();
+      view->getMotionController().writeParametersToController();
+      d.machine_params_window->hide();
     }
   }
   ImGui::SameLine();
   if (ImGui::Button("Cancel")) {
-    showMachineParameters(false);
+    d.machine_params_window->hide();
   }
   ImGui::End();
 }
 
-void NcDialogs::showProgressWindow(bool visible)
-{
-  m_progress_window_handle->visible = visible;
-}
-
-void NcDialogs::setProgressValue(float progress) { m_progress = progress; }
-
-void NcDialogs::renderProgressWindow()
-{
-  ImGui::Begin("Progress",
-               &m_progress_window_handle->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::ProgressBar(m_progress, ImVec2(0.0f, 0.0f));
-  ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-  ImGui::Text("Progress");
-  ImGui::End();
-}
-
-void NcDialogs::showInfoWindow(bool visible)
-{
-  m_info_window_handle->visible = visible;
-}
-
-void NcDialogs::setInfoValue(const std::string& info)
-{
-  m_info = info;
-  LOG_F(WARNING, "Info Window => %s", m_info.c_str());
-  showInfoWindow(true);
-}
-
-void NcDialogs::renderInfoWindow()
-{
-  ImGui::Begin(
-    "Info", &m_info_window_handle->visible, ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("%s", m_info.c_str());
-  if (ImGui::Button("Close")) {
-    showInfoWindow(false);
-  }
-  ImGui::End();
-}
-
-void NcDialogs::showControllerOfflineWindow(bool visible)
-{
-  m_controller_offline_window_handle->visible = visible;
-}
-
-void NcDialogs::setControllerOfflineValue(const std::string& info)
-{
-  m_info = info;
-  LOG_F(WARNING, "Controller Offline Window => %s", m_info.c_str());
-  showControllerOfflineWindow(true);
-}
-
-void NcDialogs::renderControllerOfflineWindow()
-{
-  ImGui::Begin("Controller Offline",
-               &m_controller_offline_window_handle->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text(
-    "The motion controller is offline! Verify that USB connection is secure!");
-  ImGui::End();
-}
-
-void NcDialogs::showControllerAlarmWindow(bool visible)
-{
-  m_controller_alarm_window_handle->visible = visible;
-}
-
-void NcDialogs::setControllerAlarmValue(const std::string& alarm_text)
-{
-  m_controller_alarm_text = alarm_text;
-}
-
-void NcDialogs::renderControllerAlarmWindow()
-{
-  ImGui::Begin("Controller Alarm",
-               &m_controller_alarm_window_handle->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("%s", m_controller_alarm_text.c_str());
-  if (ImGui::Button("Clear Alarm")) {
-    LOG_F(WARNING, "User cleared alarm!");
-    if (m_app) {
-      m_app->getControlView().getMotionController().triggerReset();
-    }
-    showControllerAlarmWindow(false);
-  }
-  ImGui::End();
-}
-
-bool NcDialogs::isControllerAlarmWindowVisible() const
-{
-  return m_controller_alarm_window_handle->visible;
-}
-
-void NcDialogs::showControllerHomingWindow(bool visible)
-{
-  m_controller_homing_window_handle->visible = visible;
-}
-
-void NcDialogs::renderControllerHomingWindow()
-{
-  ImGui::Begin("Home Machine",
-               &m_controller_homing_window_handle->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("Machine needs to be homed. Click on Home button when ready!");
-  if (ImGui::Button("Home")) {
-    LOG_F(WARNING, "User initiated homing cycle!");
-    if (m_app) {
-      m_app->getControlView().getMotionController().sendCommand("home");
-    }
-    showControllerHomingWindow(false);
-  }
-  ImGui::End();
-}
-
-void NcDialogs::askYesNo(const std::string&     question,
-                         std::function<void()>  yes_callback,
-                         std::function<void()>  no_callback,
-                         std::optional<Point2d> placement)
-{
-  m_ask_window.text = question;
-  m_ask_window.yes_callback = yes_callback;
-  m_ask_window.no_callback = no_callback;
-  m_ask_window.placement = placement;
-  LOG_F(INFO, "Ask Window => %s", m_ask_window.text.c_str());
-  m_ask_window.handle->visible = true;
-}
-
-void NcDialogs::renderAskWindow()
-{
-  if (m_ask_window.placement.has_value()) {
-    const Point2d& pos = m_ask_window.placement.value();
-    auto           window_size = ImGui::GetIO().DisplaySize;
-    float window_x = static_cast<float>(pos.x) + (window_size.x / 2.0f);
-    float window_y = (window_size.y / 2.0f) - static_cast<float>(pos.y);
-
-    ImGui::SetNextWindowPos(ImVec2(window_x + 10.0f, window_y + 10.0f),
-                            ImGuiCond_Always);
-  }
-
-  ImGui::Begin("Question",
-               &m_ask_window.handle->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("%s", m_ask_window.text.c_str());
-  if (ImGui::Button("Yes")) {
-    if (m_ask_window.yes_callback)
-      m_ask_window.yes_callback();
-    m_ask_window.handle->visible = false;
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("No")) {
-    if (m_ask_window.no_callback)
-      m_ask_window.no_callback();
-    m_ask_window.handle->visible = false;
-  }
-  ImGui::End();
-}
-
-void NcDialogs::showThcWindow(bool visible)
-{
-  m_thc_window_handle->visible = visible;
-}
-
-void NcDialogs::renderThcWindow()
+void renderThcWindow(NcControlView::ControllerDialogs& d,
+                     NcApp* app, NcControlView* view)
 {
   ImGui::Begin("Torch Height Control",
-               &m_thc_window_handle->visible,
+               &d.thc_window->visible,
                ImGuiWindowFlags_AlwaysAutoResize);
   ImGui::Separator();
 
-  static float new_value =
-    m_app->getControlView().m_machine_parameters.thc_set_value;
   ImGui::Text("New target is set on next touch-off.");
   ImGui::Separator();
-  ImGui::InputFloat("Set Voltage", &new_value, 0.1f, 0.5f);
-  new_value = std::clamp(new_value, 0.f, 200.f);
+  ImGui::InputFloat("Set Voltage", &d.thc_new_value, 0.1f, 0.5f);
+  d.thc_new_value = std::clamp(d.thc_new_value, 0.f, 200.f);
 
   if (ImGui::Button("Set Target")) {
-    askYesNo(
-      "Set target arc voltage to " + std::to_string(new_value) + "?", [this]() {
-        m_app->getControlView().m_machine_parameters.thc_set_value = new_value;
-        showThcWindow(false);
+    float value = d.thc_new_value;
+    app->getDialogs().askYesNo(
+      "Set target arc voltage to " + std::to_string(value) + "?",
+      [view, &d, value]() {
+        view->m_machine_parameters.thc_set_value = value;
+        d.thc_window->hide();
       });
   }
   ImGui::SameLine();
   if (ImGui::Button("Close")) {
-    showThcWindow(false);
+    d.thc_window->hide();
   }
   ImGui::End();
 }
 
-void NcDialogs::init()
-{
-  m_file_open_handle =
-    m_app->getRenderer().pushGui(true, [this]() { renderFileOpen(); });
-  m_preferences_window_handle =
-    m_app->getRenderer().pushGui(false, [this]() { renderPreferences(); });
-  m_machine_parameters_window_handle = m_app->getRenderer().pushGui(
-    false, [this]() { renderMachineParameters(); });
-  m_progress_window_handle =
-    m_app->getRenderer().pushGui(false, [this]() { renderProgressWindow(); });
-  m_info_window_handle =
-    m_app->getRenderer().pushGui(false, [this]() { renderInfoWindow(); });
-  m_controller_offline_window_handle = m_app->getRenderer().pushGui(
-    false, [this]() { renderControllerOfflineWindow(); });
-  m_controller_alarm_window_handle = m_app->getRenderer().pushGui(
-    false, [this]() { renderControllerAlarmWindow(); });
-  m_controller_homing_window_handle = m_app->getRenderer().pushGui(
-    false, [this]() { renderControllerHomingWindow(); });
-  m_ask_window.handle =
-    m_app->getRenderer().pushGui(false, [this]() { renderAskWindow(); });
-  m_thc_window_handle =
-    m_app->getRenderer().pushGui(false, [this]() { renderThcWindow(); });
-}
+} // namespace dialogs

@@ -75,6 +75,13 @@ void NcAdminView::renderUI()
         }
         ImGui::EndMenu();
       }
+      if (ImGui::BeginMenu("Edit")) {
+        if (ImGui::MenuItem("Preferences", "")) {
+          LOG_F(INFO, "Edit->Preferences");
+          m_app->getDialogs().showPreferences(true);
+        }
+        ImGui::EndMenu();
+      }
       if (ImGui::BeginMenu("Utilities")) {
         if (ImGui::MenuItem("List Clients", "")) {
           LOG_F(INFO, "Utilities->List Clients");

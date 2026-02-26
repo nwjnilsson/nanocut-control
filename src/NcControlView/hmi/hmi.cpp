@@ -207,11 +207,11 @@ void NcHmi::handleButton(const std::string& id)
               control_view.m_motion_controller->runStack();
             }
             else {
-              m_view->getDialogs().setInfoValue("No G-code loaded!");
+              m_app->getDialogs().setInfoValue("No G-code loaded!");
             }
           }
           else {
-            m_view->getDialogs().setInfoValue(
+            m_app->getDialogs().setInfoValue(
               "Program is outside of machines cuttable extents!");
           }
         } break;
@@ -235,11 +235,11 @@ void NcHmi::handleButton(const std::string& id)
               control_view.m_motion_controller->runStack();
             }
             else {
-              m_view->getDialogs().setInfoValue("No G-code loaded!");
+              m_app->getDialogs().setInfoValue("No G-code loaded!");
             }
           }
           else {
-            m_view->getDialogs().setInfoValue(
+            m_app->getDialogs().setInfoValue(
               "Program is outside of machines cuttable extents!");
           }
         } break;
@@ -365,7 +365,7 @@ void NcHmi::handleButton(const std::string& id)
 
       case HmiButtonId::THC:
         LOG_F(INFO, "Clicked THC");
-        m_view->getDialogs().showThcWindow(true);
+        m_view->dialogs().thc_window->show();
         break;
 
       default:
@@ -395,11 +395,11 @@ void NcHmi::jumpin(Primitive* p)
       control_view.m_motion_controller->runStack();
     }
     else {
-      m_view->getDialogs().setInfoValue("No G-code loaded!");
+      m_app->getDialogs().setInfoValue("No G-code loaded!");
     }
   }
   else {
-    m_view->getDialogs().setInfoValue(
+    m_app->getDialogs().setInfoValue(
       "Program is outside of machines cuttable extents!");
   }
 }
@@ -411,7 +411,7 @@ void NcHmi::reverse(Primitive* p)
   auto&       control_view = m_app->getControlView();
   const auto& source_lines = control_view.getGCode().getLines();
   if (source_lines.empty()) {
-    m_view->getDialogs().setInfoValue("No G-code loaded!");
+    m_app->getDialogs().setInfoValue("No G-code loaded!");
     return;
   }
 
@@ -465,7 +465,7 @@ void NcHmi::reverse(Primitive* p)
       out.close();
     }
     catch (...) {
-      m_view->getDialogs().setInfoValue("Could not write gcode file to disk!");
+      m_app->getDialogs().setInfoValue("Could not write gcode file to disk!");
       return;
     }
   }
@@ -508,7 +508,7 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
           }
           else if (be.action == GLFW_RELEASE) {
             c->color = &m_app->getColor(ThemeColor::PlotLines);
-            m_view->getDialogs().askYesNo(
+            m_app->getDialogs().askYesNo(
               "Are you sure you want to start the program at this path?",
               [this, c]() { jumpin(c); },
               nullptr,
@@ -520,7 +520,7 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
         if (be.mods & GLFW_MOD_CONTROL) {
           if (be.action == GLFW_RELEASE) {
             c->color = &m_app->getColor(ThemeColor::PlotLines);
-            m_view->getDialogs().askYesNo(
+            m_app->getDialogs().askYesNo(
               "Are you sure you want to reverse this paths direction?",
               [this, c]() { reverse(c); },
               nullptr,
@@ -584,7 +584,7 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
 
         // Show popup asking user if they want to go to this location
         // Position popup near the click location
-        m_view->getDialogs().askYesNo(
+        m_app->getDialogs().askYesNo(
           "Go to waypoint position?",
           [this]() { goToWaypoint(nullptr); },
           [&control_view]() {
