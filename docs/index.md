@@ -1,5 +1,5 @@
 <div style="text-align: center; margin: 20px 0;">
-  <img src="images/logo.png" alt="Logo" style="width: 512px; height: auto; border-radius: 8px;">
+  <img src="images/logo_feathered.png" alt="Logo" style="width: 512px; height: auto; border-radius: 8px;">
 </div>
 
 # NanoCut Control Manual
