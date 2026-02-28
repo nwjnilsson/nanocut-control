@@ -10,4 +10,5 @@ nav:
   - Control View: control-view.md
   - Machine Parameters: machine-parameters.md
   - Keyboard Shortcuts: keyboard-shortcuts.md
+  - Building a CNC Table: building-your-machine.md
 theme: material

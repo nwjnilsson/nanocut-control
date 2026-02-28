@@ -31,6 +31,7 @@ step-by-step walkthrough of your first cutting job.
 - [Control View](control-view.md) -- Running G-code, jogging, machine control
 - [Machine Parameters](machine-parameters.md) -- Configuring grbl and plasma settings
 - [Keyboard Shortcuts](keyboard-shortcuts.md) -- All keyboard and mouse controls
+- [Building a CNC Table](building-your-machine.md) -- Some advice on DIY-ing your CNC plasma table
 
 ## Getting Help
 
