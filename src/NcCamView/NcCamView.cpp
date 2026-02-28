@@ -459,6 +459,10 @@ void NcCamView::renderContextMenus(bool& show_edit_contour)
   // Viewer context menu
   if (m_show_viewer_context_menu.x != -inf<double>() &&
       m_show_viewer_context_menu.y != -inf<double>()) {
+    if (!m_mouse_over_part) {
+      m_show_viewer_context_menu = Point2d::infNeg();
+      return;
+    }
     ImGui::SetNextWindowPos(
       ImVec2(m_show_viewer_context_menu.x, m_show_viewer_context_menu.y));
     ImGui::Begin("View Contect Menu",

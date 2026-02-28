@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <thread>
 #include <ctime>
 #include <fstream>
 #include <ftw.h>
@@ -479,6 +480,12 @@ bool NcRender::poll(bool should_quit)
     }
   }
   m_render_performance = (millis() - begin_timestamp);
+  constexpr unsigned long target_frame_ms = 10;
+  if (m_render_performance < target_frame_ms) {
+    std::this_thread::sleep_for(
+      std::chrono::milliseconds(target_frame_ms - m_render_performance));
+    m_render_performance = (millis() - begin_timestamp);
+  }
   if (m_show_fps == true) {
     if (m_fps_label == NULL) {
       LOG_F(INFO, "Creating FPS label!");

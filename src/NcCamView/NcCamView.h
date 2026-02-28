@@ -242,10 +242,10 @@ private:
   void                         startImportThread();
 
 public:
-  Part*  m_mouse_over_part;
-  Part*  m_edit_contour_part;
-  size_t m_mouse_over_path;
-  size_t m_edit_contour_path;
+  Part*  m_mouse_over_part = nullptr;
+  Part*  m_edit_contour_part = nullptr;
+  size_t m_mouse_over_path = 0;
+  size_t m_edit_contour_path = 0;
 
   ThemeColor m_mouse_over_color;
   ThemeColor m_outside_contour_color;
