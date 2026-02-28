@@ -827,6 +827,55 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
   auto&   control_view = m_app->getControlView();
   Point2d screen_pos = m_app->getInputState().getMousePosition();
 
+  // Handle Ctrl+click on G-code paths for jump-in and reverse
+  if (dynamic_cast<Path*>(c) && hasFlag(c->flags, PrimitiveFlags::GCode) &&
+      !hasFlag(c->flags, PrimitiveFlags::GCodeArrow)) {
+    if (std::holds_alternative<MouseHoverEvent>(e)) {
+      const auto& hover = std::get<MouseHoverEvent>(e);
+      if (hover.event == NcRender::EventType::MouseIn &&
+          m_app->isModifierPressed(GLFW_MOD_CONTROL)) {
+        c->color = &m_app->getColor(ThemeColor::PlotLines);
+      }
+      else if (hover.event == NcRender::EventType::MouseOut) {
+        c->color = &m_app->getColor(ThemeColor::Text);
+      }
+    }
+    else if (std::holds_alternative<MouseButtonEvent>(e)) {
+      const auto& be = std::get<MouseButtonEvent>(e);
+      if (be.button == GLFW_MOUSE_BUTTON_1) {
+        if (be.mods & GLFW_MOD_CONTROL) {
+          if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
+            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
+          }
+          else if (be.action == GLFW_RELEASE) {
+            c->color = &m_app->getColor(ThemeColor::PlotLines);
+            m_app->getDialogs().askYesNo(
+              "Are you sure you want to start the program at this path?",
+              [this, c]() { jumpin(c); },
+              nullptr,
+              screen_pos);
+          }
+        }
+      }
+      else if (be.button == GLFW_MOUSE_BUTTON_2) {
+        if (be.mods & GLFW_MOD_CONTROL) {
+          if (be.action == GLFW_RELEASE) {
+            c->color = &m_app->getColor(ThemeColor::PlotLines);
+            m_app->getDialogs().askYesNo(
+              "Are you sure you want to reverse this paths direction?",
+              [this, c]() { reverse(c); },
+              nullptr,
+              screen_pos);
+          }
+          else if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
+            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
+          }
+        }
+      }
+    }
+    return;
+  }
+
   // Handle machine/cuttable plane clicks for waypoint functionality
   if ((hasFlag(c->flags, PrimitiveFlags::CuttablePlane) ||
        hasFlag(c->flags, PrimitiveFlags::MachinePlane)) &&

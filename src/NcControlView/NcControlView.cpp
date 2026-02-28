@@ -268,7 +268,8 @@ void NcControlView::handleMouseEvent(const MouseButtonEvent& e,
     return;
 
   // Handle right-click drag for pan/move view
-  if (e.button == GLFW_MOUSE_BUTTON_2) {
+  // Skip when Ctrl is held — Ctrl+right-click is used for reverse path
+  if (e.button == GLFW_MOUSE_BUTTON_2 && !(e.mods & GLFW_MOD_CONTROL)) {
     if (e.action == GLFW_PRESS) {
       // Start pan/move view mode
       setMoveViewActive(true);

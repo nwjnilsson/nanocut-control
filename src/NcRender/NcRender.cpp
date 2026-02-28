@@ -75,12 +75,12 @@ void NcRender::handleKeyEvent(const KeyEvent& ev)
 void NcRender::handleMouseButtonEvent(int button, int action, int mods)
 {
   ImGuiIO& io = ImGui::GetIO();
-  if (io.WantCaptureKeyboard || io.WantCaptureMouse) {
-    return; // ImGui is handling input
+  if (io.WantCaptureMouse) {
+    return; // ImGui is handling this mouse event
   }
 
   // Handle primitive mouse events
-  if (!io.WantCaptureKeyboard && !io.WantCaptureMouse) {
+  {
     bool ignore_next_mouse_events = false;
     for (auto it = m_primitive_stack.rbegin(); it != m_primitive_stack.rend();
          ++it) {
