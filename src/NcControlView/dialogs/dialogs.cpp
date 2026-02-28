@@ -18,7 +18,7 @@ void renderControllerOfflineWindow(NcControlView::ControllerDialogs& d)
 }
 
 void renderControllerAlarmWindow(NcControlView::ControllerDialogs& d,
-                                 NcApp* app)
+                                 NcApp*                            app)
 {
   ImGui::Begin("Controller Alarm",
                &d.alarm_window->visible,
@@ -35,7 +35,7 @@ void renderControllerAlarmWindow(NcControlView::ControllerDialogs& d,
 }
 
 void renderControllerHomingWindow(NcControlView::ControllerDialogs& d,
-                                  NcApp* app)
+                                  NcApp*                            app)
 {
   ImGui::Begin("Home Machine",
                &d.homing_window->visible,
@@ -52,7 +52,8 @@ void renderControllerHomingWindow(NcControlView::ControllerDialogs& d,
 }
 
 void renderMachineParameters(NcControlView::ControllerDialogs& d,
-                             NcApp* app, NcControlView* view)
+                             NcApp*                            app,
+                             NcControlView*                    view)
 {
   auto& temp_parameters = d.machine_params_temp;
 
@@ -153,15 +154,14 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
   if (ImGui::Button("Save and write to controller")) {
     bool skip_save = false;
     if (temp_parameters.arc_voltage_divider < 1.f or
-        temp_parameters.arc_voltage_divider > 500.f) {
+        temp_parameters.arc_voltage_divider > MAX_ARC_VOLTAGE_DIVIDER) {
       app->getDialogs().setInfoValue(
         "The arc voltage divider is insane. Pick something reasonable.");
       skip_save = true;
     }
     for (int i = 0; i < 3; ++i) {
       if (temp_parameters.machine_extents[i] < 0.f) {
-        app->getDialogs().setInfoValue(
-          "Machine extents must not be negative.");
+        app->getDialogs().setInfoValue("Machine extents must not be negative.");
         skip_save = true;
         break;
       }

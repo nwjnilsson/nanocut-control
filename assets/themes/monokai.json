@@ -3,7 +3,7 @@
   "description": "Monokai-inspired theme with dark background and vibrant colors",
   "app_colors": {
     "machine_plane_color": [0.27, 0.27, 0.27],
-    "cuttable_plane_color": [0.85, 0.5, 0.15]
+    "cuttable_plane_color": [0.45, 0.25, 0.10]
   },
   "imgui_colors": {
     "Text": [0.95, 0.95, 0.95, 1.00],

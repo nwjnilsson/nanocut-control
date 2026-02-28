@@ -2,8 +2,8 @@
   "name": "Dark",
   "description": "Dark theme with dark background and light text",
   "app_colors": {
-    "machine_plane_color": [0.39, 0.39, 0.39],
-    "cuttable_plane_color": [0.2, 0.35, 0.6]
+    "machine_plane_color": [0.25, 0.25, 0.25],
+    "cuttable_plane_color": [0.15, 0.25, 0.45]
   },
   "imgui_colors": {
     "Text": [1.00, 1.00, 1.00, 1.00],

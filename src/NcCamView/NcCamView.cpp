@@ -171,7 +171,7 @@ void NcCamView::RenderUI()
   // ImGui state that persists across frames
   static bool        show_create_operation = false;
   static bool        show_job_options = false;
-  static bool        show_tool_library = false;
+  static bool        show_tool_library = true;
   static bool        show_new_tool = false;
   static int         show_tool_edit = -1;
   static int         show_edit_tool_operation = -1;
@@ -540,7 +540,7 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   // Job Options Dialog
   if (show_job_options == true) {
     ImVec2 window_size = ImGui::GetIO().DisplaySize;
-    float  menu_bar_height = ImGui::GetFrameHeightWithSpacing() * 1.0f;
+    float  menu_bar_height = ImGui::GetFrameHeightWithSpacing() * 0.85f;
     ImGui::SetNextWindowPos(ImVec2(300, menu_bar_height));
     ImGui::SetNextWindowSize(ImVec2(window_size.x - 300, 0));
     ImGui::Begin("Job Options",
@@ -623,13 +623,13 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
       if (!skip_save) {
         tool.tool_name = std::string(tool_name_buffer);
-        m_tool_library.push_back(tool);
+        m_tool_library[tool.tool_name] = tool;
 
         // Save to file using custom serialization
         nlohmann::json tool_library;
-        for (size_t x = 0; x < m_tool_library.size(); x++) {
+        for (const auto& [tool_name, tool_data] : m_tool_library) {
           nlohmann::json tool_json;
-          NcCamView::to_json(tool_json, m_tool_library[x]);
+          NcCamView::to_json(tool_json, tool_data);
           tool_library.push_back(tool_json);
         }
 
@@ -646,11 +646,12 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   }
 
   // Edit Tool Dialog
-  static ToolData edit_tool;
-  static char     edit_tool_name_buffer[1024] = "";
-  if (show_tool_edit != -1) {
+  static ToolData    edit_tool;
+  static char        edit_tool_name_buffer[1024] = "";
+  static std::string current_edit_tool_name;
+  if (!current_edit_tool_name.empty()) {
     if (edit_tool.tool_name.empty()) {
-      edit_tool = m_tool_library[show_tool_edit];
+      edit_tool = m_tool_library[current_edit_tool_name];
       snprintf(edit_tool_name_buffer,
                sizeof(edit_tool_name_buffer),
                "%s",
@@ -682,20 +683,25 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
       }
 
       if (!skip_save) {
-        edit_tool.tool_name = std::string(edit_tool_name_buffer);
-        m_tool_library[show_tool_edit] = edit_tool;
+        std::string old_tool_name = current_edit_tool_name;
+        std::string new_tool_name = std::string(edit_tool_name_buffer);
+        edit_tool.tool_name = new_tool_name;
+
+        // Remove old tool and add updated one
+        m_tool_library.erase(old_tool_name);
+        m_tool_library[new_tool_name] = edit_tool;
 
         // Save to file using custom serialization
         nlohmann::json tool_library;
-        for (size_t x = 0; x < m_tool_library.size(); x++) {
+        for (const auto& [tool_name, tool_data] : m_tool_library) {
           nlohmann::json tool_json;
-          NcCamView::to_json(tool_json, m_tool_library[x]);
+          NcCamView::to_json(tool_json, tool_data);
           tool_library.push_back(tool_json);
         }
 
         renderer.dumpJsonToFile(
           renderer.getConfigDirectory() + "tool_library.json", tool_library);
-        show_tool_edit = -1;
+        current_edit_tool_name.clear();
       }
     }
     ImGui::End();
@@ -703,6 +709,7 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   else {
     edit_tool = ToolData(); // Reset to default
     memset(edit_tool_name_buffer, 0, sizeof(edit_tool_name_buffer));
+    current_edit_tool_name.clear();
   }
 
   // Tool Library Dialog
@@ -718,8 +725,7 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
 
     // Calculate button area height
     float button_height = ImGui::GetFrameHeightWithSpacing();
-    float table_height = tool_library_height - button_height -
-                         m_app->getRenderer().scaleUI(4.0f) * 12;
+    float table_height = tool_library_height - button_height * 2.5f;
 
     // Scrollable table area
     ImGui::BeginChild("ScrollingTools", ImVec2(0, table_height), true);
@@ -735,27 +741,49 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
       ImGui::TableSetupColumn("Action");
       ImGui::TableHeadersRow();
 
-      for (size_t x = 0; x < m_tool_library.size(); ++x) {
+      for (const auto& [tool_name, tool_data] : m_tool_library) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::Text("%s", m_tool_library[x].tool_name.c_str());
+        ImGui::Text("%s", tool_data.tool_name.c_str());
         ImGui::TableSetColumnIndex(1);
-        ImGui::Text("%.4f", m_tool_library[x].pierce_height);
+        ImGui::Text("%.4f", tool_data.pierce_height);
         ImGui::TableSetColumnIndex(2);
-        ImGui::Text("%.4f", m_tool_library[x].pierce_delay);
+        ImGui::Text("%.4f", tool_data.pierce_delay);
         ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%.4f", m_tool_library[x].cut_height);
+        ImGui::Text("%.4f", tool_data.cut_height);
         ImGui::TableSetColumnIndex(4);
-        ImGui::Text("%.4f", m_tool_library[x].kerf_width);
+        ImGui::Text("%.4f", tool_data.kerf_width);
         ImGui::TableSetColumnIndex(5);
-        ImGui::Text("%.4f", m_tool_library[x].feed_rate);
+        ImGui::Text("%.4f", tool_data.feed_rate);
         ImGui::TableSetColumnIndex(6);
-        ImGui::Text("%.4f", m_tool_library[x].thc);
+        ImGui::Text("%.4f", tool_data.thc);
         ImGui::TableSetColumnIndex(7);
-        if (ImGui::Button(
-              std::string("Edit##Edit-" + std::to_string(x)).c_str())) {
-          show_tool_edit = x;
-          LOG_F(INFO, "show_tool_edit: %d", show_tool_edit);
+        if (ImGui::Button(std::string("Edit##Edit-" + tool_name).c_str())) {
+          current_edit_tool_name = tool_name;
+          LOG_F(INFO, "Editing tool: %s", tool_name.c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(std::string("Delete##Delete-" + tool_name).c_str())) {
+          // Show confirmation dialog
+          m_app->getDialogs().askYesNo(
+            std::format("Delete \"{}\"?", tool_name),
+            [this, tool_name]() {
+              m_tool_library.erase(tool_name);
+
+              // Save updated tool library
+              nlohmann::json tool_library_json;
+              for (const auto& [name, data] : m_tool_library) {
+                nlohmann::json tool_json;
+                NcCamView::to_json(tool_json, data);
+                tool_library_json.push_back(tool_json);
+              }
+              auto& renderer = m_app->getRenderer();
+              renderer.dumpJsonToFile(renderer.getConfigDirectory() +
+                                        "tool_library.json",
+                                      tool_library_json);
+            },
+            nullptr // No callback for "No"
+          );
         }
       }
       ImGui::EndTable();
@@ -798,30 +826,27 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     ImGui::Separator();
 
     static ToolOperation operation;
-    static int           operation_tool = -1;
+    static std::string   operation_tool;
 
     // Auto-set lead in/out based on tool kerf width
-    if (m_tool_library.size() > static_cast<size_t>(operation_tool) &&
-        operation_tool != -1 && operation.lead_in_length == DEFAULT_LEAD_IN &&
+    if (!operation_tool.empty() &&
+        operation.lead_in_length == DEFAULT_LEAD_IN &&
         operation.lead_out_length == DEFAULT_LEAD_OUT) {
-      operation.lead_in_length =
-        m_tool_library[operation_tool].kerf_width * 1.5;
-      operation.lead_out_length =
-        m_tool_library[operation_tool].kerf_width * 1.5;
+      auto tool_it = m_tool_library.find(operation_tool);
+      if (tool_it != m_tool_library.end()) {
+        operation.lead_in_length = tool_it->second.kerf_width * 1.5;
+        operation.lead_out_length = tool_it->second.kerf_width * 1.5;
+      }
     }
 
     // Tool selection combo
     if (ImGui::BeginCombo("Tool",
-                          operation_tool >= 0 &&
-                              operation_tool <
-                                static_cast<int>(m_tool_library.size())
-                            ? m_tool_library[operation_tool].tool_name.c_str()
-                            : "Select...")) {
-      for (size_t i = 0; i < m_tool_library.size(); i++) {
-        bool is_selected = (operation_tool == static_cast<int>(i));
-        if (ImGui::Selectable(m_tool_library[i].tool_name.c_str(),
-                              is_selected)) {
-          operation_tool = i;
+                          operation_tool.empty() ? "Select..."
+                                                 : operation_tool.c_str())) {
+      for (const auto& [tool_name, tool_data] : m_tool_library) {
+        bool is_selected = (tool_name == operation_tool);
+        if (ImGui::Selectable(tool_name.c_str(), is_selected)) {
+          operation_tool = tool_name;
         }
         if (is_selected) {
           ImGui::SetItemDefaultFocus();
@@ -851,25 +876,25 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     }
 
     // Lead in/out settings
-    if (operation_tool != -1) {
+    if (!operation_tool.empty()) {
       ImGui::InputDouble("Lead-in", &operation.lead_in_length);
       ImGui::InputDouble("Lead-out", &operation.lead_out_length);
     }
 
     if (ImGui::Button("Create")) {
-      if (operation_tool != -1 && layer_selection != -1) {
+      if (!operation_tool.empty() && layer_selection != -1) {
         if (operation.lead_in_length < 0)
           operation.lead_in_length = 0;
         if (operation.lead_out_length < 0)
           operation.lead_out_length = 0;
         operation.enabled = true;
         operation.layer = layers[layer_selection];
-        operation.tool_number = operation_tool;
+        operation.tool_name = operation_tool;
         operation.type = OpType::Cut;
         m_toolpath_operations.push_back(operation);
         operation.lead_in_length = DEFAULT_LEAD_IN;
         operation.lead_out_length = DEFAULT_LEAD_OUT;
-        operation_tool = -1;
+        operation_tool.clear();
         layer_selection = -1;
         show_create_operation = false;
       }
@@ -913,16 +938,15 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   // Calculate fixed button area height (buttons never move)
   int   failed = m_operation.failed_count.load();
   bool  operation_in_progress = m_operation.in_progress.load();
-  float button_area_height =
-    ImGui::GetFrameHeightWithSpacing() * 3 + m_app->getRenderer().scaleUI(4.0f);
+  float button_area_height = ImGui::GetFrameHeightWithSpacing() * 3.f;
 
   // Extra height for progress/warning rendered above the fixed buttons
   float extra_height = 0;
   if (operation_in_progress) {
-    extra_height += ImGui::GetFrameHeightWithSpacing() * 3.0f * m_app->getRenderer().getUIScale();
+    extra_height += ImGui::GetFrameHeightWithSpacing() * 3.0f;
   }
   if (failed > 0) {
-    extra_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f * m_app->getRenderer().getUIScale();
+    extra_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f;
   }
 
   float buttons_y = ImGui::GetWindowHeight() - button_area_height -
@@ -1380,8 +1404,9 @@ std::vector<std::string> NcCamView::generateGCode()
       std::vector<std::vector<Point2d>> tool_paths =
         part->getOrderedToolpaths();
 
-      if (m_tool_library.size() > m_toolpath_operations[i].tool_number) {
-        const auto& tool = m_tool_library[m_toolpath_operations[i].tool_number];
+      auto tool_it = m_tool_library.find(m_toolpath_operations[i].tool_name);
+      if (tool_it != m_tool_library.end()) {
+        const auto& tool = tool_it->second;
 
         if (tool.thc > 0) {
           lines.push_back("$T=" + std::to_string(tool.thc));
@@ -1400,6 +1425,10 @@ std::vector<std::string> NcCamView::generateGCode()
           }
           lines.push_back("torch_off");
         }
+      }
+      else {
+        LOG_F(WARNING,
+              "Tried generating GCode with tool that no longer exists");
       }
     });
   }
@@ -1785,10 +1814,10 @@ void NcCamView::preInit()
       INFO,
       "Found %s!",
       std::string(renderer.getConfigDirectory() + "tool_library.json").c_str());
-    for (size_t x = 0; x < tool_library.size(); x++) {
+    for (auto& tool_json : tool_library) {
       ToolData tool;
-      NcCamView::from_json(tool_library[x], tool);
-      m_tool_library.push_back(tool);
+      NcCamView::from_json(tool_json, tool);
+      m_tool_library[tool.tool_name] = tool;
     }
   }
   else {
@@ -1847,9 +1876,10 @@ void NcCamView::tick()
           Part::Layer& layer = layer_it->second;
 
           // Set layer-level properties
-          if (m_tool_library.size() > m_toolpath_operations[x].tool_number) {
-            layer.toolpath_offset =
-              m_tool_library[m_toolpath_operations[x].tool_number].kerf_width;
+          auto tool_it =
+            m_tool_library.find(m_toolpath_operations[x].tool_name);
+          if (tool_it != m_tool_library.end()) {
+            layer.toolpath_offset = tool_it->second.kerf_width;
           }
           layer.toolpath_visible = m_toolpath_operations[x].enabled;
 

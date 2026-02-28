@@ -3,7 +3,7 @@
   "description": "Popular dark theme with purple tones and vibrant accents",
   "app_colors": {
     "machine_plane_color": [0.22, 0.22, 0.28],
-    "cuttable_plane_color": [0.741, 0.576, 0.976]
+    "cuttable_plane_color": [0.15, 0.10, 0.25]
   },
   "imgui_colors": {
     "Text": [0.973, 0.973, 0.949, 1.00],

@@ -104,6 +104,9 @@ public:
   void  adjustThcOffset(float delta);
   void  resetThcOffset();
 
+  // Homing safety check
+  bool isHomingSafe() const;
+
   // Parameter management
   void saveParameters();
   void writeParametersToController();
@@ -130,6 +133,7 @@ private:
   bool m_abort_pending{ false };
   bool m_handling_crash{ false };
   bool m_needs_homed{ true };
+  bool m_homing_in_progress{ false };
 
   // THC baby-stepping state
   float m_thc_base_value{ 0.0f };

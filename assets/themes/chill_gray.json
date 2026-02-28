@@ -3,7 +3,7 @@
   "description": "Chill gray theme with cool tones",
   "app_colors": {
     "machine_plane_color": [0.27, 0.27, 0.27],
-    "cuttable_plane_color": [0.35, 0.45, 0.65]
+    "cuttable_plane_color": [0.20, 0.25, 0.40]
   },
   "imgui_colors": {
     "Text": [0.671, 0.694, 0.749, 1.00],

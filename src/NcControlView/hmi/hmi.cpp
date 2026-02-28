@@ -43,6 +43,8 @@ static HmiButtonId parseButtonId(const std::string& id)
     return HmiButtonId::Clean;
   if (id == "Fit")
     return HmiButtonId::Fit;
+  if (id == "Home")
+    return HmiButtonId::Home;
 
   LOG_F(WARNING, "Unknown HMI button ID: %s", id.c_str());
   return HmiButtonId::Unknown;
@@ -247,6 +249,46 @@ void NcHmi::renderThcWidget()
   ImGui::PopStyleColor(); // WindowBg
 }
 
+// Helper function to render buttons with safety checks
+void NcHmi::renderButtonWithSafety(const char* label,
+                                   HmiButtonId id,
+                                   float       width,
+                                   float       height)
+{
+  ButtonCategory category = getButtonCategory(id);
+  bool           should_disable = false;
+
+  // Disable motion buttons when machine is in motion
+  if (category == ButtonCategory::MotionButton && !isMotionAllowed()) {
+    should_disable = true;
+  }
+
+  // Special handling for Home button (additional safeguards)
+  if (id == HmiButtonId::Home && !isHomingAllowed()) {
+    should_disable = true;
+  }
+
+  if (should_disable) {
+    ImGui::BeginDisabled();
+  }
+
+  if (ImGui::Button(label, ImVec2(width, height))) {
+    handleButton(label);
+  }
+
+  if (should_disable) {
+    if (ImGui::IsItemHovered()) {
+      if (id == HmiButtonId::Home) {
+        ImGui::SetTooltip("Homing not available while machine is busy!");
+      }
+      else {
+        ImGui::SetTooltip("Button disabled while machine is in motion");
+      }
+    }
+    ImGui::EndDisabled();
+  }
+}
+
 // Main ImGui rendering function for HMI - renders the button panel
 void NcHmi::renderHmi()
 {
@@ -282,62 +324,60 @@ void NcHmi::renderHmi()
 
   if (ImGui::Begin("HMI Buttons", nullptr, win_flags)) {
     float button_width = (panel_width - 3.f * scaled_spacing_x) / 2.0f;
-    float total_spacing = 7.0f * scaled_spacing_y;
+    float total_spacing =
+      8.0f * scaled_spacing_y; // Added extra row for new layout
     float button_height = (panel_height - total_spacing) / 6.0f;
 
     float total_group_width = button_width * 2.0f + scaled_spacing_x;
     float cursor_x = (panel_width - total_group_width) / 2.0f;
 
+    // Row 1: Zero buttons
     ImGui::SetCursorPosX(cursor_x);
-    if (ImGui::Button("Zero X", ImVec2(button_width, button_height))) {
-      handleButton("Zero X");
-    }
+    renderButtonWithSafety(
+      "Zero X", HmiButtonId::ZeroX, button_width, button_height);
     ImGui::SameLine();
-    if (ImGui::Button("Zero Y", ImVec2(button_width, button_height))) {
-      handleButton("Zero Y");
-    }
+    renderButtonWithSafety(
+      "Zero Y", HmiButtonId::ZeroY, button_width, button_height);
 
+    // Row 2: Touch/Retract buttons
     ImGui::SetCursorPosX(cursor_x);
-    if (ImGui::Button("Touch", ImVec2(button_width, button_height))) {
-      handleButton("Touch");
-    }
+    renderButtonWithSafety(
+      "Touch", HmiButtonId::Touch, button_width, button_height);
     ImGui::SameLine();
-    if (ImGui::Button("Retract", ImVec2(button_width, button_height))) {
-      handleButton("Retract");
-    }
+    renderButtonWithSafety(
+      "Retract", HmiButtonId::Retract, button_width, button_height);
 
+    // Row 3: Fit/Clean buttons
     ImGui::SetCursorPosX(cursor_x);
-    if (ImGui::Button("Fit", ImVec2(button_width, button_height))) {
-      handleButton("Fit");
-    }
+    renderButtonWithSafety(
+      "Fit", HmiButtonId::Fit, button_width, button_height);
     ImGui::SameLine();
-    if (ImGui::Button("Clean", ImVec2(button_width, button_height))) {
-      handleButton("Clean");
-    }
+    renderButtonWithSafety(
+      "Clean", HmiButtonId::Clean, button_width, button_height);
 
+    // Row 4: Wpos/Park buttons
     ImGui::SetCursorPosX(cursor_x);
-    if (ImGui::Button("Wpos", ImVec2(button_width, button_height))) {
-      handleButton("Wpos");
-    }
+    renderButtonWithSafety(
+      "Wpos", HmiButtonId::Wpos, button_width, button_height);
     ImGui::SameLine();
-    if (ImGui::Button("Park", ImVec2(button_width, button_height))) {
-      handleButton("Park");
-    }
+    renderButtonWithSafety(
+      "Park", HmiButtonId::Park, button_width, button_height);
 
+    // Row 5: Home/Test Run buttons
     ImGui::SetCursorPosX(cursor_x);
-    if (ImGui::Button("Test Run", ImVec2(button_width, button_height))) {
-      handleButton("Test Run");
-    }
+    renderButtonWithSafety(
+      "Home", HmiButtonId::Home, button_width, button_height);
     ImGui::SameLine();
-    if (ImGui::Button("Run", ImVec2(button_width, button_height))) {
-      handleButton("Run");
-    }
+    renderButtonWithSafety(
+      "Test Run", HmiButtonId::TestRun, button_width, button_height);
 
-    // ImGui::Dummy(ImVec2(button_width, button_height));
-    ImGui::SetCursorPosX((panel_width - button_width) / 2.f);
-    if (ImGui::Button("Abort", ImVec2(button_width, button_height))) {
-      handleButton("Abort");
-    }
+    // Row 6: Run/Abort buttons
+    ImGui::SetCursorPosX(cursor_x);
+    renderButtonWithSafety(
+      "Run", HmiButtonId::Run, button_width, button_height);
+    ImGui::SameLine();
+    renderButtonWithSafety(
+      "Abort", HmiButtonId::Abort, button_width, button_height);
   }
   ImGui::End();
   ImGui::PopStyleColor(); // WindowBg
@@ -427,6 +467,18 @@ void NcHmi::handleButton(const std::string& id)
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
           break;
+
+        case HmiButtonId::Home: {
+          LOG_F(INFO, "Clicked Home");
+          if (isHomingAllowed()) {
+            control_view.m_motion_controller->home();
+          }
+          else {
+            m_app->getDialogs().setInfoValue(
+              "Homing not available while machine is busy!");
+          }
+          break;
+        }
 
         case HmiButtonId::Park:
           LOG_F(INFO, "Clicked Park");
@@ -939,6 +991,38 @@ void NcHmi::tabKeyUpCallback(const KeyEvent& e)
     control_view.m_way_point_position.x = std::numeric_limits<int>::min();
     control_view.m_way_point_position.y = std::numeric_limits<int>::min();
   }
+}
+
+bool NcHmi::isMotionAllowed() const
+{
+  if (!m_app)
+    return false;
+  const DROData& dro_data =
+    m_app->getControlView().m_motion_controller->getDRO();
+  return !dro_data.in_motion;
+}
+
+ButtonCategory NcHmi::getButtonCategory(HmiButtonId id) const
+{
+  switch (id) {
+    case HmiButtonId::Abort:
+      return ButtonCategory::AbortButton;
+    case HmiButtonId::Clean:
+    case HmiButtonId::Fit:
+      return ButtonCategory::SafeButton;
+    default:
+      return ButtonCategory::MotionButton; // All others push GCode
+  }
+}
+
+bool NcHmi::isHomingAllowed()
+{
+  if (!m_app)
+    return false;
+  auto&          control_view = m_app->getControlView();
+  const DROData& dro_data = control_view.m_motion_controller->getDRO();
+  return !dro_data.in_motion &&
+         control_view.m_motion_controller->isHomingSafe();
 }
 
 void NcHmi::goToWaypoint(Primitive* args)

@@ -20,12 +20,18 @@ NanoCut firmware.
 
 ## Quick Start
 
-1. Build the application using CMake
-2. Connect to your CNC machine via serial port
-3. Load a DXF file or create a new design
-4. Generate G-code and start cutting!
+New to NanoCut Control? Follow the [Getting Started](getting-started.md) guide for a
+step-by-step walkthrough of your first cutting job.
+
+## Documentation
+
+- [Installation](installation.md) -- Building from source
+- [Getting Started](getting-started.md) -- First launch and basic workflow
+- [CAM View](cam-view.md) -- Importing DXFs, creating toolpaths, nesting parts
+- [Control View](control-view.md) -- Running G-code, jogging, machine control
+- [Machine Parameters](machine-parameters.md) -- Configuring grbl and plasma settings
+- [Keyboard Shortcuts](keyboard-shortcuts.md) -- All keyboard and mouse controls
 
 ## Getting Help
 
-- Check out the [Installation Guide](installation.md)
 - Report issues on [GitHub](https://github.com/nwjnilsson/nanocut-control)

@@ -203,8 +203,11 @@ void MotionController::sendCommand(const std::string& cmd)
     m_gcode_queue.clear();
   }
   else if (cmd == "home") {
-    m_okay_callback = [this]() { homingDoneCallback(); };
-    send("$H");
+    if (!m_homing_in_progress) {
+      m_homing_in_progress = true;
+      m_okay_callback = [this]() { homingDoneCallback(); };
+      send("$H");
+    }
   }
 }
 
@@ -304,7 +307,7 @@ void MotionController::lineHandler(std::string line)
           m_dro_data.arc_ok = j.at("ARC_OK").get<bool>();
           m_dro_data.torch_on = m_torch_on;
 
-          //LOG_F(INFO, "ARC VOLTAGE = %f", m_dro_data.voltage);
+          // LOG_F(INFO, "ARC VOLTAGE = %f", m_dro_data.voltage);
 
           if (m_dro_data.arc_ok == false) {
             if (m_arc_okay_callback) {
@@ -340,9 +343,10 @@ void MotionController::lineHandler(std::string line)
           send("$X");
         }
         else {
-          LOG_F(WARNING,
-                "Controller lockout for unknown reason. Machine will need to be "
-                "re-homed...");
+          LOG_F(
+            WARNING,
+            "Controller lockout for unknown reason. Machine will need to be "
+            "re-homed...");
           m_needs_homed = true;
         }
         break;
@@ -351,8 +355,9 @@ void MotionController::lineHandler(std::string line)
         auto current_time = std::chrono::steady_clock::now();
         auto last_error_duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(
-            current_time - std::chrono::steady_clock::time_point{
-                             std::chrono::milliseconds{ m_last_checksum_error } });
+            current_time -
+            std::chrono::steady_clock::time_point{
+              std::chrono::milliseconds{ m_last_checksum_error } });
 
         if (m_last_checksum_error > 0 &&
             last_error_duration < std::chrono::milliseconds{ 100 }) {
@@ -480,8 +485,10 @@ void MotionController::runPop()
         "[fire_torch] Sending probing cycle! - Waiting for probe to finish!");
       std::vector<std::string> args = split(line, ' ');
       if (args.size() == 4) {
-        m_torch_params.pierce_height = static_cast<double>(atof(args[1].c_str()));
-        m_torch_params.pierce_delay = static_cast<double>(atof(args[2].c_str()));
+        m_torch_params.pierce_height =
+          static_cast<double>(atof(args[1].c_str()));
+        m_torch_params.pierce_delay =
+          static_cast<double>(atof(args[2].c_str()));
         m_torch_params.cut_height = static_cast<double>(atof(args[3].c_str()));
       }
       else {
@@ -516,8 +523,10 @@ void MotionController::runPop()
         "[touch_torch] Sending probing cycle! - Waiting for probe to finish!");
       std::vector<std::string> args = split(line, ' ');
       if (args.size() == 4) {
-        m_torch_params.pierce_height = static_cast<double>(atof(args[1].c_str()));
-        m_torch_params.pierce_delay = static_cast<double>(atof(args[2].c_str()));
+        m_torch_params.pierce_height =
+          static_cast<double>(atof(args[1].c_str()));
+        m_torch_params.pierce_delay =
+          static_cast<double>(atof(args[2].c_str()));
         m_torch_params.cut_height = static_cast<double>(atof(args[3].c_str()));
       }
       else {
@@ -564,10 +573,13 @@ void MotionController::runPop()
       if (value > 0.0f) {
         m_thc_base_value = value;
         m_thc_offset = 0.0f;
-        float effective = m_thc_base_value + m_thc_offset;
+        float       effective = m_thc_base_value + m_thc_offset;
         std::string cmd = "$T=" + to_string_strip_zeros(effective);
-        LOG_F(INFO, "(runpop) stream THC: base=%.1f offset=%.1f sending %s",
-              m_thc_base_value, m_thc_offset, cmd.c_str());
+        LOG_F(INFO,
+              "(runpop) stream THC: base=%.1f offset=%.1f sending %s",
+              m_thc_base_value,
+              m_thc_offset,
+              cmd.c_str());
         sendWithCRC(cmd);
       }
       else {
@@ -609,12 +621,10 @@ bool MotionController::arcOkayExpireTimer()
     m_arc_okay_callback = nullptr;
     m_torch_on = false;
 
-    m_gcode_queue.push_front("fire_torch " +
-                             to_string_strip_zeros(m_torch_params.pierce_height) +
-                             " " +
-                             to_string_strip_zeros(m_torch_params.pierce_delay) +
-                             " " +
-                             to_string_strip_zeros(m_torch_params.cut_height));
+    m_gcode_queue.push_front(
+      "fire_torch " + to_string_strip_zeros(m_torch_params.pierce_height) +
+      " " + to_string_strip_zeros(m_torch_params.pierce_delay) + " " +
+      to_string_strip_zeros(m_torch_params.cut_height));
     m_gcode_queue.push_front("G0 Z0");
     m_gcode_queue.push_front("M5");
 
@@ -665,10 +675,17 @@ void MotionController::programFinished()
   m_gcode_queue.clear();
 }
 
+bool MotionController::isHomingSafe() const
+{
+  return m_controller_ready && !m_homing_in_progress &&
+         m_okay_callback == nullptr && m_gcode_queue.empty();
+}
+
 void MotionController::homingDoneCallback()
 {
   m_okay_callback = nullptr;
   m_needs_homed = false;
+  m_homing_in_progress = false; // Release homing lock
   LOG_F(INFO, "Homing finished! Saving Z work offset...");
   m_control_view->m_machine_parameters.work_offset[2] = getDRO().mcs.z;
   m_gcode_queue.push_back("G10 L20 P0 Z0");
@@ -684,14 +701,14 @@ void MotionController::lowerToCutHeightAndRunProgram()
   m_arc_okay_callback = nullptr;
   m_arc_retry_count = 0;
   if (getThcEffective() > 0.0f) {
-    m_gcode_queue.push_front(
-      "$T!" + to_string_strip_zeros(getThcEffective()));
+    m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
   }
   m_gcode_queue.push_front("G90");
-  m_gcode_queue.push_front(
-    "G91G0 Z" + to_string_strip_zeros(
-                  m_torch_params.pierce_height - m_torch_params.cut_height));
-  m_gcode_queue.push_front("G4P" + to_string_strip_zeros(m_torch_params.pierce_delay));
+  m_gcode_queue.push_front("G91G0 Z" +
+                           to_string_strip_zeros(m_torch_params.pierce_height -
+                                                 m_torch_params.cut_height));
+  m_gcode_queue.push_front("G4P" +
+                           to_string_strip_zeros(m_torch_params.pierce_delay));
   LOG_F(INFO, "Running callback => lower_to_cut_height_and_run_program()");
   runPop();
 }
@@ -704,7 +721,8 @@ void MotionController::raiseToPierceHeightAndFireTorch()
   m_gcode_queue.push_front("WAIT_FOR_ARC_OKAY");
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front("M3S1000");
-  m_gcode_queue.push_front("G0Z-" + to_string_strip_zeros(m_torch_params.pierce_height));
+  m_gcode_queue.push_front("G0Z-" +
+                           to_string_strip_zeros(m_torch_params.pierce_height));
   m_gcode_queue.push_front(
     "G0Z-" + to_string_strip_zeros(
                m_control_view->m_machine_parameters.floating_head_backlash));
@@ -777,15 +795,19 @@ MotionController::calculateCRC32(uint32_t crc, const char* buf, size_t len)
 
 void MotionController::adjustThcOffset(float delta)
 {
-  float new_effective = m_thc_base_value + m_thc_offset + delta;
-  new_effective = std::clamp(new_effective, 0.0f, 250.0f);
-  m_thc_offset = new_effective - m_thc_base_value;
-  LOG_F(INFO, "THC offset adjusted: base=%.1f offset=%.1f effective=%.1f",
-        m_thc_base_value, m_thc_offset, getThcEffective());
+  // Clamping to encourage proper targets in tool library instead
+  m_thc_offset = std::clamp(m_thc_offset + delta, MIN_THC_OFFSET, MAX_THC_OFFSET);
+  float new_effective = m_thc_base_value + m_thc_offset;
+  new_effective = std::clamp(new_effective, 0.0f, MAX_ARC_VOLTAGE);
+  // m_thc_offset = new_effective - m_thc_base_value;
+  LOG_F(INFO,
+        "THC offset adjusted: base=%.1f offset=%.1f effective=%.1f",
+        m_thc_base_value,
+        m_thc_offset,
+        getThcEffective());
 
   if (m_torch_on) {
-    m_gcode_queue.push_front(
-      "$T!" + to_string_strip_zeros(getThcEffective()));
+    m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
     if (!m_okay_callback) {
       m_okay_callback = [this]() { runPop(); };
     }
@@ -795,8 +817,10 @@ void MotionController::adjustThcOffset(float delta)
 void MotionController::resetThcOffset()
 {
   m_thc_offset = 0.0f;
-  LOG_F(INFO, "THC offset reset: base=%.1f effective=%.1f",
-        m_thc_base_value, getThcEffective());
+  LOG_F(INFO,
+        "THC offset reset: base=%.1f effective=%.1f",
+        m_thc_base_value,
+        getThcEffective());
 }
 
 void MotionController::logRuntime()
@@ -1120,8 +1144,8 @@ void MotionController::writeParametersToController()
                 m_control_view->m_machine_parameters.invert_probe_pin)));
     m_gcode_queue.push_back("$10=" + std::to_string(3));
     m_gcode_queue.push_back(
-      "$11=" + std::to_string(
-                 m_control_view->m_machine_parameters.junction_deviation));
+      "$11=" +
+      std::to_string(m_control_view->m_machine_parameters.junction_deviation));
     m_gcode_queue.push_back("$12=" + std::to_string(0.002));
     m_gcode_queue.push_back("$13=" + std::to_string(0));
     m_gcode_queue.push_back(
@@ -1142,8 +1166,8 @@ void MotionController::writeParametersToController()
       "$26=" +
       std::to_string(m_control_view->m_machine_parameters.homing_debounce));
     m_gcode_queue.push_back(
-      "$33=" + std::to_string(
-                 m_control_view->m_machine_parameters.arc_voltage_divider));
+      "$33=" +
+      std::to_string(m_control_view->m_machine_parameters.arc_voltage_divider));
     m_gcode_queue.push_back(
       "$27=" +
       std::to_string(m_control_view->m_machine_parameters.homing_pull_off));

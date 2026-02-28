@@ -3,7 +3,7 @@
   "description": "Ethan Schoonover's precision-designed color scheme with teal-tinted backgrounds",
   "app_colors": {
     "machine_plane_color": [0.02, 0.17, 0.42],
-    "cuttable_plane_color": [0.149, 0.545, 0.824]
+    "cuttable_plane_color": [0.08, 0.25, 0.45]
   },
   "imgui_colors": {
     "Text": [0.514, 0.580, 0.588, 1.00],

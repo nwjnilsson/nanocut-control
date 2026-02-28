@@ -3,7 +3,7 @@
   "description": "Classic developer theme from Atom editor with balanced warm and cool tones",
   "app_colors": {
     "machine_plane_color": [0.20, 0.22, 0.25],
-    "cuttable_plane_color": [0.380, 0.686, 0.937]
+    "cuttable_plane_color": [0.15, 0.25, 0.40]
   },
   "imgui_colors": {
     "Text": [0.671, 0.698, 0.749, 1.00],

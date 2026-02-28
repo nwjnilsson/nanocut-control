@@ -3,7 +3,7 @@
   "description": "Warm retro color scheme with earthy tones and sharp edges",
   "app_colors": {
     "machine_plane_color": [0.20, 0.18, 0.15],
-    "cuttable_plane_color": [0.514, 0.647, 0.596]
+    "cuttable_plane_color": [0.30, 0.40, 0.35]
   },
   "imgui_colors": {
     "Text": [0.922, 0.859, 0.698, 1.00],

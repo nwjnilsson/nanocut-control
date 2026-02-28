@@ -3,7 +3,7 @@
   "description": "Modern dark theme with deep blue-purple tones inspired by Tokyo city lights",
   "app_colors": {
     "machine_plane_color": [0.16, 0.18, 0.26],
-    "cuttable_plane_color": [0.478, 0.635, 0.969]
+    "cuttable_plane_color": [0.18, 0.25, 0.50]
   },
   "imgui_colors": {
     "Text": [0.753, 0.792, 0.961, 1.00],

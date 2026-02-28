@@ -3,7 +3,7 @@
   "description": "Retro clean theme with rounded corners and clean colors",
   "app_colors": {
     "machine_plane_color": [0.09, 0.09, 0.4],
-    "cuttable_plane_color": [0.3, 0.60, 0.90]
+    "cuttable_plane_color": [0.15, 0.35, 0.60]
   },
   "imgui_colors": {
     "Text": [0.90, 0.90, 0.90, 0.90],

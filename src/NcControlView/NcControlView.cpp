@@ -63,8 +63,8 @@ void NcControlView::preInit()
     m_machine_parameters.max_accel[1] = SCALE(800.0f);
     m_machine_parameters.max_accel[2] = SCALE(200.0f);
     m_machine_parameters.junction_deviation = SCALE(0.005f);
-    m_machine_parameters.arc_stabilization_time = 2000;
-    m_machine_parameters.arc_voltage_divider = 50.f;
+    m_machine_parameters.arc_stabilization_time = DEFAULT_ARC_STABILIZATION_TIME;
+    m_machine_parameters.arc_voltage_divider = DEFAULT_ARC_VOLTAGE_DIVIDER;
     m_machine_parameters.floating_head_backlash = SCALE(10.f);
     m_machine_parameters.z_probe_feedrate = SCALE(100.f);
     m_machine_parameters.axis_invert[0] = true;

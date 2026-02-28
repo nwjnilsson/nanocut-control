@@ -33,6 +33,15 @@ enum class HmiButtonId {
   Abort,
   Clean,
   Fit,
+  Home,
+  Unknown
+};
+
+// Button categories for safety management
+enum class ButtonCategory {
+  MotionButton,    // Pushes GCode, disabled during motion
+  SafeButton,      // Doesn't affect motion (Clean, Fit)
+  AbortButton,     // Always enabled
   Unknown
 };
 
@@ -82,6 +91,7 @@ public:
   void renderHmi();
   void renderDro();
   void renderThcWidget();
+  void renderButtonWithSafety(const char* label, HmiButtonId id, float width, float height);
 
   // Event handlers
   void handleKeyEvent(const KeyEvent& e, const InputState& input);
@@ -123,6 +133,9 @@ private:
   void goToWaypoint(Primitive* args);
   void jumpin(Primitive* p);
   void reverse(Primitive* p);
+  bool isHomingAllowed();
+  bool isMotionAllowed() const;
+  ButtonCategory getButtonCategory(HmiButtonId id) const;
 
   // Key event callbacks
   void escapeKeyCallback(const KeyEvent& e);

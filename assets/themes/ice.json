@@ -2,8 +2,8 @@
   "name": "Ice",
   "description": "Light theme with bright background and dark text",
   "app_colors": {
-    "machine_plane_color": [0.39, 0.39, 0.39],
-    "cuttable_plane_color": [0.15, 0.45, 0.85]
+    "machine_plane_color": [0.25, 0.25, 0.25],
+    "cuttable_plane_color": [0.10, 0.30, 0.60]
   },
   "imgui_colors": {
     "Text": [0.00, 0.00, 0.00, 1.00],

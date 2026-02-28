@@ -4,6 +4,7 @@
 // Standard library includes
 #include <atomic>
 #include <cstdio>
+#include <map>
 #include <memory>
 #include <thread>
 
@@ -92,7 +93,7 @@ private:
     bool        enabled;
     bool        last_enabled = false;
     OpType      type;
-    int         tool_number;
+    std::string tool_name;
     double      lead_in_length = DEFAULT_LEAD_IN;
     double      lead_out_length = DEFAULT_LEAD_OUT;
     std::string layer;
@@ -252,7 +253,7 @@ public:
   ThemeColor m_open_contour_color;
 
   JobOptions                 m_job_options;
-  std::vector<ToolData>      m_tool_library;
+  std::map<std::string, ToolData> m_tool_library;
   std::vector<ToolOperation> m_toolpath_operations;
   Box*                       m_material_plane;
 

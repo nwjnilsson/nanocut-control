@@ -3,7 +3,7 @@
   "description": "Catppuccin Mocha theme with pastel colors and rounded corners",
   "app_colors": {
     "machine_plane_color": [0.20, 0.20, 0.28],
-    "cuttable_plane_color": [0.796, 0.698, 0.972]
+    "cuttable_plane_color": [0.15, 0.12, 0.25]
   },
   "imgui_colors": {
     "Text": [0.803, 0.815, 0.878, 1.00],
