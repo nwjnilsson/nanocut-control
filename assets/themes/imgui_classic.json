@@ -1,6 +1,6 @@
 {
-  "name": "Dark",
-  "description": "Dark theme with dark background and light text",
+  "name": "ImGui Classic",
+  "description": "Classic dark ImGui colors",
   "app_colors": {
     "machine_plane_color": [0.25, 0.25, 0.25],
     "cuttable_plane_color": [0.15, 0.25, 0.45]
