@@ -10,6 +10,7 @@
 #include "ThemeManager/ThemeManager.h"
 #include <cmath>
 #include <fstream>
+#include <imgui.h>
 
 // Helper function to parse button ID string into enum
 static HmiButtonId parseButtonId(const std::string& id)
@@ -42,11 +43,304 @@ static HmiButtonId parseButtonId(const std::string& id)
     return HmiButtonId::Clean;
   if (id == "Fit")
     return HmiButtonId::Fit;
-  if (id == "THC")
-    return HmiButtonId::THC;
 
   LOG_F(WARNING, "Unknown HMI button ID: %s", id.c_str());
   return HmiButtonId::Unknown;
+}
+
+// Helper: convert Color4f (0-255) to ImVec4 (0-1)
+static ImVec4 toImGuiColor(const Color4f& c)
+{
+  return ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
+}
+
+// Render the DRO (Digital Read Out) panel
+void NcHmi::renderDro()
+{
+  if (!m_app)
+    return;
+
+  ImVec2 window_size = ImGui::GetIO().DisplaySize;
+  float  panel_x =
+    window_size.x - m_panel_width - m_app->getRenderer().scaleUI(1.f);
+
+  float menu_bar_height = ImGui::GetFrameHeight();
+  ImGui::SetNextWindowPos(ImVec2(panel_x, menu_bar_height));
+  ImGui::SetNextWindowSize(ImVec2(m_panel_width, m_dro_backplane_height));
+
+  // Torch-on changes the DRO background color
+  if (m_dro.torch_on) {
+    const Color4f& base = m_app->getColor(ThemeColor::WindowBg);
+    Color4f        torch_color;
+    torch_color.r = std::min(255.0f, base.r * 1.2f);
+    torch_color.g = std::max(0.0f, base.g * 0.3f);
+    torch_color.b = std::max(0.0f, base.b * 0.5f);
+    torch_color.a = base.a;
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, toImGuiColor(torch_color));
+  }
+  else {
+    ImGui::PushStyleColor(ImGuiCol_WindowBg,
+                          toImGuiColor(m_app->getColor(ThemeColor::WindowBg)));
+  }
+
+  constexpr auto win_flags =
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+    ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+  if (ImGui::Begin("DRO Panel", nullptr, win_flags)) {
+    ImVec4 text_color = toImGuiColor(m_app->getColor(ThemeColor::Text));
+    ImVec4 work_color = toImGuiColor(m_app->getColor(ThemeColor::PlotLines));
+    ImVec4 abs_color =
+      toImGuiColor(m_app->getColor(ThemeColor::PlotLinesHovered));
+    ImVec4 arc_color =
+      m_dro.arc_ok ? toImGuiColor(m_app->getColor(ThemeColor::PlotLinesHovered))
+                   : toImGuiColor(m_app->getColor(ThemeColor::PlotLines));
+    ImVec4 sep_color = toImGuiColor(m_app->getColor(ThemeColor::Separator));
+
+    // Status row: FEED | ARC | SET | RUN
+    ImGui::SetWindowFontScale(0.65f);
+    // float status_height = ImGui::GetTextLineHeightWithSpacing();
+    // ImGui::SetCursorPosY(status_height);
+    float component_width = m_panel_width / 4.f;
+    ImGui::TextColored(abs_color, "%s", m_dro.feed.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(component_width * 1.25f);
+    ImGui::TextColored(arc_color, "%s", m_dro.arc_readout.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(component_width * 2.20f);
+    ImGui::TextColored(abs_color, "%s", m_dro.arc_set.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(component_width * 3.f);
+    ImGui::TextColored(abs_color, "%s", m_dro.run_time.c_str());
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Divide remaining height evenly among 3 axis rows
+    float status_bottom = ImGui::GetCursorPosY();
+    float total_height = ImGui::GetContentRegionAvail().y;
+    float row_height = total_height / 3.0f;
+
+    auto renderAxis = [&](int                  index,
+                          const char*          label,
+                          const DroAxisValues& axis) {
+      float row_y = status_bottom + index * row_height;
+      ImGui::SetCursorPosY(row_y);
+
+      ImGui::PushStyleColor(ImGuiCol_Separator, sep_color);
+      ImGui::Separator();
+      ImGui::PopStyleColor();
+
+      // Label (large)
+      ImGui::SetWindowFontScale(2.5f);
+      ImGui::TextColored(text_color, "%s", label);
+      ImGui::SameLine();
+
+      // Work coordinate readout (large)
+      ImGui::SetWindowFontScale(2.0f);
+      ImGui::TextColored(work_color, "%s", axis.work_readout.c_str());
+      ImGui::SameLine();
+
+      // Absolute coordinate readout (small, right-aligned)
+      ImGui::SetWindowFontScale(0.75f);
+      float  large_height = ImGui::GetFontSize() * 2.0f / 0.75f;
+      float  small_height = ImGui::GetFontSize();
+      ImVec2 abs_text_size = ImGui::CalcTextSize(axis.absolute_readout.c_str());
+      float  right_edge =
+        ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX();
+      ImGui::SetCursorPosX(right_edge - abs_text_size.x);
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() +
+                           (large_height - small_height));
+      ImGui::TextColored(abs_color, "%s", axis.absolute_readout.c_str());
+      ImGui::SetWindowFontScale(1.0f);
+    };
+
+    renderAxis(0, "Z", m_dro.z);
+    renderAxis(1, "Y", m_dro.y);
+    renderAxis(2, "X", m_dro.x);
+  }
+
+  ImGui::End();
+  ImGui::PopStyleColor(); // WindowBg
+}
+
+// Render THC baby-step widget
+void NcHmi::renderThcWidget()
+{
+  if (!m_app)
+    return;
+
+  static constexpr ThcButtonDef thc_buttons[] = {
+    { -4.0f, "-4" }, { -1.5f, "-1.5" }, { -0.5f, "-.5" },
+    { 0.5f, "+.5" }, { 1.5f, "+1.5" },  { 4.0f, "+4" },
+  };
+
+  ImVec2 window_size = ImGui::GetIO().DisplaySize;
+  float  panel_x =
+    window_size.x - m_panel_width - m_app->getRenderer().scaleUI(1.f);
+  float menu_bar_height = ImGui::GetFrameHeight();
+  float thc_y = menu_bar_height + m_dro_backplane_height;
+  float thc_height = 2.f * ImGui::GetTextLineHeightWithSpacing();
+
+  ImGui::SetNextWindowPos(ImVec2(panel_x, thc_y));
+  ImGui::SetNextWindowSize(ImVec2(m_panel_width, thc_height));
+
+  constexpr auto win_flags =
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+    ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+  ImGui::PushStyleColor(ImGuiCol_WindowBg,
+                        toImGuiColor(m_app->getColor(ThemeColor::PopupBg)));
+
+  if (ImGui::Begin("THC Widget", nullptr, win_flags)) {
+    // Remove horizontal spacing, sharp corners, and add border for tight button
+    // layout
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+
+    float available_width = ImGui::GetContentRegionAvail().x;
+    // 7 cells: 3 buttons + 1 readout + 3 buttons
+    float cell_w = available_width / 7.0f;
+    float btn_height = ImGui::GetContentRegionAvail().y;
+
+    ImGui::SetWindowFontScale(0.80f);
+
+    // First 3 buttons (negative deltas)
+    for (int i = 0; i < 3; i++) {
+      if (i > 0)
+        ImGui::SameLine();
+      if (ImGui::Button(thc_buttons[i].label, ImVec2(cell_w, btn_height))) {
+        m_view->getMotionController().adjustThcOffset(thc_buttons[i].delta);
+      }
+    }
+
+    // Offset readout (center cell)
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                          toImGuiColor(m_app->getColor(ThemeColor::FrameBg)));
+    ImGui::BeginChild("thc_offset", ImVec2(cell_w, btn_height));
+    ImGui::SetWindowFontScale(0.80f);
+    ImVec2 text_size = ImGui::CalcTextSize(m_thc_offset_readout.c_str());
+    ImGui::SetCursorPos(
+      ImVec2((cell_w - text_size.x) / 2.0f, (btn_height - text_size.y) / 2.0f));
+    ImGui::TextColored(
+      toImGuiColor(m_app->getColor(ThemeColor::PlotLinesHovered)),
+      "%s",
+      m_thc_offset_readout.c_str());
+    ImGui::EndChild();
+    ImGui::PopStyleColor(); // ChildBg
+
+    // Last 3 buttons (positive deltas)
+    for (int i = 3; i < 6; i++) {
+      ImGui::SameLine();
+      if (ImGui::Button(thc_buttons[i].label, ImVec2(cell_w, btn_height))) {
+        m_view->getMotionController().adjustThcOffset(thc_buttons[i].delta);
+      }
+    }
+
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::PopStyleVar(4);
+  }
+  ImGui::End();
+  ImGui::PopStyleColor(); // WindowBg
+}
+
+// Main ImGui rendering function for HMI - renders the button panel
+void NcHmi::renderHmi()
+{
+  if (!m_app)
+    return;
+
+  // Render all three panels
+  renderDro();
+  renderThcWidget();
+
+  ImVec2 window_size = ImGui::GetIO().DisplaySize;
+  float  panel_x =
+    window_size.x - m_panel_width - m_app->getRenderer().scaleUI(1.f);
+  float menu_bar_height = ImGui::GetFrameHeight();
+  float panel_y = menu_bar_height + m_dro_backplane_height +
+                  2.f * ImGui::GetTextLineHeightWithSpacing();
+  float panel_width = m_panel_width;
+  float panel_height = window_size.y - panel_y;
+
+  ImGui::SetNextWindowPos(ImVec2(panel_x, panel_y));
+  ImGui::SetNextWindowSize(ImVec2(panel_width, panel_height));
+
+  ImGui::PushStyleColor(ImGuiCol_WindowBg,
+                        toImGuiColor(m_app->getColor(ThemeColor::PopupBg)));
+
+  float scaled_spacing_x = ImGui::GetStyle().ItemSpacing.x;
+  float scaled_spacing_y = ImGui::GetStyle().ItemSpacing.y;
+
+  constexpr auto win_flags =
+    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+    ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+  if (ImGui::Begin("HMI Buttons", nullptr, win_flags)) {
+    float button_width = (panel_width - 3.f * scaled_spacing_x) / 2.0f;
+    float total_spacing = 7.0f * scaled_spacing_y;
+    float button_height = (panel_height - total_spacing) / 6.0f;
+
+    float total_group_width = button_width * 2.0f + scaled_spacing_x;
+    float cursor_x = (panel_width - total_group_width) / 2.0f;
+
+    ImGui::SetCursorPosX(cursor_x);
+    if (ImGui::Button("Zero X", ImVec2(button_width, button_height))) {
+      handleButton("Zero X");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Zero Y", ImVec2(button_width, button_height))) {
+      handleButton("Zero Y");
+    }
+
+    ImGui::SetCursorPosX(cursor_x);
+    if (ImGui::Button("Touch", ImVec2(button_width, button_height))) {
+      handleButton("Touch");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Retract", ImVec2(button_width, button_height))) {
+      handleButton("Retract");
+    }
+
+    ImGui::SetCursorPosX(cursor_x);
+    if (ImGui::Button("Fit", ImVec2(button_width, button_height))) {
+      handleButton("Fit");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Clean", ImVec2(button_width, button_height))) {
+      handleButton("Clean");
+    }
+
+    ImGui::SetCursorPosX(cursor_x);
+    if (ImGui::Button("Wpos", ImVec2(button_width, button_height))) {
+      handleButton("Wpos");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Park", ImVec2(button_width, button_height))) {
+      handleButton("Park");
+    }
+
+    ImGui::SetCursorPosX(cursor_x);
+    if (ImGui::Button("Test Run", ImVec2(button_width, button_height))) {
+      handleButton("Test Run");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Run", ImVec2(button_width, button_height))) {
+      handleButton("Run");
+    }
+
+    // ImGui::Dummy(ImVec2(button_width, button_height));
+    ImGui::SetCursorPosX((panel_width - button_width) / 2.f);
+    if (ImGui::Button("Abort", ImVec2(button_width, button_height))) {
+      handleButton("Abort");
+    }
+  }
+  ImGui::End();
+  ImGui::PopStyleColor(); // WindowBg
 }
 
 // Constructor
@@ -286,7 +580,7 @@ void NcHmi::handleButton(const std::string& id)
             minmax(m_app->getRenderer().getWindowSize().y,
                    control_view.m_machine_parameters.machine_extents[1]);
           auto x_pair =
-            minmax(m_app->getRenderer().getWindowSize().x - m_backplane_width,
+            minmax(m_app->getRenderer().getWindowSize().x - m_panel_width,
                    control_view.m_machine_parameters.machine_extents[0]);
           if (y_pair.second - y_pair.first < x_pair.second - x_pair.first) {
             double machine_y =
@@ -301,7 +595,7 @@ void NcHmi::handleButton(const std::string& id)
               control_view.m_machine_parameters.machine_extents[0];
             double window_x = m_app->getRenderer().getWindowSize().x;
             double new_zoom =
-              (window_x - (m_backplane_width / 2.0)) / (machine_x + window_x);
+              (window_x - (m_panel_width / 2.0)) / (machine_x + window_x);
             m_view->setZoom(new_zoom);
           }
           // Update pan based on machine extents and zoom
@@ -335,7 +629,7 @@ void NcHmi::handleButton(const std::string& id)
           m_view->setPan(new_pan);
           auto y_pair = minmax(m_app->getRenderer().getWindowSize().y, y_diff);
           auto x_pair = minmax(
-            m_app->getRenderer().getWindowSize().x - m_backplane_width, x_diff);
+            m_app->getRenderer().getWindowSize().x - m_panel_width, x_diff);
           if (y_pair.second - y_pair.first < x_pair.second - x_pair.first) {
             LOG_F(INFO, "Fitting to Y");
             double fit_zoom =
@@ -346,7 +640,7 @@ void NcHmi::handleButton(const std::string& id)
           {
             LOG_F(INFO, "Fitting to X");
             double fit_zoom = ((double) m_app->getRenderer().getWindowSize().x -
-                               (m_backplane_width / 2)) /
+                               (m_panel_width / 2)) /
                               (2 * x_diff);
             m_view->setZoom(fit_zoom);
           }
@@ -362,11 +656,6 @@ void NcHmi::handleButton(const std::string& id)
           m_view->setPan(fit_pan);
         }
       } break;
-
-      case HmiButtonId::THC:
-        LOG_F(INFO, "Clicked THC");
-        m_view->dialogs().thc_window->show();
-        break;
 
       default:
         // Unknown button ID - already logged in parseButtonId
@@ -484,82 +773,12 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
   if (!m_app)
     return;
   auto&   control_view = m_app->getControlView();
-  auto*   path = dynamic_cast<Path*>(c);
-  auto*   box = dynamic_cast<Box*>(c);
   Point2d screen_pos = m_app->getInputState().getMousePosition();
-  if (path && hasFlag(c->flags, PrimitiveFlags::GCode) &&
-      !hasFlag(c->flags, PrimitiveFlags::GCodeArrow)) {
-    if (std::holds_alternative<MouseHoverEvent>(e)) {
-      const auto& hover = std::get<MouseHoverEvent>(e);
-      if (hover.event == NcRender::EventType::MouseIn &&
-          m_app->isModifierPressed(GLFW_MOD_CONTROL)) {
-        c->color = &m_app->getColor(ThemeColor::PlotLines);
-      }
-      else if (hover.event == NcRender::EventType::MouseOut) {
-        c->color = &m_app->getColor(ThemeColor::Text);
-      }
-    }
-    else if (std::holds_alternative<MouseButtonEvent>(e)) {
-      const auto& be = std::get<MouseButtonEvent>(e);
-      if (be.button == GLFW_MOUSE_BUTTON_1) {
-        if (be.mods & GLFW_MOD_CONTROL) {
-          if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
-            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
-          }
-          else if (be.action == GLFW_RELEASE) {
-            c->color = &m_app->getColor(ThemeColor::PlotLines);
-            m_app->getDialogs().askYesNo(
-              "Are you sure you want to start the program at this path?",
-              [this, c]() { jumpin(c); },
-              nullptr,
-              screen_pos);
-          }
-        }
-      }
-      else if (be.button == GLFW_MOUSE_BUTTON_2) {
-        if (be.mods & GLFW_MOD_CONTROL) {
-          if (be.action == GLFW_RELEASE) {
-            c->color = &m_app->getColor(ThemeColor::PlotLines);
-            m_app->getDialogs().askYesNo(
-              "Are you sure you want to reverse this paths direction?",
-              [this, c]() { reverse(c); },
-              nullptr,
-              screen_pos);
-          }
-          else if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
-            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
-          }
-        }
-      }
-    }
-  }
-  else if (box && !hasFlag(c->flags, PrimitiveFlags::CuttablePlane) &&
-           !hasFlag(c->flags, PrimitiveFlags::MachinePlane)) {
-    if (std::holds_alternative<MouseHoverEvent>(e)) {
-      const auto& hover = std::get<MouseHoverEvent>(e);
-      if (hover.event == NcRender::EventType::MouseIn) {
-        c->color = &m_app->getColor(ThemeColor::ButtonHovered);
-      }
-      else if (hover.event == NcRender::EventType::MouseOut) {
-        c->color = &m_app->getColor(ThemeColor::Button);
-      }
-    }
-    else if (std::holds_alternative<MouseButtonEvent>(e)) {
-      const auto& be = std::get<MouseButtonEvent>(e);
-      if (be.button == GLFW_MOUSE_BUTTON_1) {
-        if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
-          c->color = &m_app->getColor(ThemeColor::ButtonActive);
-        }
-        else if (be.action == GLFW_RELEASE) {
-          c->color = &m_app->getColor(ThemeColor::ButtonHovered);
-          handleButton(c->id);
-        }
-      }
-    }
-  }
-  else if ((hasFlag(c->flags, PrimitiveFlags::CuttablePlane) ||
-            hasFlag(c->flags, PrimitiveFlags::MachinePlane)) &&
-           std::holds_alternative<MouseButtonEvent>(e)) {
+
+  // Handle machine/cuttable plane clicks for waypoint functionality
+  if ((hasFlag(c->flags, PrimitiveFlags::CuttablePlane) ||
+       hasFlag(c->flags, PrimitiveFlags::MachinePlane)) &&
+      std::holds_alternative<MouseButtonEvent>(e)) {
     const auto& button = std::get<MouseButtonEvent>(e);
     // Get mouse position in matrix coordinates using view transformation
     Point2d     p = m_view->screenToMatrix(screen_pos);
@@ -596,6 +815,12 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
   }
 }
 
+void NcHmi::handleMouseMoveEvent(const MouseMoveEvent& e,
+                                 const InputState&     input)
+{
+  mouseMotionCallback(e);
+}
+
 bool NcHmi::updateTimer()
 {
   if (!m_app)
@@ -604,50 +829,42 @@ bool NcHmi::updateTimer()
   const DROData& dro_data = control_view.m_motion_controller->getDRO();
   try {
     if (dro_data.status != MachineStatus::Unknown) {
-      // DROData contains: status, mcs{x,y,z}, wcs{x,y,z}, feed, voltage,
-      // in_motion, arc_ok, torch_on
       const float wcx = dro_data.wcs.x;
       const float wcy = dro_data.wcs.y;
       const float wcz = dro_data.wcs.z;
-      m_dro.x.work_readout->m_textval = to_fixed_string(fabs(wcx), 4);
-      m_dro.y.work_readout->m_textval = to_fixed_string(fabs(wcy), 4);
-      m_dro.z.work_readout->m_textval = to_fixed_string(fabs(wcz), 4);
+      m_dro.x.work_readout = to_fixed_string(fabs(wcx), 2);
+      m_dro.y.work_readout = to_fixed_string(fabs(wcy), 2);
+      m_dro.z.work_readout = to_fixed_string(fabs(wcz), 2);
       const float mcx = dro_data.mcs.x;
       const float mcy = dro_data.mcs.y;
       const float mcz = dro_data.mcs.z;
-      m_dro.x.absolute_readout->m_textval = to_fixed_string(fabs(mcx), 4);
-      m_dro.y.absolute_readout->m_textval = to_fixed_string(fabs(mcy), 4);
-      m_dro.z.absolute_readout->m_textval = to_fixed_string(fabs(mcz), 4);
-      m_dro.feed->m_textval = "FEED: " + to_fixed_string(dro_data.feed, 1);
-      m_dro.arc_readout->m_textval =
-        "ARC: " + to_fixed_string(dro_data.voltage, 1) + "V";
-      m_dro.arc_set->m_textval =
+      m_dro.x.absolute_readout = to_fixed_string(fabs(mcx), 2);
+      m_dro.y.absolute_readout = to_fixed_string(fabs(mcy), 2);
+      m_dro.z.absolute_readout = to_fixed_string(fabs(mcz), 2);
+      m_dro.feed = "FEED: " + to_fixed_string(dro_data.feed, 1);
+      m_dro.arc_readout = "ARC: " + to_fixed_string(dro_data.voltage, 1) + "V";
+      m_dro.arc_set =
         "SET: " +
-        to_fixed_string(control_view.m_machine_parameters.thc_set_value, 1);
+        to_fixed_string(control_view.m_motion_controller->getThcEffective(), 1);
+      {
+        float ofs = control_view.m_motion_controller->getThcOffset();
+        if (ofs >= 0.0f)
+          m_thc_offset_readout = "+" + to_fixed_string(ofs, 1);
+        else
+          m_thc_offset_readout = "-" + to_fixed_string(ofs, 1);
+      }
       RuntimeData runtime = control_view.m_motion_controller->getRunTime();
       if (runtime.hours != 0 || runtime.minutes != 0 || runtime.seconds != 0)
-        m_dro.run_time->m_textval =
-          "RUN: " + to_string_strip_zeros((int) runtime.hours) + ":" +
-          to_string_strip_zeros((int) runtime.minutes) + ":" +
-          to_string_strip_zeros((int) runtime.seconds);
+        m_dro.run_time = "RUN: " + to_string_strip_zeros((int) runtime.hours) +
+                         ":" + to_string_strip_zeros((int) runtime.minutes) +
+                         ":" + to_string_strip_zeros((int) runtime.seconds);
       control_view.m_torch_pointer->m_center = { fabs(mcx), fabs(mcy) };
 
-      const Color4f& base_color = m_app->getColor(ThemeColor::WindowBg);
+      m_dro.torch_on = control_view.m_motion_controller->isTorchOn();
+      m_dro.arc_ok = dro_data.arc_ok;
 
-      if (control_view.m_motion_controller->isTorchOn()) {
-        // Dark reddish version of the theme color - store in owned member
-        m_dro_torch_on_color.r = std::min(255.0f, base_color.r * 1.2f);
-        m_dro_torch_on_color.g = std::max(0.0f, base_color.g * 0.3f);
-        m_dro_torch_on_color.b = std::max(0.0f, base_color.b * 0.5f);
-        m_dro_torch_on_color.a = base_color.a;
-        m_dro_backpane->color = &m_dro_torch_on_color;
-      }
-      else {
-        m_dro_backpane->color = &m_app->getColor(ThemeColor::WindowBg);
-      }
-      if (dro_data.arc_ok == false) {
-        m_dro.arc_readout->color = &m_app->getColor(ThemeColor::PlotLines);
-        // Keep adding m_points to current highlight path
+      if (!dro_data.arc_ok) {
+        // Keep adding points to current highlight path
         // Negated because this is how gcode is interpreted to be consistent
         // with grbl's machine coordinates
         const Point2d wc_point{ -wcx, -wcy };
@@ -669,9 +886,7 @@ bool NcHmi::updateTimer()
         }
       }
       else {
-        m_arc_okay_highlight_path = NULL;
-        m_dro.arc_readout->color =
-          &m_app->getColor(ThemeColor::PlotLinesHovered);
+        m_arc_okay_highlight_path = nullptr;
       }
     }
   }
@@ -683,161 +898,15 @@ bool NcHmi::updateTimer()
 
 void NcHmi::resizeCallback(const WindowResizeEvent& e)
 {
-  // LOG_F(INFO, "(resizeCallback) width=%d height=%d", e.width, e.height);
-  m_backpane->m_bottom_left.x =
-    (m_app->getRenderer().getWindowSize().x / 2) - m_backplane_width;
-  m_backpane->m_bottom_left.y = -(m_app->getRenderer().getWindowSize().y / 2);
-  m_backpane->m_width = m_backplane_width;
-  m_backpane->m_height = m_app->getRenderer().getWindowSize().y - 15;
-
-  m_dro_backpane->m_bottom_left.x = m_backpane->m_bottom_left.x + 5;
-  m_dro_backpane->m_bottom_left.y =
-    (m_app->getRenderer().getWindowSize().y / 2) - m_dro_backplane_height;
-  m_dro_backpane->m_width = m_backplane_width - 10;
-  m_dro_backpane->m_height = m_dro_backplane_height - 30;
-
-  float dro_group_x = (float) m_dro_backpane->m_bottom_left.x;
-  float dro_group_y = (float) m_dro_backpane->m_bottom_left.y;
-
-  dro_group_y += 10;
-  m_dro.feed->m_position = { (float) dro_group_x + 5,
-                             (float) dro_group_y - m_dro.feed->m_height + 5 };
-  m_dro.arc_readout->m_position = { (float) dro_group_x + 80,
-                                    (float) dro_group_y -
-                                      m_dro.arc_readout->m_height + 5 };
-  m_dro.arc_set->m_position = {
-    (float) dro_group_x + 150, (float) dro_group_y - m_dro.arc_set->m_height + 5
-  };
-  m_dro.run_time->m_position = { (float) dro_group_x + 210,
-                                 (float) dro_group_y -
-                                   m_dro.run_time->m_height + 5 };
-  dro_group_y += 55;
-  m_dro.z.label->m_position = { (float) dro_group_x + 5,
-                                (float) dro_group_y - m_dro.z.label->m_height };
-  m_dro.z.work_readout->m_position = {
-    (float) dro_group_x + 5 + 50, (float) dro_group_y - m_dro.z.label->m_height
-  };
-  m_dro.z.absolute_readout->m_position = {
-    (float) dro_group_x + 5 + 220, (float) dro_group_y - m_dro.z.label->m_height
-  };
-  m_dro.z.divider->m_bottom_left = { (float) dro_group_x + 5,
-                                     (float) dro_group_y - 45 };
-  m_dro.z.divider->m_width = m_backplane_width - 20;
-  m_dro.z.divider->m_height = 5;
-  dro_group_y += 55;
-  m_dro.y.label->m_position = { (float) dro_group_x + 5,
-                                (float) dro_group_y - m_dro.y.label->m_height };
-  m_dro.y.work_readout->m_position = {
-    (float) dro_group_x + 5 + 50, (float) dro_group_y - m_dro.y.label->m_height
-  };
-  m_dro.y.absolute_readout->m_position = {
-    (float) dro_group_x + 5 + 220, (float) dro_group_y - m_dro.y.label->m_height
-  };
-  m_dro.y.divider->m_bottom_left = { (float) dro_group_x + 5,
-                                     (float) dro_group_y - 45 };
-  m_dro.y.divider->m_width = m_backplane_width - 20;
-  m_dro.y.divider->m_height = 5;
-  dro_group_y += 55;
-  m_dro.x.label->m_position = { (float) dro_group_x + 5,
-                                (float) dro_group_y - m_dro.x.label->m_height };
-  m_dro.x.work_readout->m_position = {
-    (float) dro_group_x + 5 + 50, (float) dro_group_y - m_dro.x.label->m_height
-  };
-  m_dro.x.absolute_readout->m_position = {
-    (float) dro_group_x + 5 + 220, (float) dro_group_y - m_dro.x.label->m_height
-  };
-  m_dro.x.divider->m_bottom_left = { (float) dro_group_x + 5,
-                                     (float) dro_group_y - 45 };
-  m_dro.x.divider->m_width = m_backplane_width - 20;
-  m_dro.x.divider->m_height = 5;
-
-  m_button_backpane->m_bottom_left.x = m_backpane->m_bottom_left.x + 5;
-  m_button_backpane->m_bottom_left.y = m_backpane->m_bottom_left.y + 20;
-  m_button_backpane->m_width = m_backplane_width - 10;
-  m_button_backpane->m_height =
-    m_app->getRenderer().getWindowSize().y - (m_dro_backplane_height + 30);
-
-  double button_group_x = m_button_backpane->m_bottom_left.x;
-  double button_group_y =
-    m_button_backpane->m_bottom_left.y + m_button_backpane->m_height;
-  double button_height =
-    (m_button_backpane->m_height - 10) / (double) m_button_groups.size();
-  double button_width = m_button_backpane->m_width / 2;
-
-  double center_x;
-  double center_y;
-  for (int x = 0; x < m_button_groups.size(); x++) {
-    m_button_groups[x].button_one.object->m_bottom_left.x = button_group_x + 5;
-    m_button_groups[x].button_one.object->m_bottom_left.y =
-      (button_group_y - 2.5) - button_height;
-    m_button_groups[x].button_one.object->m_width = button_width - 10;
-    m_button_groups[x].button_one.object->m_height = button_height - 10;
-    center_x = m_button_groups[x].button_one.object->m_bottom_left.x +
-               (button_width / 2);
-    center_y = m_button_groups[x].button_one.object->m_bottom_left.y +
-               (button_height / 2);
-    m_button_groups[x].button_one.label->m_position = {
-      (float) center_x - (m_button_groups[x].button_one.label->m_width / 2.0f) -
-        5,
-      (float) center_y - (m_button_groups[x].button_one.label->m_height) + 5
-    };
-
-    button_group_x += button_width;
-    m_button_groups[x].button_two.object->m_bottom_left.x = button_group_x + 5;
-    m_button_groups[x].button_two.object->m_bottom_left.y =
-      (button_group_y - 2.5) - button_height;
-    m_button_groups[x].button_two.object->m_width = button_width - 10;
-    m_button_groups[x].button_two.object->m_height = button_height - 10;
-    center_x = m_button_groups[x].button_two.object->m_bottom_left.x +
-               (button_width / 2);
-    center_y = m_button_groups[x].button_two.object->m_bottom_left.y +
-               (button_height / 2);
-
-    m_button_groups[x].button_two.label->m_position = {
-      (float) center_x - (m_button_groups[x].button_two.label->m_width / 2.0f) -
-        5,
-      (float) center_y - (m_button_groups[x].button_two.label->m_height) + 5
-    };
-    button_group_x -= button_width;
-
-    button_group_y -= button_height;
-  }
+  // ImGui handles all UI panel layout automatically.
+  // Nothing to do here - panels are positioned in
+  // renderHmi/renderDro/renderThcWidget.
 }
 
-void NcHmi::pushButtonGroup(const std::string& b1, const std::string& b2)
+void NcHmi::handleWindowResizeEvent(const WindowResizeEvent& e,
+                                    const InputState&        input)
 {
-  hmi_button_group_t group;
-  group.button_one.name = b1;
-  group.button_one.object =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  group.button_one.object->mouse_callback =
-    [this](Primitive* c, const Primitive::MouseEventData& e) {
-      mouseCallback(c, e);
-    };
-  group.button_one.object->color = &m_app->getColor(ThemeColor::Button);
-  group.button_one.object->zindex = 200;
-  group.button_one.object->id = b1;
-  group.button_one.label = m_app->getRenderer().pushPrimitive<Text>(
-    Point2d::infNeg(), group.button_one.name, 20);
-  group.button_one.label->zindex = 210;
-  group.button_one.label->color = &m_app->getColor(ThemeColor::Text);
-
-  group.button_two.name = b2;
-  group.button_two.object =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  group.button_two.object->mouse_callback =
-    [this](Primitive* c, const Primitive::MouseEventData& e) {
-      mouseCallback(c, e);
-    };
-  group.button_two.object->color = &m_app->getColor(ThemeColor::Button);
-  group.button_two.object->zindex = 200;
-  group.button_two.object->id = b2;
-  group.button_two.label = m_app->getRenderer().pushPrimitive<Text>(
-    Point2d::infNeg(), group.button_two.name, 20);
-  group.button_two.label->zindex = 210;
-  group.button_two.label->color = &m_app->getColor(ThemeColor::Text);
-
-  m_button_groups.push_back(group);
+  resizeCallback(e);
 }
 
 void NcHmi::clearHighlights()
@@ -1182,15 +1251,24 @@ void NcHmi::mouseMotionCallback(const MouseMoveEvent& e)
   Point2d     matrix_coords = { (e.x - pan.x) / zoom, (e.y - pan.y) / zoom };
   // Matrix coordinates are calculated on demand via view transformation
 }
+
 void NcHmi::init()
 {
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
 
+  // Layout dimensions
+  m_dro_backplane_height = m_app->getRenderer().scaleUI(65.f);
+  m_panel_width = m_app->getRenderer().scaleUI(70.f);
+
   control_view.m_way_point_position = { std::numeric_limits<int>::min(),
                                         std::numeric_limits<int>::min() };
 
+  // Setup timer for DRO updates
+  m_app->getRenderer().pushTimer(100, [this]() { return updateTimer(); });
+
+  // Initialize world-space primitives (machine/cuttable planes, pointers)
   control_view.m_machine_plane = m_app->getRenderer().pushPrimitive<Box>(
     Point2d{ 0, 0 },
     control_view.m_machine_parameters.machine_extents[0],
@@ -1226,102 +1304,6 @@ void NcHmi::init()
   control_view.m_cuttable_plane->matrix_callback =
     m_view->getTransformCallback();
 
-  m_backpane =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_backpane->color = &m_app->getColor(ThemeColor::PopupBg);
-  m_backpane->zindex = 100;
-
-  m_dro_backpane =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_dro_backpane->color = &m_app->getColor(ThemeColor::WindowBg);
-  m_dro_backpane->zindex = 110;
-
-  m_button_backpane =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 5);
-  m_button_backpane->color = &m_app->getColor(ThemeColor::PopupBg);
-  m_button_backpane->zindex = 115;
-
-  pushButtonGroup("Zero X", "Zero Y");
-  pushButtonGroup("Touch", "Retract");
-  pushButtonGroup("Fit", "Clean");
-  pushButtonGroup("Wpos", "Park");
-  pushButtonGroup("Test Run", "THC");
-  pushButtonGroup("Run", "Abort");
-
-  m_dro.x.label =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "X", 50);
-  m_dro.x.label->zindex = 210;
-  m_dro.x.label->color = &m_app->getColor(ThemeColor::Text);
-  m_dro.x.work_readout =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
-  m_dro.x.work_readout->zindex = 210;
-  m_dro.x.work_readout->color = &m_app->getColor(ThemeColor::PlotLines);
-  m_dro.x.absolute_readout =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
-  m_dro.x.absolute_readout->zindex = 210;
-  m_dro.x.absolute_readout->color =
-    &m_app->getColor(ThemeColor::PlotLinesHovered);
-  m_dro.x.divider =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
-  m_dro.x.divider->zindex = 150;
-  m_dro.x.divider->color = &m_app->getColor(ThemeColor::Separator);
-
-  m_dro.y.label =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "Y", 50);
-  m_dro.y.label->zindex = 210;
-  m_dro.y.label->color = &m_app->getColor(ThemeColor::Text);
-  m_dro.y.work_readout =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
-  m_dro.y.work_readout->zindex = 210;
-  m_dro.y.work_readout->color = &m_app->getColor(ThemeColor::PlotLines);
-  m_dro.y.absolute_readout =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
-  m_dro.y.absolute_readout->zindex = 210;
-  m_dro.y.absolute_readout->color =
-    &m_app->getColor(ThemeColor::PlotLinesHovered);
-  m_dro.y.divider =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
-  m_dro.y.divider->zindex = 150;
-  m_dro.y.divider->color = &m_app->getColor(ThemeColor::Separator);
-
-  m_dro.z.label =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "Z", 50);
-  m_dro.z.label->zindex = 210;
-  m_dro.z.label->color = &m_app->getColor(ThemeColor::Text);
-  m_dro.z.work_readout =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 40);
-  m_dro.z.work_readout->zindex = 210;
-  m_dro.z.work_readout->color = &m_app->getColor(ThemeColor::PlotLines);
-  m_dro.z.absolute_readout =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "0.0000", 15);
-  m_dro.z.absolute_readout->zindex = 210;
-  m_dro.z.absolute_readout->color =
-    &m_app->getColor(ThemeColor::PlotLinesHovered);
-  m_dro.z.divider =
-    m_app->getRenderer().pushPrimitive<Box>(Point2d::infNeg(), 1, 1, 3);
-  m_dro.z.divider->zindex = 150;
-  m_dro.z.divider->color = &m_app->getColor(ThemeColor::Separator);
-
-  m_dro.feed =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "FEED: 0", 12);
-  m_dro.feed->zindex = 210;
-  m_dro.feed->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
-
-  m_dro.arc_readout = m_app->getRenderer().pushPrimitive<Text>(
-    Point2d::infNeg(), "ARC: 0.0V", 12);
-  m_dro.arc_readout->zindex = 210;
-  m_dro.arc_readout->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
-
-  m_dro.arc_set =
-    m_app->getRenderer().pushPrimitive<Text>(Point2d::infNeg(), "SET: 0", 12);
-  m_dro.arc_set->zindex = 210;
-  m_dro.arc_set->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
-
-  m_dro.run_time = m_app->getRenderer().pushPrimitive<Text>(
-    Point2d::infNeg(), "RUN: 0:0:0", 12);
-  m_dro.run_time->zindex = 210;
-  m_dro.run_time->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
-
   control_view.m_torch_pointer =
     m_app->getRenderer().pushPrimitive<Circle>(Point2d::infNeg(), 5);
   control_view.m_torch_pointer->zindex = 500;
@@ -1342,19 +1324,6 @@ void NcHmi::init()
   control_view.m_waypoint_pointer->matrix_callback =
     m_view->getTransformCallback();
   control_view.m_waypoint_pointer->visible = false;
-
-  // Events now handled through NcControlView delegation system
-
-  m_app->getRenderer().pushTimer(100, [this]() { return updateTimer(); });
-
-  // Perform initial layout of HMI elements based on current window size
-  // This is necessary because buttons are created at Point2d::infNeg() and need
-  // to be positioned. With tiling window managers like i3, the resize event may
-  // not fire immediately, so we do an initial layout here.
-  WindowResizeEvent resize_event;
-  resize_event.width = m_app->getRenderer().getWindowSize().x;
-  resize_event.height = m_app->getRenderer().getWindowSize().y;
-  resizeCallback(resize_event);
 
   handleButton("Fit");
 }
@@ -1389,16 +1358,4 @@ void NcHmi::handleKeyEvent(const KeyEvent& e, const InputState& input)
       // Key not handled by HMI
       break;
   }
-}
-
-void NcHmi::handleMouseMoveEvent(const MouseMoveEvent& e,
-                                 const InputState&     input)
-{
-  mouseMotionCallback(e);
-}
-
-void NcHmi::handleWindowResizeEvent(const WindowResizeEvent& e,
-                                    const InputState&        input)
-{
-  resizeCallback(e);
 }

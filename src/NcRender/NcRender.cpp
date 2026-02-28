@@ -45,7 +45,8 @@
 
 const auto NcRenderProgramStartTime = std::chrono::steady_clock::now();
 
-NcRender::NcRender(NcApp* app) : m_window(app->getGlfwWindow()), m_app(app)
+NcRender::NcRender(NcApp* app)
+  : m_window(app->getGlfwWindow()), m_app(app), m_ui_scale(4.0f)
 {
   // Load Defaults
   setWindowTitle("NcRender");
@@ -118,7 +119,7 @@ void NcRender::handleWindowSizeEvent(int width, int height)
   // This ensures getWindowSize() returns current values for UI layout
   // calculations
   setWindowSize(width, height);
-
+  m_ui_scale = 4.f * (width / 1080.f);
   // NcApp now handles all window resize events directly through view delegation
 }
 
@@ -189,6 +190,12 @@ void NcRender::setClearColor(float r, float g, float b)
 void NcRender::setShowFPS(bool show_fps) { m_show_fps = show_fps; }
 
 void NcRender::setCurrentView(std::string v) { m_current_view = v; }
+
+void NcRender::setUIScale(float scale) { m_ui_scale = scale; }
+
+float NcRender::getUIScale() const { return m_ui_scale; }
+
+float NcRender::scaleUI(float value) const { return value * m_ui_scale; }
 
 unsigned long NcRender::millis()
 {

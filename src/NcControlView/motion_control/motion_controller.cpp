@@ -551,6 +551,31 @@ void MotionController::runPop()
       m_okay_callback = nullptr;
       m_probe_callback = nullptr;
     }
+    else if (line.find("$T!") != std::string::npos) {
+      // Internal THC command - send as $T= to hardware, no base update
+      std::string cmd = "$T=" + line.substr(line.find("$T!") + 3);
+      cmd.erase(std::remove(cmd.begin(), cmd.end(), ' '), cmd.end());
+      LOG_F(INFO, "(runpop) internal THC: sending %s", cmd.c_str());
+      sendWithCRC(cmd);
+    }
+    else if (line.find("$T=") != std::string::npos) {
+      // G-code stream THC command - update base and apply offset
+      float value = std::stof(line.substr(line.find("$T=") + 3));
+      if (value > 0.0f) {
+        m_thc_base_value = value;
+        m_thc_offset = 0.0f;
+        float effective = m_thc_base_value + m_thc_offset;
+        std::string cmd = "$T=" + to_string_strip_zeros(effective);
+        LOG_F(INFO, "(runpop) stream THC: base=%.1f offset=%.1f sending %s",
+              m_thc_base_value, m_thc_offset, cmd.c_str());
+        sendWithCRC(cmd);
+      }
+      else {
+        // $T=0 disables THC, pass through as-is
+        LOG_F(INFO, "(runpop) stream THC disable: sending $T=0");
+        sendWithCRC("$T=0");
+      }
+    }
     else {
       line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
       LOG_F(INFO, "(runpop) sending %s", line.c_str());
@@ -631,6 +656,8 @@ void MotionController::programFinished()
   logRuntime();
   m_program_start_time = std::chrono::steady_clock::time_point{};
   m_arc_retry_count = 0;
+  m_thc_base_value = 0.0f;
+  m_thc_offset = 0.0f;
   m_okay_callback = nullptr;
   m_probe_callback = nullptr;
   m_motion_sync_callback = nullptr;
@@ -656,9 +683,10 @@ void MotionController::lowerToCutHeightAndRunProgram()
   m_probe_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_arc_retry_count = 0;
-  m_gcode_queue.push_front(
-    "$T=" + to_string_strip_zeros(
-              m_control_view->m_machine_parameters.thc_set_value));
+  if (getThcEffective() > 0.0f) {
+    m_gcode_queue.push_front(
+      "$T!" + to_string_strip_zeros(getThcEffective()));
+  }
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front(
     "G91G0 Z" + to_string_strip_zeros(
@@ -709,6 +737,7 @@ void MotionController::torchOffAndAbort()
   m_motion_sync_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_torch_on = false;
+  m_thc_offset = 0.0f;
 
   m_gcode_queue.push_front("M30");
   m_gcode_queue.push_front("G0 Z0");
@@ -725,7 +754,7 @@ void MotionController::torchOffAndRetract()
   m_arc_okay_callback = nullptr;
   m_torch_on = false;
 
-  m_gcode_queue.push_front("$T=0.0");
+  m_gcode_queue.push_front("$T!0.0");
   m_gcode_queue.push_front("G0 Z0");
   m_gcode_queue.push_front("M5");
   LOG_F(INFO, "Shutting torch off and retracting!");
@@ -744,6 +773,30 @@ MotionController::calculateCRC32(uint32_t crc, const char* buf, size_t len)
       crc = crc & 1 ? (crc >> 1) ^ CRC_POLY : crc >> 1;
   }
   return ~crc;
+}
+
+void MotionController::adjustThcOffset(float delta)
+{
+  float new_effective = m_thc_base_value + m_thc_offset + delta;
+  new_effective = std::clamp(new_effective, 0.0f, 250.0f);
+  m_thc_offset = new_effective - m_thc_base_value;
+  LOG_F(INFO, "THC offset adjusted: base=%.1f offset=%.1f effective=%.1f",
+        m_thc_base_value, m_thc_offset, getThcEffective());
+
+  if (m_torch_on) {
+    m_gcode_queue.push_front(
+      "$T!" + to_string_strip_zeros(getThcEffective()));
+    if (!m_okay_callback) {
+      m_okay_callback = [this]() { runPop(); };
+    }
+  }
+}
+
+void MotionController::resetThcOffset()
+{
+  m_thc_offset = 0.0f;
+  LOG_F(INFO, "THC offset reset: base=%.1f effective=%.1f",
+        m_thc_base_value, getThcEffective());
 }
 
 void MotionController::logRuntime()

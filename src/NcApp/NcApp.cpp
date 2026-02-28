@@ -99,6 +99,16 @@ void NcApp::initialize(int argc, char** argv)
   // Initialize renderer
   m_renderer->init(argc, argv);
 
+  // Create theme manager (after renderer init, needs config directory)
+  std::string config_dir = m_renderer->getConfigDirectory();
+  std::string theme_dir = config_dir + "themes";
+  m_theme_manager = std::make_unique<ThemeManager>(this, theme_dir, config_dir);
+  m_theme_manager->applyTheme();
+
+  // Set clear color from theme
+  Color4f bg = m_theme_manager->getColor(ThemeColor::WindowBg);
+  m_renderer->setClearColor(bg.r, bg.g, bg.b);
+
   // Create app-level dialogs (view-independent)
   m_dialogs = std::make_unique<NcDialogs>(this);
 
@@ -110,16 +120,6 @@ void NcApp::initialize(int argc, char** argv)
   // Call PreInit methods with dependency injection
   m_control_view->preInit();
   m_cam_view->preInit();
-
-  // Create theme manager (after renderer init, needs config directory)
-  std::string config_dir = m_renderer->getConfigDirectory();
-  std::string theme_dir = config_dir + "themes";
-  m_theme_manager = std::make_unique<ThemeManager>(this, theme_dir, config_dir);
-  m_theme_manager->applyTheme();
-
-  // Set clear color from theme
-  Color4f bg = m_theme_manager->getColor(ThemeColor::WindowBg);
-  m_renderer->setClearColor(bg.r, bg.g, bg.b);
 
   // Register centralized modifier key events
   registerModifierKeyEvents();

@@ -61,9 +61,7 @@ public:
     float                arc_stabilization_time = 0;
     float                arc_voltage_divider = 0;
     float                floating_head_backlash = 0;
-    // Not Included in machine_parameters.json
-    float thc_set_value{ 0.f };
-    float precise_jog_units = 0.0f;
+    float                precise_jog_units = 0.0f;
   };
 
   // JSON serialization functions for MachineParameters
@@ -162,11 +160,9 @@ public:
     NcRender::NcRenderGui* alarm_window = nullptr;
     NcRender::NcRenderGui* homing_window = nullptr;
     NcRender::NcRenderGui* machine_params_window = nullptr;
-    NcRender::NcRenderGui* thc_window = nullptr;
 
-    std::string      alarm_text;
+    std::string       alarm_text;
     MachineParameters machine_params_temp{};
-    float            thc_new_value = 0.0f;
   };
 
   Box*              m_machine_plane;
@@ -178,6 +174,7 @@ public:
 
   // UI elements
   NcRender::NcRenderGui* m_menu_bar = nullptr;
+  NcRender::NcRenderGui* m_hmi_gui = nullptr;
 
   // Motion control system (public for compatibility wrapper access)
   std::unique_ptr<MotionController> m_motion_controller;
@@ -248,13 +245,12 @@ public:
 namespace dialogs {
 void renderControllerOfflineWindow(NcControlView::ControllerDialogs& d);
 void renderControllerAlarmWindow(NcControlView::ControllerDialogs& d,
-                                 NcApp* app);
+                                 NcApp*                            app);
 void renderControllerHomingWindow(NcControlView::ControllerDialogs& d,
-                                  NcApp* app);
+                                  NcApp*                            app);
 void renderMachineParameters(NcControlView::ControllerDialogs& d,
-                             NcApp* app, NcControlView* view);
-void renderThcWindow(NcControlView::ControllerDialogs& d,
-                     NcApp* app, NcControlView* view);
+                             NcApp*                            app,
+                             NcControlView*                    view);
 } // namespace dialogs
 
 #endif

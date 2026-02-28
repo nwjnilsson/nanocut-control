@@ -44,7 +44,6 @@
     "TabActive": [0.329, 0.341, 0.365, 1.00],
     "TabUnfocused": [0.251, 0.251, 0.251, 0.80],
     "TabUnfocusedActive": [0.251, 0.251, 0.251, 0.60],
-    "TabUnfocusedActiveOverline": [0.50, 0.50, 0.50, 0.00],
     "PlotLines": [0.61, 0.61, 0.61, 1.00],
     "PlotLinesHovered": [1.00, 0.43, 0.35, 1.00],
     "PlotHistogram": [0.90, 0.70, 0.00, 1.00],
@@ -63,7 +62,6 @@
     "TextLink": [0.247, 0.584, 0.808, 1.00],
     "DockingPreview": [0.129, 0.145, 0.169, 1.00],
     "DockingEmptyBg": [0.157, 0.173, 0.200, 1.00],
-    "TreeLines": [0.671, 0.694, 0.749, 1.00],
     "NavCursor": [0.247, 0.584, 0.808, 1.00]
   },
   "imgui_style": {

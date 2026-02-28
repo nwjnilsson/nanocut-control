@@ -97,6 +97,13 @@ public:
   const DROData&    getDRO() const { return m_dro_data; }
   const RuntimeData getRunTime() const;
 
+  // THC baby-stepping
+  float getThcBaseValue() const { return m_thc_base_value; }
+  float getThcOffset() const { return m_thc_offset; }
+  float getThcEffective() const { return m_thc_base_value + m_thc_offset; }
+  void  adjustThcOffset(float delta);
+  void  resetThcOffset();
+
   // Parameter management
   void saveParameters();
   void writeParametersToController();
@@ -123,6 +130,10 @@ private:
   bool m_abort_pending{ false };
   bool m_handling_crash{ false };
   bool m_needs_homed{ true };
+
+  // THC baby-stepping state
+  float m_thc_base_value{ 0.0f };
+  float m_thc_offset{ 0.0f };
 
   // Counters and timing
   int                                   m_arc_retry_count{ 0 };

@@ -181,33 +181,4 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
   ImGui::End();
 }
 
-void renderThcWindow(NcControlView::ControllerDialogs& d,
-                     NcApp* app, NcControlView* view)
-{
-  ImGui::Begin("Torch Height Control",
-               &d.thc_window->visible,
-               ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Separator();
-
-  ImGui::Text("New target is set on next touch-off.");
-  ImGui::Separator();
-  ImGui::InputFloat("Set Voltage", &d.thc_new_value, 0.1f, 0.5f);
-  d.thc_new_value = std::clamp(d.thc_new_value, 0.f, 200.f);
-
-  if (ImGui::Button("Set Target")) {
-    float value = d.thc_new_value;
-    app->getDialogs().askYesNo(
-      "Set target arc voltage to " + std::to_string(value) + "?",
-      [view, &d, value]() {
-        view->m_machine_parameters.thc_set_value = value;
-        d.thc_window->hide();
-      });
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Close")) {
-    d.thc_window->hide();
-  }
-  ImGui::End();
-}
-
 } // namespace dialogs

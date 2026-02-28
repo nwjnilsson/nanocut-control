@@ -189,6 +189,13 @@ void NcControlView::init()
   // Register menu bar rendering
   m_menu_bar = renderer.pushGui(true, [this]() { renderUI(); });
 
+  // Register HMI rendering
+  m_hmi_gui = renderer.pushGui(true, [this]() {
+    if (m_hmi) {
+      m_hmi->renderHmi();
+    }
+  });
+
   // Initialize G-code parser with dependencies
   m_gcode = std::make_unique<GCode>(m_app, this);
 
@@ -215,11 +222,6 @@ void NcControlView::init()
     renderer.pushGui(false, [this]() {
       dialogs::renderMachineParameters(m_controller_dialogs, m_app, this);
     });
-  m_controller_dialogs.thc_window = renderer.pushGui(false, [this]() {
-    dialogs::renderThcWindow(m_controller_dialogs, m_app, this);
-  });
-  m_controller_dialogs.thc_new_value =
-    m_machine_parameters.thc_set_value;
 
   // Initialize view state
   setMoveViewActive(false);

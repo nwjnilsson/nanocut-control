@@ -1,20 +1,19 @@
 #ifndef HMI_
 #define HMI_
 
-#include <NcRender/NcRender.h>
 #include <NanoCut.h>
+#include <NcRender/NcRender.h>
+#include <array>
+#include <string>
 #include <vector>
 
 // Forward declarations
 class NcApp;
 class NcControlView;
 class InputState;
-class Box;
 class Path;
 class Primitive;
 struct KeyEvent;
-struct MouseButtonEvent;
-struct MouseHoverEvent;
 struct MouseMoveEvent;
 struct WindowResizeEvent;
 
@@ -34,37 +33,29 @@ enum class HmiButtonId {
   Abort,
   Clean,
   Fit,
-  THC,
   Unknown
 };
 
-// HMI data structures
-struct hmi_button_t {
-  std::string name;
-  Box*        object;
-  Text*       label;
+// DRO display values (written by updateTimer, read by renderDro)
+struct DroAxisValues {
+  std::string work_readout = "0.0000";
+  std::string absolute_readout = "0.0000";
 };
 
-struct hmi_button_group_t {
-  hmi_button_t button_one;
-  hmi_button_t button_two;
+struct DroValues {
+  DroAxisValues x, y, z;
+  std::string   feed = "FEED: 0";
+  std::string   arc_readout = "ARC: 0.0V";
+  std::string   arc_set = "SET: 0";
+  std::string   run_time = "RUN: 0:0:0";
+  bool          arc_ok = true;
+  bool          torch_on = false;
 };
 
-struct dro_data_t {
-  Text* label;
-  Text* work_readout;
-  Text* absolute_readout;
-  Box*  divider;
-};
-
-struct dro_group_data_t {
-  dro_data_t x;
-  dro_data_t y;
-  dro_data_t z;
-  Text*      feed;
-  Text*      arc_readout;
-  Text*      arc_set;
-  Text*      run_time;
+// THC baby-step button definition
+struct ThcButtonDef {
+  float       delta;
+  const char* label;
 };
 
 /**
@@ -86,6 +77,11 @@ public:
 
   // Initialization
   void init();
+
+  // ImGui rendering functions
+  void renderHmi();
+  void renderDro();
+  void renderThcWidget();
 
   // Event handlers
   void handleKeyEvent(const KeyEvent& e, const InputState& input);
@@ -109,25 +105,24 @@ private:
   NcApp*         m_app;
   NcControlView* m_view;
 
-  // HMI UI elements
-  double                          m_backplane_width = 300.0;
-  Box*                            m_backpane = nullptr;
-  double                          m_dro_backplane_height = 220.0;
-  Box*                            m_dro_backpane = nullptr;
-  Box*                            m_button_backpane = nullptr;
-  Path*                           m_arc_okay_highlight_path = nullptr;
-  dro_group_data_t                m_dro;
-  std::vector<hmi_button_group_t> m_button_groups;
+  // Layout dimensions (set once in init, used by render methods)
+  float m_dro_backplane_height = 0.0f;
+  float m_panel_width = 0.0f;
 
-  // Computed color for DRO backpane when torch is on (can't use theme pointer)
-  Color4f m_dro_torch_on_color = { 0.0f, 0.0f, 0.0f, 255.0f };
+  // DRO display values (updated by timer, rendered by ImGui)
+  DroValues m_dro;
+
+  // THC offset readout (updated by timer)
+  std::string m_thc_offset_readout = "+0.0";
+
+  // World-space primitives (not managed by ImGui)
+  Path* m_arc_okay_highlight_path = nullptr;
 
   // Private helper methods
   bool checkPathBounds();
   void goToWaypoint(Primitive* args);
   void jumpin(Primitive* p);
   void reverse(Primitive* p);
-  void pushButtonGroup(const std::string& b1, const std::string& b2);
 
   // Key event callbacks
   void escapeKeyCallback(const KeyEvent& e);

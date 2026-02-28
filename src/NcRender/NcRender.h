@@ -52,6 +52,7 @@ private:
   std::string        m_main_log_filename;
   std::string        m_gui_style;
   std::string        m_current_view;
+  float              m_ui_scale;
 
   std::deque<std::unique_ptr<Primitive>> m_primitive_stack;
   std::vector<NcRenderTimer>             m_timer_stack;
@@ -111,6 +112,7 @@ public:
   void setClearColor(float r, float g, float b);
   void setShowFPS(bool show_fps);
   void setCurrentView(std::string v);
+  void setUIScale(float scale);
 
   /* Time */
   static unsigned long millis();
@@ -124,6 +126,8 @@ public:
   uint8_t     getFramesPerSecond();
   std::string getCurrentView() const;
   std::deque<std::unique_ptr<Primitive>>& getPrimitiveStack();
+  float       getUIScale() const;
+  float       scaleUI(float value) const;
 
   /* Debugging */
   nlohmann::json dumpPrimitiveStack();

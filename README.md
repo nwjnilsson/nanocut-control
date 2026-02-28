@@ -95,7 +95,7 @@ M30
 # Building
 Building should be roughly the same for all platforms when using CMake. See
 `shell.nix` for a list of what libraries you will (roughly) need. For more detailed
-instructions, refer to the installation [instructions](https://nwjnilsson.github.io/nanocut-control)
+instructions, refer to the installation [instructions](https://nwjnilsson.github.io/nanocut-control/installation)
 
 ```
 mkdir build && cd build

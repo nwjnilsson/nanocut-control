@@ -719,7 +719,7 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     // Calculate button area height
     float button_height = ImGui::GetFrameHeightWithSpacing();
     float table_height = tool_library_height - button_height -
-                         ImGui::GetStyle().ItemSpacing.y * 12;
+                         m_app->getRenderer().scaleUI(4.0f) * 12;
 
     // Scrollable table area
     ImGui::BeginChild("ScrollingTools", ImVec2(0, table_height), true);
@@ -914,15 +914,15 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
   int   failed = m_operation.failed_count.load();
   bool  operation_in_progress = m_operation.in_progress.load();
   float button_area_height =
-    ImGui::GetFrameHeightWithSpacing() * 3 + ImGui::GetStyle().ItemSpacing.y;
+    ImGui::GetFrameHeightWithSpacing() * 3 + m_app->getRenderer().scaleUI(4.0f);
 
   // Extra height for progress/warning rendered above the fixed buttons
   float extra_height = 0;
   if (operation_in_progress) {
-    extra_height += ImGui::GetFrameHeightWithSpacing() * 3.0f;
+    extra_height += ImGui::GetFrameHeightWithSpacing() * 3.0f * m_app->getRenderer().getUIScale();
   }
   if (failed > 0) {
-    extra_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f;
+    extra_height += ImGui::GetTextLineHeightWithSpacing() * 2.5f * m_app->getRenderer().getUIScale();
   }
 
   float buttons_y = ImGui::GetWindowHeight() - button_area_height -
