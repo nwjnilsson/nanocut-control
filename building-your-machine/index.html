@@ -13,10 +13,8 @@
       
       
       
-        <link rel="prev" href="../control-view/">
+        <link rel="prev" href="../keyboard-shortcuts/">
       
-      
-        <link rel="next" href="../keyboard-shortcuts/">
       
       
         
@@ -27,7 +25,7 @@
     
     
       
-        <title>Machine Parameters - NanoCut Control</title>
+        <title>Building a CNC Table - NanoCut Control</title>
       
     
     
@@ -68,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#machine-parameters" class="md-skip">
+        <a href="#advice-on-building-your-own-cnc-plasma-table" class="md-skip">
           Skip to content
         </a>
       
@@ -104,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Machine Parameters
+              Building a CNC Table
             
           </span>
         </div>
@@ -356,37 +354,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Machine Parameters
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../machine-parameters/" class="md-nav__link">
         
   
   
@@ -402,131 +373,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#accessing-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Accessing Parameters
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#standard-grbl-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Standard grbl Parameters
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#nanocut-specific-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NanoCut-Specific Parameters
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="NanoCut-Specific Parameters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#arc-voltage-divider-33" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arc Voltage Divider ($33)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#arc-stabilization-time" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arc Stabilization Time
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#floating-head-backlash" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Floating Head Backlash
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#precise-jog-distance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Precise Jog Distance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cutting-extents" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cutting Extents
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#work-offsets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Work Offsets
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -562,10 +408,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../building-your-machine/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building a CNC Table
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -581,6 +454,93 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-use-nanocut-at-all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why use NanoCut at all?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pitfalls-to-avoid-when-building-your-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pitfalls to avoid when building your table
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pitfalls to avoid when building your table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-right-hand-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The right-hand rule
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The right-hand rule">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#important" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IMPORTANT
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#just-do-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Just do it
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -612,10 +572,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#accessing-parameters" class="md-nav__link">
+  <a href="#why-use-nanocut-at-all" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Accessing Parameters
+        Why use NanoCut at all?
       
     </span>
   </a>
@@ -623,66 +583,34 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#standard-grbl-parameters" class="md-nav__link">
+  <a href="#pitfalls-to-avoid-when-building-your-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Standard grbl Parameters
+        Pitfalls to avoid when building your table
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#nanocut-specific-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NanoCut-Specific Parameters
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="NanoCut-Specific Parameters">
+    <nav class="md-nav" aria-label="Pitfalls to avoid when building your table">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#arc-voltage-divider-33" class="md-nav__link">
+  <a href="#the-right-hand-rule" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Arc Voltage Divider ($33)
+        The right-hand rule
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="The right-hand rule">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#arc-stabilization-time" class="md-nav__link">
+  <a href="#important" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Arc Stabilization Time
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#floating-head-backlash" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Floating Head Backlash
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#precise-jog-distance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Precise Jog Distance
+        IMPORTANT
       
     </span>
   </a>
@@ -693,23 +621,17 @@
     </nav>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#cutting-extents" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cutting Extents
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#work-offsets" class="md-nav__link">
+  <a href="#just-do-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Work Offsets
+        Just do it
       
     </span>
   </a>
@@ -736,67 +658,81 @@
   
 
 
-<h1 id="machine-parameters">Machine Parameters</h1>
-<h2 id="accessing-parameters">Accessing Parameters</h2>
-<p>Open the <strong>Machine Parameters</strong> dialog from Control View to view and modify machine
-settings. Changes are written to the controller immediately.</p>
-<h2 id="standard-grbl-parameters">Standard grbl Parameters</h2>
-<p>NanoCut firmware is based on grbl. The following standard parameters are available:</p>
-<ul>
-<li><strong>Machine extents</strong>: Maximum travel for each axis</li>
-<li><strong>Axis scale</strong>: Steps per unit (steps/mm or steps/inch)</li>
-<li><strong>Max velocity</strong>: Maximum speed for each axis</li>
-<li><strong>Max acceleration</strong>: Maximum acceleration for each axis</li>
-<li><strong>Homing settings</strong>: Feed rate, seek rate, debounce time, pull-off distance, and
-  direction for each axis</li>
-<li><strong>Axis inversion</strong>: Reverse direction for individual axes</li>
-<li><strong>Limit pin inversion</strong>: Invert the logic of limit switch inputs</li>
-<li><strong>Probe pin inversion</strong>: Invert the logic of the probe input</li>
-<li><strong>Soft limits</strong>: Prevent the machine from moving beyond its defined extents</li>
-</ul>
-<p>For detailed descriptions of all standard grbl parameters, refer to the
-<a href="https://github.com/gnea/grbl/wiki/Grbl-v1.1-Configuration">grbl v1.1 Configuration documentation</a>.</p>
-<h2 id="nanocut-specific-parameters">NanoCut-Specific Parameters</h2>
-<p>These parameters are specific to the NanoCut firmware and control plasma cutting
-behavior.</p>
-<h3 id="arc-voltage-divider-33">Arc Voltage Divider ($33)</h3>
-<p>Calibration factor for reading arc voltage from the plasma cutter.</p>
-<ul>
-<li><strong>Default</strong>: 50 (1:50 voltage divider)</li>
-<li><strong>Range</strong>: 1--500</li>
-</ul>
-<p>This value must match your hardware voltage divider circuit. The controller reads a
-scaled-down voltage from the plasma cutter and multiplies it by this factor to
-calculate the actual arc voltage. If your arc voltage readings are incorrect, adjust
-this parameter to match your divider ratio.</p>
-<h3 id="arc-stabilization-time">Arc Stabilization Time</h3>
-<p>Time in milliseconds to wait after the torch fires before THC becomes active.</p>
-<ul>
-<li><strong>Default</strong>: 2000 ms</li>
-</ul>
-<p>When the torch first fires, the arc voltage fluctuates as it stabilizes. This delay
-prevents THC from making unnecessary height adjustments during that initial period.
-Increase this value if you notice erratic torch movement at the start of each cut.</p>
-<h3 id="floating-head-backlash">Floating Head Backlash</h3>
-<p>Distance the floating head travels from its gravity rest position to the probe trigger
-point.</p>
-<p>This compensates for mechanical backlash in the Z-axis probing system. When the torch
-probe touches the material, the floating head must travel through this backlash
-distance before the probe switch triggers. Setting this correctly ensures accurate
-touch-off measurements.</p>
-<h3 id="precise-jog-distance">Precise Jog Distance</h3>
-<p>The distance moved when using <strong>Ctrl+Arrow keys</strong> for precise jogging.</p>
-<p>Set this to match your typical fine-positioning needs. Useful for accurately setting
-work zero or verifying clearances.</p>
-<h2 id="cutting-extents">Cutting Extents</h2>
-<p>Defines a safe rectangle within the machine extents where cutting is allowed. This
-provides a safety margin around the edges of the machine's travel. The safe cutting
-zone is displayed as a green rectangle in <a href="../control-view/">Control View</a>.</p>
-<p>Programs that extend outside the cutting extents will be rejected before running.</p>
-<h2 id="work-offsets">Work Offsets</h2>
-<p>Work offsets define the relationship between machine coordinates and work coordinates.
-Set them using the <strong>Zero X</strong> and <strong>Zero Y</strong> buttons in Control View. These offsets
-are saved automatically and persist across sessions.</p>
+<h1 id="advice-on-building-your-own-cnc-plasma-table">Advice on building your own CNC plasma table</h1>
+<p>This page is for those who want to build their own table from scratch, like I did.
+I mostly followed Bob's design from the <a href="https://www.youtube.com/c/makingstuff">Making Stuff</a> YouTube channel.
+He has a series where he covers most of the basic hardware needed to fabricate your own table.
+I think he still has a BOM somewhere covering things like the square tubing,
+linear rails, sensors etc. Where his design and mine differ though, is of course the
+control software. Bob went with LinuxCNC and Mesa hardware. This is a perfectly
+sane choice to make. The less sane choice is to fork the GRBL firmware and write
+your own control software. Naturally, I picked the second option.</p>
+<p>Going down this rabbit hole of writing much of the software myself has taught me a lot.
+Money-wise I'd say I would have saved a lot by going with the Mesa hardware, considering
+the time it took to get the software right. But where's the fun in that? Besides, this
+project should enable others out there to build their CNC tables for <em>really</em> cheap.
+I'm running NanoCut on an old Raspberry Pi 4, and it is controlling the table through an
+old Arduino Nano. Mesa does have cheaper alternatives today than they did back
+when I started. Had this been available then, this is probably the route I would go.
+On the other hand, you can run NanoCut on whatever laptop you have available,
+so CNC control is basically just the price of an Arduino.</p>
+<h2 id="why-use-nanocut-at-all">Why use NanoCut at all?</h2>
+<p>There are many other solid choices out there, varying in prices and complexity.
+Even though I started this project a long time ago, I still think NanoCut is a
+good option today. It's free, extremely easy to use, and it is cross platform.
+The most difficult part about it would be to configure GRBL and flashing the
+firmware, but even that is already mostly taken care of if you reuse my own
+configuration. Once you've wired up the plasma to the controller and configured
+GRBL, going from a .dxf to cutting will be a piece of cake.</p>
+<h2 id="pitfalls-to-avoid-when-building-your-table">Pitfalls to avoid when building your table</h2>
+<p>Building my table was mostly a straight-forward process. You take measurements,
+cut tubes, weld, drill, tap, make cables, 3D-print a bit, and <em>Bob</em>'s your uncle.
+The main roadblocks I hit were software related, and that is partly because I
+didn't do my research ahead of time. This mainly came down to the <em>coordinate system</em>.</p>
+<h3 id="the-right-hand-rule">The right-hand rule</h3>
+<p>I oriented my machine in a way that made sense for my workshop. My reasoning was:
+"<em>I'll be running GRBL, it's so configurable that it won't be a problem</em>". Silly me.
+I tried putting the origin in the bottom-right corner of the machine. Trying to make
+that work was a dead end, so I flipped the gantry and repositioned my homing sensors.</p>
+<p>If you google the "right hand rule", you'll see a number of different configurations.
+Turns out, people from different backgrounds seem to have different interpretations
+of it. So much for it being a <em>rule</em>, eh? The one that best fits my mental model of
+how GRBL works is this one:</p>
+<div style="text-align: center; margin: 20px 0;">
+  <img src="../images/right-hand-rule.png" alt="The right-hand rule" style="width: 300px; height: auto; border-radius: 8px;">
+</div>
+
+<p>This image tells me that the origin of the machine should be in the bottom left
+corner. If you think like a CNC machine, you might disagree with me, thinking:
+"<em>THE ORIGIN SHOULD BE IN THE TOP RIGHT!!1</em>". Both would be correct. The thing
+is: GRBL always represents Machine Coordinates (MCS) internally as negative
+values. From this perspective, the origin is in the top right corner. My brain
+seems to operate in workspace coordinates though, so the image above feels more natural
+to me.</p>
+<h4 id="important">IMPORTANT</h4>
+<p>Because of how I ended up implementing machine jogging, where +X (right arrow
+key) sends a negative machine coordinate (same for Y), my advice is to just put
+your origin in the bottom left corner. For the Z axis, the origin is (internally)
+at the lowest possible torch position. But you should of course wire it so that
+it searches upwards for the switch. After homing, a WCS offset is applied to
+the Z axis so that the top position has the maximum Z coortinate.</p>
+<p>Technically, GRBL will even allow you to home toward any corner with per-axis
+homing inversion and set that as your origin through <code>HOMING_FORCE_SET_ORIGIN</code>.
+Avoid doing any of these things with NanoCut. I'm pretty sure things will get
+weird quickly with motion commands and soft limits. <em>You should not need "Invert
+homing direction X/Y/Z" or <code>HOMING_FORCE_SET_ORIGIN</code> if your machine is
+"properly" set up</em>.</p>
+<h2 id="just-do-it">Just do it</h2>
+<p>Building a CNC machine is fun. It's a somewhat strange feeling building a machine
+and then seeing it produce parts that would take you days or weeks to do by hand.
+You'll realize it can greatly help you in replicating itself. The first parts I
+made on my machine were new gantry plates (the ones bolted to the linear bearings),
+due to a poor initial design on the ones I drilled and tapped by hand. Having
+built the machine from scratch makes seeing it re-produce the parts in seconds
+all the more rewarding. So should you DIY it? Shia seems to think so</p>
+<div style="text-align: center; margin: 20px 0;">
+  <img src="../images/shia-labeouf-do-it.gif" alt="Do it" style="width: 300px; height: auto; border-radius: 8px;">
+</div>
 
 
 
