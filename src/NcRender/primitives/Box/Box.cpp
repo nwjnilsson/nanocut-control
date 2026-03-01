@@ -96,7 +96,7 @@ void Box::render()
     glPushMatrix();
     glTranslatef(offset[0], offset[1], offset[2]);
     glScalef(scale, scale, scale);
-    glColor4f(color->r / 255, color->g / 255, color->b / 255, color->a / 255);
+    glColor4f(color->r, color->g, color->b, color->a);
     render_rectangle_with_radius(m_bottom_left.x,
                                  m_bottom_left.y + m_height,
                                  m_width,

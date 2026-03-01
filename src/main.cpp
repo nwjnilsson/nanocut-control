@@ -1,13 +1,13 @@
-#include "NcRender/NcRender.h"
-#include <imgui.h>
-#include <loguru.hpp>
-#include "WebsocketClient/WebsocketClient.h"
-#include "WebsocketServer/WebsocketServer.h"
-#include "NcAdminView/NcAdminView.h"
 #include "NanoCut.h"
+#include "NcAdminView/NcAdminView.h"
 #include "NcApp/NcApp.h"
 #include "NcCamView/NcCamView.h"
 #include "NcControlView/NcControlView.h"
+#include "NcRender/NcRender.h"
+#include "WebsocketClient/WebsocketClient.h"
+#include "WebsocketServer/WebsocketServer.h"
+#include <imgui.h>
+#include <loguru.hpp>
 #include <memory>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -32,7 +32,7 @@ int main(int argc, char** argv)
   app.initialize(argc, argv);
 
   // Main application loop
-  while (app.getRenderer().poll(app.shouldQuit())) {
+  while (app.getRenderer().poll(app.shouldQuit(), app.getInputState())) {
     // Handle view ticking
     if (app.getRenderer().getCurrentView() == "NcControlView") {
       app.getControlView().tick();

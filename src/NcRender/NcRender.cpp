@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <chrono>
-#include <thread>
 #include <ctime>
 #include <fstream>
 #include <ftw.h>
@@ -11,9 +10,11 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <thread>
 #include <vector>
 
 #include "NcRender.h"
+#include <Input/InputState.h>
 #include <NcApp/NcApp.h>
 #include <ThemeManager/ThemeManager.h>
 
@@ -60,7 +61,7 @@ NcRender::NcRender(NcApp* app)
   setGuiLogFileName("NcRenderGui.log");
   setMainLogFileName("NcRender.log");
   setGuiStyle("light");
-  setClearColor(21, 22, 34);
+  setClearColor(21.0f / 255.0f, 22.0f / 255.0f, 34.0f / 255.0f);
   setShowFPS(false);
   setCurrentView("main");
   m_fps_label = NULL;
@@ -181,11 +182,9 @@ void NcRender::setGuiStyle(std::string s) { m_gui_style = s; }
 
 void NcRender::setClearColor(float r, float g, float b)
 {
-  m_clear_color[0] = r / 255;
-  m_clear_color[1] = g / 255;
-  m_clear_color[2] = b / 255;
-  // LOG_F(INFO, "set Clear Color (%.4f, %.4f, %.4f)", m_clear_color[0],
-  // m_clear_color[1], m_clear_color[2]);
+  m_clear_color[0] = r;
+  m_clear_color[1] = g;
+  m_clear_color[2] = b;
 }
 
 void NcRender::setShowFPS(bool show_fps) { m_show_fps = show_fps; }
@@ -254,19 +253,9 @@ std::string NcRender::getConfigDirectory()
   return path;
 }
 
-Point2d NcRender::getWindowMousePosition()
+Point2i NcRender::getWindowSize()
 {
-  double mouseX, mouseY;
-  glfwGetCursorPos(m_window, &mouseX, &mouseY);
-  mouseX -= 2;
-  mouseY -= 4;
-  return { mouseX - (m_window_size[0] / 2.0f),
-           (m_window_size[1] - mouseY) - (m_window_size[1] / 2.0f) };
-}
-
-Point2d NcRender::getWindowSize()
-{
-  return { (double) m_window_size[0], (double) m_window_size[1] };
+  return { m_window_size[0], m_window_size[1] };
 }
 
 uint8_t NcRender::getFramesPerSecond()
@@ -343,13 +332,23 @@ void NcRender::stringToFile(std::string filename, std::string s)
 void NcRender::deletePrimitivesById(std::string id)
 {
   auto it = m_primitive_stack.begin();
+  bool sort{ false };
   while (it != m_primitive_stack.end()) {
     if ((*it)->id == id) {
       it = m_primitive_stack.erase(it);
+      sort = true;
     }
     else {
       ++it;
     }
+  }
+
+  if (sort) {
+    std::stable_sort(m_primitive_stack.begin(),
+                     m_primitive_stack.end(),
+                     [](const auto& lhs, const auto& rhs) {
+                       return lhs->zindex < rhs->zindex;
+                     });
   }
 }
 
@@ -393,19 +392,19 @@ bool NcRender::init(int argc, char** argv)
   return true;
 }
 
-bool NcRender::poll(bool should_quit)
+bool NcRender::poll(bool should_quit, const InputState& input)
 {
   ImGuiIO&      io = ImGui::GetIO();
   unsigned long begin_timestamp = millis();
   float         ratio = m_window_size[0] / (float) m_window_size[1];
-  Point2d       window_mouse_pos = getWindowMousePosition();
+  Point2d       window_mouse_pos = input.getMousePosition();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glDepthRange(0, 1);
   glDepthFunc(GL_LEQUAL);
-  glClearColor(m_clear_color[0], m_clear_color[1], m_clear_color[2], 255);
+  glClearColor(m_clear_color[0], m_clear_color[1], m_clear_color[2], 1.0f);
   /* IMGUI */
   ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGlfw_NewFrame();
@@ -434,10 +433,6 @@ bool NcRender::poll(bool should_quit)
   glLoadIdentity();
   glViewport(0, 0, m_window_size[0], m_window_size[1]);
   glClear(GL_COLOR_BUFFER_BIT);
-  std::stable_sort(
-    m_primitive_stack.begin(),
-    m_primitive_stack.end(),
-    [](const auto& lhs, const auto& rhs) { return lhs->zindex < rhs->zindex; });
   bool ignore_next_mouse_events = false;
   for (size_t x = 0; x < m_primitive_stack.size(); x++) {
     if (m_primitive_stack[x]->visible == true &&
@@ -480,7 +475,7 @@ bool NcRender::poll(bool should_quit)
     }
   }
   m_render_performance = (millis() - begin_timestamp);
-  constexpr unsigned long target_frame_ms = 10;
+  constexpr unsigned long target_frame_ms = 13;
   if (m_render_performance < target_frame_ms) {
     std::this_thread::sleep_for(
       std::chrono::milliseconds(target_frame_ms - m_render_performance));

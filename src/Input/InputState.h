@@ -34,6 +34,7 @@ public:
   void setMousePosition(const Point2d& pos);
   void setPreviousMousePosition(double x, double y);
 
+  /// Return the mouse position in window coordinates
   const Point2d& getMousePosition() const { return m_mouse_position; }
   const Point2d& getPreviousMousePosition() const
   {

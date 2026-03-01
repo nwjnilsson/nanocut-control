@@ -1,4 +1,5 @@
 #include "NcSerial.h"
+#include <thread>
 
 std::string last_string_sent;
 
@@ -37,12 +38,12 @@ void NcSerial::sendString(const std::string& s)
     }
   }
 }
+
 void NcSerial::delay(int ms)
 {
-  unsigned long delay_timer = NcRender::millis();
-  while ((NcRender::millis() - delay_timer) < ms)
-    ;
+  std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
+
 void NcSerial::resend() { sendString(last_string_sent); }
 void NcSerial::tick()
 {

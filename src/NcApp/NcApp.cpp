@@ -458,8 +458,9 @@ void NcApp::cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
   // Get window size for center-based coordinates
   auto   window_size = app->m_renderer->getWindowSize();
-  double transformed_x = mouseX - (window_size.x / 2.0f);
-  double transformed_y = (window_size.y - mouseY) - (window_size.y / 2.0f);
+  double transformed_x = mouseX - static_cast<double>(window_size.x >> 1);
+  double transformed_y = (static_cast<double>(window_size.y) - mouseY) -
+                         static_cast<double>(window_size.y >> 1);
 
   // Update input state with transformed position (also stores previous)
   app->m_input_state->setMousePosition(transformed_x, transformed_y);
@@ -473,8 +474,7 @@ void NcApp::cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
   // Also delegate to NcRender for legacy compatibility and GUI events
   if (app->m_renderer) {
-    app->m_renderer->handleCursorPositionEvent(
-      xpos, ypos); // NcRender still expects raw coordinates
+    app->m_renderer->handleCursorPositionEvent(xpos, ypos);
   }
 }
 

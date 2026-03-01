@@ -9,12 +9,6 @@
 
 namespace fs = std::filesystem;
 
-// Helper: convert RGBA 0-1 to Color4f 0-255
-static Color4f toColor255(float r, float g, float b, float a = 1.0f)
-{
-  return { r * 255.0f, g * 255.0f, b * 255.0f, a * 255.0f };
-}
-
 static int imguiColorNameToThemeColor(const std::string& colorName)
 {
   // Map ImGui color names to ThemeColor enum values
@@ -127,21 +121,22 @@ void ThemeManager::Theme::buildColorCache()
     color_cache[i] = THEME_COLOR_DEFAULTS[i];
   }
 
-  // Populate ImGui colors from theme
+  // Populate ImGui colors from theme (JSON values are already 0-1)
   for (const auto& [color_name, color] : imgui_colors) {
     int theme_color = imguiColorNameToThemeColor(color_name);
     if (theme_color >= 0) {
-      color_cache[theme_color] =
-        toColor255(color[0], color[1], color[2], color[3]);
+      color_cache[theme_color] = Color4f{ color[0], color[1], color[2], color[3] };
     }
   }
 
-  // App-specific colors from theme fields
-  color_cache[static_cast<int>(ThemeColor::MachinePlaneColor)] = toColor255(
-    machine_plane_color[0], machine_plane_color[1], machine_plane_color[2]);
+  // App-specific colors from theme fields (JSON values are already 0-1)
+  color_cache[static_cast<int>(ThemeColor::MachinePlaneColor)] = Color4f{
+    machine_plane_color[0], machine_plane_color[1], machine_plane_color[2], 1.0f
+  };
 
-  color_cache[static_cast<int>(ThemeColor::CuttablePlaneColor)] = toColor255(
-    cuttable_plane_color[0], cuttable_plane_color[1], cuttable_plane_color[2]);
+  color_cache[static_cast<int>(ThemeColor::CuttablePlaneColor)] = Color4f{
+    cuttable_plane_color[0], cuttable_plane_color[1], cuttable_plane_color[2], 1.0f
+  };
 }
 
 ThemeManager::ThemeManager(NcApp*             app,

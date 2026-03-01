@@ -24,6 +24,16 @@ public:
   void           render() override;
   nlohmann::json serialize() override;
 
+  // Add a point and invalidate the hit-test cache
+  void addPoint(const Point2d& p)
+  {
+    m_points.push_back(p);
+    m_hit_cache_dirty = true;
+  }
+
+  // Invalidate cache (for any direct m_points mutation)
+  void invalidateHitCache() { m_hit_cache_dirty = true; }
+
   // Override transform - gcode paths use WCO, others use default
   void applyTransform(const TransformData& transform) override
   {
@@ -38,6 +48,14 @@ public:
       Primitive::applyTransform(transform);
     }
   }
+
+private:
+  static constexpr size_t kSimplifyThreshold = 32;
+  bool                    m_hit_cache_dirty = true;
+  geo::Extents            m_bbox;
+  std::vector<Point2d>    m_simplified;
+
+  void rebuildHitCache();
 };
 
 #endif // PATH_

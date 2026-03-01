@@ -94,7 +94,7 @@ public:
   int               zindex = 1;
   // Points into ThemeManager's stable color cache; auto-updates on theme change.
   // Default: static white (never null).
-  static constexpr Color4f s_default_color = { 255.0f, 255.0f, 255.0f, 255.0f };
+  static constexpr Color4f s_default_color = { 1.0f, 1.0f, 1.0f, 1.0f };
   const Color4f*           color = &s_default_color;
   float             offset[3] = { 0.0f, 0.0f, 0.0f };
   float             scale = 1.0f;

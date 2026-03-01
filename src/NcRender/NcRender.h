@@ -26,6 +26,7 @@
 #endif
 
 class NcApp;
+class InputState;
 struct GLFWwindow;
 
 class NcRender {
@@ -76,8 +77,8 @@ public:
     std::string           view;
     bool                  visible;
     std::function<void()> callback;
-    void show() { visible = true; }
-    void hide() { visible = false; }
+    void                  show() { visible = true; }
+    void                  hide() { visible = false; }
   };
   std::deque<NcRenderGui> m_gui_stack;
 
@@ -91,6 +92,11 @@ public:
     T*   raw_ptr = prim.get();
     raw_ptr->view = m_current_view;
     m_primitive_stack.push_back(std::move(prim));
+    std::stable_sort(m_primitive_stack.begin(),
+                     m_primitive_stack.end(),
+                     [](const auto& lhs, const auto& rhs) {
+                       return lhs->zindex < rhs->zindex;
+                     });
     return raw_ptr;
   }
 
@@ -121,13 +127,12 @@ public:
   /* Getters */
   std::string getEnvironmentVariable(const std::string& var);
   std::string getConfigDirectory();
-  Point2d     getWindowMousePosition();
-  Point2d     getWindowSize();
+  Point2i     getWindowSize();
   uint8_t     getFramesPerSecond();
   std::string getCurrentView() const;
   std::deque<std::unique_ptr<Primitive>>& getPrimitiveStack();
-  float       getUIScale() const;
-  float       scaleUI(float value) const;
+  float                                   getUIScale() const;
+  float                                   scaleUI(float value) const;
 
   /* Debugging */
   nlohmann::json dumpPrimitiveStack();
@@ -153,7 +158,7 @@ public:
 
   /* Main Operators */
   bool init(int argc, char** argv);
-  bool poll(bool should_quit);
+  bool poll(bool should_quit, const InputState& input);
   void close();
 };
 

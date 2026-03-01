@@ -52,6 +52,7 @@ template <typename T> struct Point3 {
   }
 };
 
+using Point2i = Point2<int>;
 using Point2f = Point2<float>;
 using Point2d = Point2<double>;
 using Point3f = Point3<float>;
@@ -68,16 +69,13 @@ struct Color4f {
 
   Color4f& operator=(const ImVec4& col)
   {
-    r = col.x * 255.0f;
-    g = col.y * 255.0f;
-    b = col.z * 255.0f;
-    a = col.w * 255.0f;
+    r = col.x;
+    g = col.y;
+    b = col.z;
+    a = col.w;
     return *this;
   }
-  operator ImVec4() const
-  {
-    return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
-  }
+  operator ImVec4() const { return ImVec4(r, g, b, a); }
 };
 
 // Forward declarations moved to NcApp.h as needed

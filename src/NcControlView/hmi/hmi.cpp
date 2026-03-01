@@ -50,12 +50,6 @@ static HmiButtonId parseButtonId(const std::string& id)
   return HmiButtonId::Unknown;
 }
 
-// Helper: convert Color4f (0-255) to ImVec4 (0-1)
-static ImVec4 toImGuiColor(const Color4f& c)
-{
-  return ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
-}
-
 // Render the DRO (Digital Read Out) panel
 void NcHmi::renderDro()
 {
@@ -74,15 +68,15 @@ void NcHmi::renderDro()
   if (m_dro.torch_on) {
     const Color4f& base = m_app->getColor(ThemeColor::WindowBg);
     Color4f        torch_color;
-    torch_color.r = std::min(255.0f, base.r * 1.2f);
+    torch_color.r = std::min(1.0f, base.r * 1.2f);
     torch_color.g = std::max(0.0f, base.g * 0.3f);
     torch_color.b = std::max(0.0f, base.b * 0.5f);
     torch_color.a = base.a;
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, toImGuiColor(torch_color));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, torch_color);
   }
   else {
     ImGui::PushStyleColor(ImGuiCol_WindowBg,
-                          toImGuiColor(m_app->getColor(ThemeColor::WindowBg)));
+                          m_app->getColor(ThemeColor::WindowBg));
   }
 
   constexpr auto win_flags =
@@ -91,14 +85,14 @@ void NcHmi::renderDro()
     ImGuiWindowFlags_NoBringToFrontOnFocus;
 
   if (ImGui::Begin("DRO Panel", nullptr, win_flags)) {
-    ImVec4 text_color = toImGuiColor(m_app->getColor(ThemeColor::Text));
-    ImVec4 work_color = toImGuiColor(m_app->getColor(ThemeColor::PlotLines));
+    ImVec4 text_color = m_app->getColor(ThemeColor::Text);
+    ImVec4 work_color = m_app->getColor(ThemeColor::PlotLines);
     ImVec4 abs_color =
-      toImGuiColor(m_app->getColor(ThemeColor::PlotLinesHovered));
+      m_app->getColor(ThemeColor::PlotLinesHovered);
     ImVec4 arc_color =
-      m_dro.arc_ok ? toImGuiColor(m_app->getColor(ThemeColor::PlotLinesHovered))
-                   : toImGuiColor(m_app->getColor(ThemeColor::PlotLines));
-    ImVec4 sep_color = toImGuiColor(m_app->getColor(ThemeColor::Separator));
+      m_dro.arc_ok ? (ImVec4)m_app->getColor(ThemeColor::PlotLinesHovered)
+                   : (ImVec4)m_app->getColor(ThemeColor::PlotLines);
+    ImVec4 sep_color = m_app->getColor(ThemeColor::Separator);
 
     // Status row: FEED | ARC | SET | RUN
     ImGui::SetWindowFontScale(0.65f);
@@ -192,7 +186,7 @@ void NcHmi::renderThcWidget()
     ImGuiWindowFlags_NoBringToFrontOnFocus;
 
   ImGui::PushStyleColor(ImGuiCol_WindowBg,
-                        toImGuiColor(m_app->getColor(ThemeColor::PopupBg)));
+                        m_app->getColor(ThemeColor::PopupBg));
 
   if (ImGui::Begin("THC Widget", nullptr, win_flags)) {
     // Remove horizontal spacing, sharp corners, and add border for tight button
@@ -221,14 +215,14 @@ void NcHmi::renderThcWidget()
     // Offset readout (center cell)
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_ChildBg,
-                          toImGuiColor(m_app->getColor(ThemeColor::FrameBg)));
+                          m_app->getColor(ThemeColor::FrameBg));
     ImGui::BeginChild("thc_offset", ImVec2(cell_w, btn_height));
     ImGui::SetWindowFontScale(0.80f);
     ImVec2 text_size = ImGui::CalcTextSize(m_thc_offset_readout.c_str());
     ImGui::SetCursorPos(
       ImVec2((cell_w - text_size.x) / 2.0f, (btn_height - text_size.y) / 2.0f));
     ImGui::TextColored(
-      toImGuiColor(m_app->getColor(ThemeColor::PlotLinesHovered)),
+      m_app->getColor(ThemeColor::PlotLinesHovered),
       "%s",
       m_thc_offset_readout.c_str());
     ImGui::EndChild();
@@ -312,7 +306,7 @@ void NcHmi::renderHmi()
   ImGui::SetNextWindowSize(ImVec2(panel_width, panel_height));
 
   ImGui::PushStyleColor(ImGuiCol_WindowBg,
-                        toImGuiColor(m_app->getColor(ThemeColor::PopupBg)));
+                        m_app->getColor(ThemeColor::PopupBg));
 
   float scaled_spacing_x = ImGui::GetStyle().ItemSpacing.x;
   float scaled_spacing_y = ImGui::GetStyle().ItemSpacing.y;
@@ -983,7 +977,7 @@ bool NcHmi::updateTimer()
             m_view->getTransformCallback();
         }
         else {
-          m_arc_okay_highlight_path->m_points.push_back(wc_point);
+          m_arc_okay_highlight_path->addPoint(wc_point);
         }
       }
       else {
