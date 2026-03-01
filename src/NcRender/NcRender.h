@@ -8,6 +8,7 @@
 #include <chrono>
 #include <ctime>
 #include <deque>
+#include <vector>
 #include <functional>
 #include <imgui.h>
 #include <memory>
@@ -55,7 +56,7 @@ private:
   std::string        m_current_view;
   float              m_ui_scale;
 
-  std::deque<std::unique_ptr<Primitive>> m_primitive_stack;
+  std::vector<std::unique_ptr<Primitive>> m_primitive_stack;
   std::vector<NcRenderTimer>             m_timer_stack;
 
   static void
@@ -91,12 +92,13 @@ public:
     auto prim = std::make_unique<T>(std::forward<Ts>(args)...);
     T*   raw_ptr = prim.get();
     raw_ptr->view = m_current_view;
-    m_primitive_stack.push_back(std::move(prim));
-    std::stable_sort(m_primitive_stack.begin(),
-                     m_primitive_stack.end(),
-                     [](const auto& lhs, const auto& rhs) {
-                       return lhs->zindex < rhs->zindex;
-                     });
+    auto pos = std::upper_bound(m_primitive_stack.begin(),
+                                m_primitive_stack.end(),
+                                prim,
+                                [](const auto& lhs, const auto& rhs) {
+                                  return lhs->zindex < rhs->zindex;
+                                });
+    m_primitive_stack.insert(pos, std::move(prim));
     return raw_ptr;
   }
 
@@ -130,7 +132,7 @@ public:
   Point2i     getWindowSize();
   uint8_t     getFramesPerSecond();
   std::string getCurrentView() const;
-  std::deque<std::unique_ptr<Primitive>>& getPrimitiveStack();
+  std::vector<std::unique_ptr<Primitive>>& getPrimitiveStack();
   float                                   getUIScale() const;
   float                                   scaleUI(float value) const;
 

@@ -13,6 +13,8 @@
 #include <imgui.h>
 #include <loguru.hpp>
 
+NcCamView::~NcCamView() { m_background_thread->join(); }
+
 // JSON serialization for ToolData
 void NcCamView::to_json(nlohmann::json& j, const ToolData& tool)
 {
@@ -50,21 +52,36 @@ void NcCamView::zoomEventCallback(const ScrollEvent& e, const InputState& input)
       if ((*it)->view == m_app->getRenderer().getCurrentView()) {
         auto* part = dynamic_cast<Part*>(it->get());
         if (part and part->m_is_part_selected) {
-          if (e.y_offset > 0) {
-            if (input.isCtrlPressed()) {
-              part->m_control.angle += 5;
-            }
-            if (input.isShiftPressed()) {
-              part->m_control.scale += .1f;
-            }
+          double direction = (e.y_offset > 0) ? 1.0 : -1.0;
+
+          // Bounding box center of the built points
+          Point2d center = { (part->m_bb_min.x + part->m_bb_max.x) / 2.0,
+                             (part->m_bb_min.y + part->m_bb_max.y) / 2.0 };
+
+          // Scale about center
+          if (input.isShiftPressed()) {
+            double old_scale = part->m_control.scale;
+            double new_scale = old_scale * (e.y_offset > 0 ? 1.1 : 1.0 / 1.1);
+            part->m_control.offset.x +=
+              center.x * (1.0 / new_scale - 1.0 / old_scale);
+            part->m_control.offset.y +=
+              center.y * (1.0 / new_scale - 1.0 / old_scale);
+            part->m_control.scale = new_scale;
           }
-          else {
-            if (input.isCtrlPressed()) {
-              part->m_control.angle -= 5;
-            }
-            if (input.isShiftPressed()) {
-              part->m_control.scale -= .1f;
-            }
+
+          // Rotate about center
+          if (input.isCtrlPressed()) {
+            double  delta = direction * 5.0;
+            Point2d pre = {
+              center.x / part->m_control.scale - part->m_control.offset.x,
+              center.y / part->m_control.scale - part->m_control.offset.y
+            };
+            Point2d rotated_pre = geo::rotatePoint({ 0, 0 }, pre, delta);
+            part->m_control.offset.x =
+              center.x / part->m_control.scale - rotated_pre.x;
+            part->m_control.offset.y =
+              center.y / part->m_control.scale - rotated_pre.y;
+            part->m_control.angle += delta;
           }
         }
       }
@@ -1205,7 +1222,6 @@ void NcCamView::deletePart(std::string part_name)
     return;
   auto& renderer = m_app->getRenderer();
 
-  // Use modern algorithm instead of manual loop
   auto& stack = renderer.getPrimitiveStack();
   stack.erase(std::remove_if(stack.begin(),
                              stack.end(),

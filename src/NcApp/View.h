@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../NcRender/geometry/geometry.h"
 #include "../Input/InputEvents.h"
+#include "../NcRender/geometry/geometry.h"
 #include <GLFW/glfw3.h>
 #include <functional>
 
@@ -19,20 +19,19 @@ public:
   virtual void handleMouseEvent(const MouseButtonEvent& e,
                                 const InputState&       input)
   {
-  } // Mouse button events
-  virtual void handleKeyEvent(const KeyEvent& e, const InputState& input) {
-  } // Keyboard events
+  }
+  virtual void handleKeyEvent(const KeyEvent& e, const InputState& input) {}
   virtual void handleScrollEvent(const ScrollEvent& e, const InputState& input)
   {
-  } // Mouse scroll events
+  }
   virtual void handleWindowResize(const WindowResizeEvent& e,
                                   const InputState&        input)
   {
-  } // Window resize events
+  }
   virtual void handleMouseMoveEvent(const MouseMoveEvent& e,
                                     const InputState&     input)
   {
-  } // Mouse movement events
+  }
 
   // View transform management
   double getZoom() const { return m_zoom; }

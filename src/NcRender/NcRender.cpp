@@ -265,7 +265,7 @@ uint8_t NcRender::getFramesPerSecond()
 
 std::string NcRender::getCurrentView() const { return m_current_view; }
 
-std::deque<std::unique_ptr<Primitive>>& NcRender::getPrimitiveStack()
+std::vector<std::unique_ptr<Primitive>>& NcRender::getPrimitiveStack()
 {
   return m_primitive_stack;
 }
@@ -331,25 +331,11 @@ void NcRender::stringToFile(std::string filename, std::string s)
 
 void NcRender::deletePrimitivesById(std::string id)
 {
-  auto it = m_primitive_stack.begin();
-  bool sort{ false };
-  while (it != m_primitive_stack.end()) {
-    if ((*it)->id == id) {
-      it = m_primitive_stack.erase(it);
-      sort = true;
-    }
-    else {
-      ++it;
-    }
-  }
-
-  if (sort) {
-    std::stable_sort(m_primitive_stack.begin(),
-                     m_primitive_stack.end(),
-                     [](const auto& lhs, const auto& rhs) {
-                       return lhs->zindex < rhs->zindex;
-                     });
-  }
+  m_primitive_stack.erase(
+    std::remove_if(m_primitive_stack.begin(),
+                   m_primitive_stack.end(),
+                   [&](const auto& prim) { return prim->id == id; }),
+    m_primitive_stack.end());
 }
 
 bool NcRender::init(int argc, char** argv)

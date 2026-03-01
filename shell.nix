@@ -1,5 +1,5 @@
 {pkgs ? import <nixpkgs> {}}:
-pkgs.stdenv.mkDerivation {
+pkgs.mkShell {
   name = "nanocut-control-dev";
   nativeBuildInputs = with pkgs; [
     pkg-config

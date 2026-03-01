@@ -12,7 +12,9 @@ class Part : public Primitive {
 public:
   struct path_t {
     std::vector<Point2d> points;
+    std::vector<Point2d> simplified_points; // Cached simplification result
     std::vector<Point2d> built_points;
+    geo::Extents         bbox;              // Bounding box of built_points
     bool                 is_closed;
     bool                 is_inside_contour;
     const Color4f*       color = &Primitive::s_default_color;

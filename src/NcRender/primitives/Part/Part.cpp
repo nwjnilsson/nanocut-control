@@ -11,92 +11,121 @@
 std::string Part::getTypeName() { return "part"; }
 void        Part::processMouse(float mpos_x, float mpos_y)
 {
-  if (visible == true) {
-    mpos_x = (mpos_x - offset[0]) / scale;
-    mpos_y = (mpos_y - offset[1]) / scale;
-    size_t path_index = -1;
-    if (m_control.mouse_mode == 0) {
-      bool   mouse_is_over_path = false;
-      size_t global_index = 0;
-      for (auto& [layer_name, layer] : m_layers) {
-        for (auto& path : layer.paths) {
-          for (size_t i = 1; i < path.built_points.size(); i++) {
-            if (geo::lineIntersectsWithCircle(
-                  { { path.built_points.at(i - 1).x,
-                      path.built_points.at(i - 1).y },
-                    { path.built_points.at(i).x, path.built_points.at(i).y } },
-                  { mpos_x, mpos_y },
-                  mouse_over_padding / scale)) {
-              path_index = global_index;
-              mouse_is_over_path = true;
-              break;
-            }
-          }
-          if (path.is_closed == true) {
-            if (geo::lineIntersectsWithCircle(
-                  { { path.built_points.at(0).x, path.built_points.at(0).y },
-                    { path.built_points.at(path.built_points.size() - 1).x,
-                      path.built_points.at(path.built_points.size() - 1).y } },
-                  { mpos_x, mpos_y },
-                  mouse_over_padding / scale)) {
-              path_index = global_index;
-              mouse_is_over_path = true;
-            }
-          }
-          if (mouse_is_over_path)
-            break;
+  if (!visible)
+    return;
+
+  mpos_x = (mpos_x - offset[0]) / scale;
+  mpos_y = (mpos_y - offset[1]) / scale;
+  double pad = mouse_over_padding / scale;
+
+  // Part-level bounding box early-out
+  if (mpos_x < m_bb_min.x - pad || mpos_x > m_bb_max.x + pad ||
+      mpos_y < m_bb_min.y - pad || mpos_y > m_bb_max.y + pad) {
+    if (mouse_over) {
+      m_mouse_event =
+        MouseHoverEvent(NcRender::EventType::MouseOut, mpos_x, mpos_y);
+      mouse_over = false;
+    }
+    return;
+  }
+
+  size_t path_index = -1;
+  if (m_control.mouse_mode == 0) {
+    bool   mouse_is_over_path = false;
+    size_t global_index = 0;
+    for (auto& [layer_name, layer] : m_layers) {
+      for (auto& path : layer.paths) {
+        if (path.built_points.size() < 2) {
           global_index++;
+          continue;
+        }
+        // Per-path bounding box early-out
+        if (mpos_x < path.bbox.min.x - pad ||
+            mpos_x > path.bbox.max.x + pad ||
+            mpos_y < path.bbox.min.y - pad ||
+            mpos_y > path.bbox.max.y + pad) {
+          global_index++;
+          continue;
+        }
+        for (size_t i = 1; i < path.built_points.size(); i++) {
+          if (geo::lineIntersectsWithCircle(
+                { { path.built_points[i - 1].x,
+                    path.built_points[i - 1].y },
+                  { path.built_points[i].x, path.built_points[i].y } },
+                { mpos_x, mpos_y },
+                pad)) {
+            path_index = global_index;
+            mouse_is_over_path = true;
+            break;
+          }
+        }
+        if (!mouse_is_over_path && path.is_closed) {
+          if (geo::lineIntersectsWithCircle(
+                { { path.built_points.front().x,
+                    path.built_points.front().y },
+                  { path.built_points.back().x,
+                    path.built_points.back().y } },
+                { mpos_x, mpos_y },
+                pad)) {
+            path_index = global_index;
+            mouse_is_over_path = true;
+          }
         }
         if (mouse_is_over_path)
           break;
+        global_index++;
       }
-      if (mouse_is_over_path == true) {
-        if (mouse_over == false) {
-          m_mouse_event = MouseHoverEvent(
-            NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
-          mouse_over = true;
-        }
-      }
-      else {
-        if (mouse_over == true) {
-          m_mouse_event = MouseHoverEvent(
-            NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
-          mouse_over = false;
-        }
+      if (mouse_is_over_path)
+        break;
+    }
+    if (mouse_is_over_path) {
+      if (!mouse_over) {
+        m_mouse_event = MouseHoverEvent(
+          NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
+        mouse_over = true;
       }
     }
-    else if (m_control.mouse_mode == 1) { // nesting
-      bool   mouse_is_inside_perimeter = false;
-      size_t global_index = 0;
-      for (auto& [layer_name, layer] : m_layers) {
-        for (auto& path : layer.paths) {
-          if (path.is_inside_contour == false) {
-            if (checkIfPointIsInsidePath(path.built_points,
-                                         { mpos_x, mpos_y })) {
-              path_index = global_index;
-              mouse_is_inside_perimeter = true;
-              break;
-            }
+    else if (mouse_over) {
+      m_mouse_event = MouseHoverEvent(
+        NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
+      mouse_over = false;
+    }
+  }
+  else if (m_control.mouse_mode == 1) { // nesting
+    bool   mouse_is_inside_perimeter = false;
+    size_t global_index = 0;
+    for (auto& [layer_name, layer] : m_layers) {
+      for (auto& path : layer.paths) {
+        if (path.is_inside_contour == false) {
+          // Per-path bounding box early-out
+          if (mpos_x < path.bbox.min.x || mpos_x > path.bbox.max.x ||
+              mpos_y < path.bbox.min.y || mpos_y > path.bbox.max.y) {
+            global_index++;
+            continue;
           }
-          global_index++;
+          if (checkIfPointIsInsidePath(path.built_points,
+                                       { mpos_x, mpos_y })) {
+            path_index = global_index;
+            mouse_is_inside_perimeter = true;
+            break;
+          }
         }
-        if (mouse_is_inside_perimeter)
-          break;
+        global_index++;
       }
-      if (mouse_is_inside_perimeter == true) {
-        if (mouse_over == false) {
-          m_mouse_event = MouseHoverEvent(
-            NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
-          mouse_over = true;
-        }
+      if (mouse_is_inside_perimeter)
+        break;
+    }
+    if (mouse_is_inside_perimeter) {
+      if (!mouse_over) {
+        m_mouse_event = MouseHoverEvent(
+          NcRender::EventType::MouseIn, mpos_x, mpos_y, path_index);
+        mouse_over = true;
       }
-      else {
-        if (mouse_over == true) {
-          m_mouse_event = MouseHoverEvent(
-            NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
-          mouse_over = false;
-        }
-      }
+    }
+    else if (mouse_over) {
+      m_mouse_event = MouseHoverEvent(
+        NcRender::EventType::MouseOut, mpos_x, mpos_y, path_index);
+      mouse_over = false;
     }
   }
 }
@@ -210,6 +239,8 @@ void Part::simplify(const std::vector<Point2d>& pointList,
 void Part::render()
 {
   if (!(m_last_control == m_control)) {
+    bool smoothing_changed = m_last_control.smoothing != m_control.smoothing;
+
     m_number_of_verticies = 0;
     m_tool_paths.clear();
     for (auto& [layer_name, layer] : m_layers) {
@@ -220,25 +251,30 @@ void Part::render()
       for (auto& path : layer.paths) {
         path.built_points.clear();
         try {
-          std::vector<Point2d> simplified;
-
-          // For closed paths with very few points, skip simplification to
-          // preserve geometry
-          if (path.is_closed && path.points.size() <= 6) {
-            simplified = path.points;
+          // Only re-simplify when smoothing changed or first build
+          if (smoothing_changed || path.simplified_points.empty()) {
+            path.simplified_points.clear();
+            // For closed paths with very few points, skip simplification to
+            // preserve geometry
+            if (path.is_closed && path.points.size() <= 6) {
+              path.simplified_points = path.points;
+            }
+            else {
+              simplify(
+                path.points, path.simplified_points, m_control.smoothing);
+            }
           }
-          else {
-            simplify(path.points, simplified, m_control.smoothing);
-          }
 
-          for (size_t i = 0; i < simplified.size(); i++) {
-            Point2d rotated =
-              geo::rotatePoint({ 0, 0 }, simplified[i], m_control.angle);
+          // Transform cached simplified points
+          for (size_t i = 0; i < path.simplified_points.size(); i++) {
+            Point2d rotated = geo::rotatePoint(
+              { 0, 0 }, path.simplified_points[i], m_control.angle);
             path.built_points.push_back(
               { (rotated.x + m_control.offset.x) * m_control.scale,
                 (rotated.y + m_control.offset.y) * m_control.scale });
             m_number_of_verticies++;
           }
+          path.bbox = geo::calculateBoundingBox(path.built_points);
           if (layer.toolpath_visible == true) {
             if (path.is_closed == true) {
               // Need at least 3 points to form a valid closed polygon
@@ -305,47 +341,36 @@ void Part::render()
   glTranslatef(offset[0], offset[1], offset[2]);
   glScalef(scale, scale, scale);
   glLineWidth(m_width);
+  if (m_style == "dashed") {
+    glPushAttrib(GL_ENABLE_BIT);
+    glLineStipple(10, 0xAAAA);
+    glEnable(GL_LINE_STIPPLE);
+  }
+  glEnableClientState(GL_VERTEX_ARRAY);
   for (auto& [layer_name, layer] : m_layers) {
     // Skip invisible layers
     if (!layer.visible)
       continue;
 
     for (auto& path : layer.paths) {
+      if (path.built_points.empty())
+        continue;
       glColor4f(path.color->r, path.color->g, path.color->b, path.color->a);
-      if (path.is_closed == true) {
-        glBegin(GL_LINE_LOOP);
-      }
-      else {
-        glBegin(GL_LINE_STRIP);
-      }
-      if (m_style == "dashed") {
-        glPushAttrib(GL_ENABLE_BIT);
-        glLineStipple(10, 0xAAAA);
-        glEnable(GL_LINE_STIPPLE);
-      }
-      try {
-        for (int i = 0; i < path.built_points.size(); i++) {
-          glVertex3f(path.built_points[i].x, path.built_points[i].y, 0.f);
-        }
-      }
-      catch (std::exception& e) {
-        LOG_F(ERROR,
-              "(Part::render) Exception: %s, setting visability "
-              "to false to avoid further exceptions!",
-              e.what());
-        visible = false;
-      }
-      glEnd();
+      glVertexPointer(
+        2, GL_DOUBLE, sizeof(Point2d), path.built_points.data());
+      glDrawArrays(path.is_closed ? GL_LINE_LOOP : GL_LINE_STRIP,
+                   0,
+                   path.built_points.size());
     }
   }
-  for (int x = 0; x < m_tool_paths.size(); x++) {
-    glColor4f(0, 1, 0, 0.5);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i < m_tool_paths[x].size(); i++) {
-      glVertex3f(m_tool_paths[x][i].x, m_tool_paths[x][i].y, 0.f);
-    }
-    glEnd();
+  glColor4f(0, 1, 0, 0.5);
+  for (auto& tp : m_tool_paths) {
+    if (tp.empty())
+      continue;
+    glVertexPointer(2, GL_DOUBLE, sizeof(Point2d), tp.data());
+    glDrawArrays(GL_LINE_STRIP, 0, tp.size());
   }
+  glDisableClientState(GL_VERTEX_ARRAY);
   glLineWidth(1);
   glDisable(GL_LINE_STIPPLE);
   glPopMatrix();

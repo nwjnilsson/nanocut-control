@@ -47,17 +47,18 @@ enum class BackgroundOperationType {
   None,
   Nesting,
   DxfImport,
-  ToolpathGeneration  // Future extensibility
+  ToolpathGeneration // Future extensibility
 };
 
 struct BackgroundOperationState {
   BackgroundOperationType type = BackgroundOperationType::None;
-  std::atomic<bool>       in_progress{false};
-  std::atomic<float>      progress{0.0f};       // 0.0 to 1.0
-  std::string             status_text;          // Set once before thread starts
-  std::atomic<int>        failed_count{0};      // For operations that can partially fail
+  std::atomic<bool>       in_progress{ false };
+  std::atomic<float>      progress{ 0.0f }; // 0.0 to 1.0
+  std::string             status_text;      // Set once before thread starts
+  std::atomic<int> failed_count{ 0 }; // For operations that can partially fail
 
-  void reset() {
+  void reset()
+  {
     type = BackgroundOperationType::None;
     in_progress = false;
     progress = 0.0f;
@@ -67,8 +68,10 @@ struct BackgroundOperationState {
 };
 
 class NcCamView : public View {
-private:
+public:
+  ~NcCamView() override;
 
+private:
   struct JobOptions {
     float material_size[2] = { DEFAULT_MATERIAL_SIZE, DEFAULT_MATERIAL_SIZE };
     int   origin_corner = 2;
@@ -216,8 +219,8 @@ private:
 
   // Nesting helpers
   void resetNesting();
-  std::vector<std::vector<PolyNest::PolyPoint>> collectOutsideContours(
-    Part* part);
+  std::vector<std::vector<PolyNest::PolyPoint>>
+  collectOutsideContours(Part* part);
 
   Point2d m_show_viewer_context_menu;
   Point2d m_last_mouse_click_position;
@@ -252,10 +255,10 @@ public:
   ThemeColor m_inside_contour_color;
   ThemeColor m_open_contour_color;
 
-  JobOptions                 m_job_options;
+  JobOptions                      m_job_options;
   std::map<std::string, ToolData> m_tool_library;
-  std::vector<ToolOperation> m_toolpath_operations;
-  Box*                       m_material_plane;
+  std::vector<ToolOperation>      m_toolpath_operations;
+  Box*                            m_material_plane;
 
   // Application context dependency (injected)
   NcApp* m_app{ nullptr };
