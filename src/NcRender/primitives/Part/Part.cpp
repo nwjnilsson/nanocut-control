@@ -34,6 +34,10 @@ void        Part::processMouse(float mpos_x, float mpos_y)
     bool   mouse_is_over_path = false;
     size_t global_index = 0;
     for (auto& [layer_name, layer] : m_layers) {
+      if (!layer.visible) {
+        global_index += layer.paths.size();
+        continue;
+      }
       for (auto& path : layer.paths) {
         if (path.built_points.size() < 2) {
           global_index++;
@@ -95,6 +99,10 @@ void        Part::processMouse(float mpos_x, float mpos_y)
     bool   mouse_is_inside_perimeter = false;
     size_t global_index = 0;
     for (auto& [layer_name, layer] : m_layers) {
+      if (!layer.visible) {
+        global_index += layer.paths.size();
+        continue;
+      }
       for (auto& path : layer.paths) {
         if (path.is_inside_contour == false) {
           // Per-path bounding box early-out
