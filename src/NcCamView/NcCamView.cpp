@@ -537,8 +537,12 @@ void NcCamView::renderPropertiesWindow(Part*& selected_part)
     ImGui::Text("Offset Y: %.4f", selected_part->m_control.offset.y);
     ImGui::InputDouble("Scale", &selected_part->m_control.scale);
     ImGui::InputDouble("Angle", &selected_part->m_control.angle);
-    ImGui::SliderFloat(
-      "Simplification", &selected_part->m_control.smoothing, 0.f, SCALE(5.f));
+    ImGui::SliderFloat("Simplification",
+                       &selected_part->m_control.smoothing,
+                       SCALE(0.001f),
+                       SCALE(1.f),
+                       "%.3f",
+                       ImGuiSliderFlags_Logarithmic);
     if (ImGui::Button("Close")) {
       selected_part = NULL;
     }
@@ -1306,12 +1310,22 @@ std::vector<std::vector<PolyNest::PolyPoint>>
 NcCamView::collectOutsideContours(Part* part)
 {
   std::vector<std::vector<PolyNest::PolyPoint>> poly_part;
-  for (const auto& [layer_name, layer] : part->m_layers) {
-    for (const auto& path : layer.paths) {
+  for (auto& [layer_name, layer] : part->m_layers) {
+    for (auto& path : layer.paths) {
       if (!path.is_inside_contour) {
+        // Use cached simplified points, or simplify on demand
+        if (path.simplified_points.empty()) {
+          if (path.is_closed && path.points.size() <= 6) {
+            path.simplified_points = path.points;
+          }
+          else {
+            part->simplify(
+              path.points, path.simplified_points, part->m_control.smoothing);
+          }
+        }
         std::vector<PolyNest::PolyPoint> points;
-        points.reserve(path.points.size());
-        for (const auto& p : path.points) {
+        points.reserve(path.simplified_points.size());
+        for (const auto& p : path.simplified_points) {
           points.push_back({ p.x, p.y });
         }
         poly_part.push_back(std::move(points));
