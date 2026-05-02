@@ -1376,6 +1376,8 @@ void NcCamView::reevaluateContours()
                              .part->m_layers[all_path_refs[x].layer_name]
                              .paths[all_path_refs[x].path_index];
 
+    size_t containing_path_count = 0;
+
     for (size_t i = 0; i < all_path_refs.size(); i++) {
       if (i == x or all_path_refs[i].part != all_path_refs[x].part)
         continue;
@@ -1406,15 +1408,22 @@ void NcCamView::reevaluateContours()
       // Now do the expensive check
       if (all_path_refs[x].part->checkIfPathIsInsidePath(path_x.points,
                                                          path_i.points)) {
-        path_x.is_inside_contour = true;
-        if (all_path_refs[x].is_closed) {
-          path_x.color = &m_app->getColor(m_inside_contour_color);
-        }
-        else {
-          path_x.color = &m_app->getColor(m_open_contour_color);
-        }
-        break;
+        containing_path_count++;
       }
+    }
+
+    // Even-odd rule: inside if contained by an odd number of closed contours
+    path_x.is_inside_contour = (containing_path_count % 2) == 1;
+    if (path_x.is_inside_contour) {
+      if (all_path_refs[x].is_closed) {
+        path_x.color = &m_app->getColor(m_inside_contour_color);
+      }
+      else {
+        path_x.color = &m_app->getColor(m_open_contour_color);
+      }
+    }
+    else {
+      path_x.color = &m_app->getColor(m_outside_contour_color);
     }
   }
 }
@@ -1913,7 +1922,7 @@ void NcCamView::tick()
           auto tool_it =
             m_tool_library.find(m_toolpath_operations[x].tool_name);
           if (tool_it != m_tool_library.end()) {
-            layer.toolpath_offset = tool_it->second.kerf_width;
+            layer.toolpath_offset = tool_it->second.kerf_width * 0.5;
           }
           layer.toolpath_visible = m_toolpath_operations[x].enabled;
 

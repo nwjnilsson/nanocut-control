@@ -1169,6 +1169,8 @@ void DXFParsePathAdaptor::finish()
     auto& path_x =
       part_layers[path_refs[x].layer_name].paths[path_refs[x].path_index];
 
+    size_t containing_path_count = 0;
+
     for (size_t i = 0; i < path_refs.size(); i++) {
       if (i == x)
         continue;
@@ -1187,15 +1189,25 @@ void DXFParsePathAdaptor::finish()
         part_layers[path_refs[i].layer_name].paths[path_refs[i].path_index];
 
       if (checkIfPathIsInsidePath(path_x.points, path_i.points)) {
-        path_x.is_inside_contour = true;
-        if (path_x.is_closed) {
-          path_x.color = &m_cam_view->m_app->getColor(m_cam_view->m_inside_contour_color);
-        }
-        else {
-          path_x.color = &m_cam_view->m_app->getColor(m_cam_view->m_open_contour_color);
-        }
-        break;
+        containing_path_count++;
       }
+    }
+
+    // Even-odd rule: inside if contained by an odd number of closed contours
+    path_x.is_inside_contour = (containing_path_count % 2) == 1;
+    if (path_x.is_inside_contour) {
+      if (path_x.is_closed) {
+        path_x.color =
+          &m_cam_view->m_app->getColor(m_cam_view->m_inside_contour_color);
+      }
+      else {
+        path_x.color =
+          &m_cam_view->m_app->getColor(m_cam_view->m_open_contour_color);
+      }
+    }
+    else {
+      path_x.color =
+        &m_cam_view->m_app->getColor(m_cam_view->m_outside_contour_color);
     }
   }
 
