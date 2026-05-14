@@ -9,6 +9,7 @@
 #include "NcControlView/NcControlView.h"
 #include "ThemeManager/ThemeManager.h"
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <imgui.h>
 
@@ -541,10 +542,35 @@ void NcHmi::handleButton(const std::string& id)
           if (checkPathBounds()) {
             const auto& lines = control_view.getGCode().getLines();
             if (!lines.empty()) {
-              for (const auto& line : lines) {
-                control_view.m_motion_controller->pushGCode(line);
+              auto do_run = [&control_view]() {
+                const auto& l = control_view.getGCode().getLines();
+                for (const auto& line : l) {
+                  control_view.m_motion_controller->pushGCode(line);
+                }
+                control_view.m_motion_controller->runStack();
+              };
+
+              const auto& p = control_view.m_machine_parameters;
+              const bool pierce_over =
+                p.consumable_pierce_threshold > 0 &&
+                p.consumable_pierce_count >= p.consumable_pierce_threshold;
+              const bool arc_over =
+                p.consumable_arc_on_threshold_ms > 0 &&
+                p.consumable_arc_on_time_ms >= p.consumable_arc_on_threshold_ms;
+
+              if (pierce_over || arc_over) {
+                char msg[256];
+                std::snprintf(
+                  msg, sizeof(msg),
+                  "Consumable wear threshold exceeded:%s%s\nStart program "
+                  "anyway?",
+                  pierce_over ? "\n - pierces" : "",
+                  arc_over ? "\n - arc-on time" : "");
+                m_app->getDialogs().askYesNo(std::string(msg), do_run);
               }
-              control_view.m_motion_controller->runStack();
+              else {
+                do_run();
+              }
             }
             else {
               m_app->getDialogs().setInfoValue("No G-code loaded!");

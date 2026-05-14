@@ -314,6 +314,9 @@ void MotionController::lineHandler(std::string line)
               m_arc_okay_callback();
               m_arc_okay_callback = nullptr;
               m_arc_okay_timer = std::chrono::steady_clock::now();
+              m_arc_on_start = m_arc_okay_timer;
+              m_control_view->m_machine_parameters.consumable_pierce_count++;
+              saveParameters();
             }
           }
           if (m_abort_pending == true && m_dro_data.in_motion == false) {
@@ -750,6 +753,7 @@ void MotionController::touchTorchAndBackOff()
 
 void MotionController::torchOffAndAbort()
 {
+  accumulateArcOnTime();
   m_okay_callback = [this]() { runPop(); };
   m_probe_callback = nullptr;
   m_motion_sync_callback = nullptr;
@@ -766,6 +770,7 @@ void MotionController::torchOffAndAbort()
 
 void MotionController::torchOffAndRetract()
 {
+  accumulateArcOnTime();
   m_okay_callback = [this]() { runPop(); };
   m_probe_callback = nullptr;
   m_motion_sync_callback = nullptr;
@@ -777,6 +782,22 @@ void MotionController::torchOffAndRetract()
   m_gcode_queue.push_front("M5");
   LOG_F(INFO, "Shutting torch off and retracting!");
   runPop();
+}
+
+void MotionController::accumulateArcOnTime()
+{
+  if (!m_arc_on_start)
+    return;
+  const auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - *m_arc_on_start)
+      .count();
+  m_arc_on_start.reset();
+  if (elapsed_ms <= 0)
+    return;
+  m_control_view->m_machine_parameters.consumable_arc_on_time_ms +=
+    static_cast<uint64_t>(elapsed_ms);
+  saveParameters();
 }
 
 uint32_t

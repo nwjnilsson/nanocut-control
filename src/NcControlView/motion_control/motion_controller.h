@@ -7,6 +7,7 @@
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <optional>
 #include <string>
 
 // Type-safe data structures for runtime data (replacing JSON)
@@ -94,6 +95,11 @@ public:
   bool              isReady() const { return m_controller_ready; }
   bool              isTorchOn() const { return m_torch_on; }
   bool              needsHoming() const { return m_needs_homed; }
+  bool              isProgramRunning() const
+  {
+    return m_torch_on || !m_gcode_queue.empty() ||
+           m_dro_data.status == MachineStatus::Cycle;
+  }
   const DROData&    getDRO() const { return m_dro_data; }
   const RuntimeData getRunTime() const;
 
@@ -144,6 +150,9 @@ private:
   std::chrono::steady_clock::time_point m_torch_on_timer;
   std::chrono::steady_clock::time_point m_arc_okay_timer;
   std::chrono::steady_clock::time_point m_program_start_time;
+  // Set on the rising edge of arc-okay; cleared and accumulated into
+  // consumable_arc_on_time_ms on torch-off. Reset if the arc never started.
+  std::optional<std::chrono::steady_clock::time_point> m_arc_on_start;
   unsigned long m_last_checksum_error{ static_cast<unsigned long>(-1) };
 
   // Callbacks using std::function
@@ -173,6 +182,7 @@ private:
   void touchTorchAndBackOff();
   void torchOffAndAbort();
   void torchOffAndRetract();
+  void accumulateArcOnTime();
 
   // Instance methods for handling serial data
   bool byteHandler(uint8_t byte);

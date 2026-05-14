@@ -3,6 +3,7 @@
 
 // Standard library includes
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -62,6 +63,13 @@ public:
     float                arc_voltage_divider = 0;
     float                floating_head_backlash = 0;
     float                precise_jog_units = 0.0f;
+
+    // Consumable wear tracking. Stats are monotonically incremented by the
+    // motion controller; thresholds with value 0 are treated as disabled.
+    uint32_t consumable_pierce_count = 0;
+    uint64_t consumable_arc_on_time_ms = 0;
+    uint32_t consumable_pierce_threshold = 0;
+    uint64_t consumable_arc_on_threshold_ms = 0;
   };
 
   // JSON serialization functions for MachineParameters
@@ -108,6 +116,10 @@ public:
     j["invert_probe_pin"] = p.invert_probe_pin;
     j["invert_step_enable"] = p.invert_step_enable;
     j["precise_jog_units"] = p.precise_jog_units;
+    j["consumable"]["pierce_count"] = p.consumable_pierce_count;
+    j["consumable"]["arc_on_time_ms"] = p.consumable_arc_on_time_ms;
+    j["consumable"]["pierce_threshold"] = p.consumable_pierce_threshold;
+    j["consumable"]["arc_on_threshold_ms"] = p.consumable_arc_on_threshold_ms;
   }
 
   static void from_json(const nlohmann::json& j, MachineParameters& p)
@@ -153,6 +165,15 @@ public:
     p.invert_probe_pin = j.at("invert_probe_pin").get<bool>();
     p.invert_step_enable = j.at("invert_step_enable").get<bool>();
     p.precise_jog_units = j.at("precise_jog_units").get<float>();
+    // Backwards-compat: older configs predate consumable tracking.
+    if (j.contains("consumable")) {
+      const auto& c = j.at("consumable");
+      p.consumable_pierce_count = c.value("pierce_count", 0u);
+      p.consumable_arc_on_time_ms = c.value("arc_on_time_ms", uint64_t{ 0 });
+      p.consumable_pierce_threshold = c.value("pierce_threshold", 0u);
+      p.consumable_arc_on_threshold_ms =
+        c.value("arc_on_threshold_ms", uint64_t{ 0 });
+    }
   }
 
   struct ControllerDialogs {

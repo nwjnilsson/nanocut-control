@@ -148,7 +148,11 @@ void NcControlView::renderUI()
         m_app->getDialogs().showPreferences(true);
       }
       ImGui::Separator();
-      if (ImGui::MenuItem("Machine Parameters", "")) {
+      // Disabled while a program is running so live counter updates from the
+      // motion controller can't race the dialog's temp-parameter snapshot.
+      const bool params_locked =
+        m_motion_controller && m_motion_controller->isProgramRunning();
+      if (ImGui::MenuItem("Machine Parameters", "", false, !params_locked)) {
         LOG_F(INFO, "Edit->Machine Parameters");
         m_controller_dialogs.machine_params_temp = m_machine_parameters;
         m_controller_dialogs.machine_params_window->show();

@@ -2,8 +2,10 @@
 #include "../motion_control/motion_controller.h"
 #include "NcControlView/NcControlView.h"
 #include <algorithm>
+#include <cstdio>
 #include <imgui.h>
 #include <loguru.hpp>
+#include <string>
 
 namespace dialogs {
 
@@ -64,91 +66,147 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
                &d.machine_params_window->visible,
                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoCollapse);
-  ImGui::Separator();
-  ImGui::Text(
-    "Machine extents is the max distance each axis can travel freely. X0 is "
-    "the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
-  ImGui::InputFloat3("Machine Extents (X, Y, Z).",
-                     temp_parameters.machine_extents.data());
 
-  ImGui::Separator();
-  ImGui::Text("Cutting extents are used to prevent accidentally cutting onto "
-              "machine frames or generally any area outside of where cutting "
-              "should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 is "
-              "top right hand corner, values are incremented off of machine "
-              "extents, i.e X2 and Y2 should be negative");
-  ImGui::InputFloat4("Cutting Extents (X1, Y1, X2, Y2)",
-                     temp_parameters.cutting_extents.data());
-  ImGui::Separator();
-  ImGui::Text("Scale is in steps per your desired units. E.G. To use machine "
-              "in\nInches, set scales to steps per inch.");
-  ImGui::InputFloat3("Axis Scale (X, Y, Z)", temp_parameters.axis_scale.data());
-  ImGui::Text("Manual precision jogging (ctrl + [MOVE]) can be used for small "
-              "movements. The distance can be adjusted below.");
-  ImGui::InputFloat("Precision jogging distance (units)",
-                    &temp_parameters.precise_jog_units);
-  ImGui::Separator();
-  ImGui::Checkbox("Invert X", &temp_parameters.axis_invert[0]);
-  ImGui::SameLine();
-  ImGui::Checkbox("Invert Y1", &temp_parameters.axis_invert[1]);
-  ImGui::SameLine();
-  ImGui::Checkbox("Invert Y2", &temp_parameters.axis_invert[2]);
-  ImGui::SameLine();
-  ImGui::Checkbox("Invert Z", &temp_parameters.axis_invert[3]);
-  ImGui::SameLine();
-  ImGui::Checkbox("Invert stepper enable bit",
-                  &temp_parameters.invert_step_enable);
-  ImGui::Separator();
+  if (ImGui::CollapsingHeader("Machine",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text(
+      "Machine extents is the max distance each axis can travel freely. X0 is "
+      "the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
+    ImGui::InputFloat3("Machine Extents (X, Y, Z).",
+                       temp_parameters.machine_extents.data());
 
-  ImGui::Text(
-    "Homing and Soft Limits. Homing must be enabled to use soft limits!");
-  ImGui::Checkbox("Enable Soft Limits", &temp_parameters.soft_limits_enabled);
-  ImGui::Checkbox("Enable Homing", &temp_parameters.homing_enabled);
-  ImGui::Checkbox("Invert homing direction X",
-                  &temp_parameters.homing_dir_invert[0]);
-  ImGui::SameLine();
-  ImGui::Checkbox("Invert homing direction Y",
-                  &temp_parameters.homing_dir_invert[1]);
-  ImGui::SameLine();
-  ImGui::Checkbox("Invert homing direction Z",
-                  &temp_parameters.homing_dir_invert[2]);
-  ImGui::Checkbox("Invert limit pins", &temp_parameters.invert_limit_pins);
-  ImGui::Checkbox("Invert probe pin", &temp_parameters.invert_probe_pin);
-  ImGui::InputFloat("Homing Feedrate", &temp_parameters.homing_feed);
-  ImGui::InputFloat("Homing Seekrate", &temp_parameters.homing_seek);
-  ImGui::InputFloat("Homing Debounce", &temp_parameters.homing_debounce);
-  ImGui::InputFloat("Homing Pull-Off", &temp_parameters.homing_pull_off);
+    ImGui::Text("Cutting extents are used to prevent accidentally cutting onto "
+                "machine frames or generally any area outside of where cutting "
+                "should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 "
+                "is top right hand corner, values are incremented off of "
+                "machine extents, i.e X2 and Y2 should be negative");
+    ImGui::InputFloat4("Cutting Extents (X1, Y1, X2, Y2)",
+                       temp_parameters.cutting_extents.data());
 
-  ImGui::Separator();
-  ImGui::Text("Each axis maximum allowable velocity in units per minute. E.g. "
-              "inch/min or mm/min");
-  ImGui::InputFloat3("Max Velocity (X, Y, Z)", temp_parameters.max_vel.data());
-  ImGui::Separator();
-  ImGui::Text(
-    "Each axis maximum allowable acceleration in units per second squared");
-  ImGui::InputFloat3("Max Acceleration (X, Y, Z)",
-                     temp_parameters.max_accel.data());
-  ImGui::InputFloat("Junction Deviation", &temp_parameters.junction_deviation);
-  ImGui::Separator();
-  ImGui::Text(
-    "The distance the floating head moves off of it's gravity stop to where it "
-    "closes the probe switch. Ohmic sensing should have 0.0000 value");
-  ImGui::InputFloat("Floating Head Backlash",
-                    &temp_parameters.floating_head_backlash);
-  ImGui::Separator();
-  ImGui::Text("Velocity in units per minute when probing the torch");
-  ImGui::InputFloat("Z Probe Feed", &temp_parameters.z_probe_feedrate);
-  ImGui::Separator();
-  ImGui::Text("The amount of time after motion starts after a probing cycle to "
-              "consider the arc stabilized. This will affect THC accuracy!");
-  ImGui::InputFloat("Arc Stabilization Time (ms)",
-                    &temp_parameters.arc_stabilization_time);
-  ImGui::Separator();
-  ImGui::Text("The calibrated arc voltage divider of your system. This affects "
-              "the DRO and THC settings. 1 means raw arc voltage, 50 means a "
-              "1:50 divider is used.");
-  ImGui::InputFloat("Arc Voltage Divider",
-                    &temp_parameters.arc_voltage_divider);
+    ImGui::Text("Scale is in steps per your desired units. E.G. To use machine "
+                "in\nInches, set scales to steps per inch.");
+    ImGui::InputFloat3("Axis Scale (X, Y, Z)",
+                       temp_parameters.axis_scale.data());
+
+    ImGui::Text("Manual precision jogging (ctrl + [MOVE]) can be used for "
+                "small movements. The distance can be adjusted below.");
+    ImGui::InputFloat("Precision jogging distance (units)",
+                      &temp_parameters.precise_jog_units);
+
+    ImGui::Text("Axis direction inversion:");
+    ImGui::Checkbox("Invert X", &temp_parameters.axis_invert[0]);
+    ImGui::SameLine();
+    ImGui::Checkbox("Invert Y1", &temp_parameters.axis_invert[1]);
+    ImGui::SameLine();
+    ImGui::Checkbox("Invert Y2", &temp_parameters.axis_invert[2]);
+    ImGui::SameLine();
+    ImGui::Checkbox("Invert Z", &temp_parameters.axis_invert[3]);
+
+    ImGui::Text("Pin inversion:");
+    ImGui::Checkbox("Invert stepper enable bit",
+                    &temp_parameters.invert_step_enable);
+    ImGui::Checkbox("Invert limit pins", &temp_parameters.invert_limit_pins);
+    ImGui::Checkbox("Invert probe pin", &temp_parameters.invert_probe_pin);
+  }
+
+  if (ImGui::CollapsingHeader("Homing & Soft Limits",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text("Homing must be enabled to use soft limits!");
+    ImGui::Checkbox("Enable Soft Limits",
+                    &temp_parameters.soft_limits_enabled);
+    ImGui::Checkbox("Enable Homing", &temp_parameters.homing_enabled);
+    ImGui::Checkbox("Invert homing direction X",
+                    &temp_parameters.homing_dir_invert[0]);
+    ImGui::SameLine();
+    ImGui::Checkbox("Invert homing direction Y",
+                    &temp_parameters.homing_dir_invert[1]);
+    ImGui::SameLine();
+    ImGui::Checkbox("Invert homing direction Z",
+                    &temp_parameters.homing_dir_invert[2]);
+    ImGui::InputFloat("Homing Feedrate", &temp_parameters.homing_feed);
+    ImGui::InputFloat("Homing Seekrate", &temp_parameters.homing_seek);
+    ImGui::InputFloat("Homing Debounce", &temp_parameters.homing_debounce);
+    ImGui::InputFloat("Homing Pull-Off", &temp_parameters.homing_pull_off);
+  }
+
+  if (ImGui::CollapsingHeader("Speed & Acceleration",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text("Each axis maximum allowable velocity in units per minute. "
+                "E.g. inch/min or mm/min");
+    ImGui::InputFloat3("Max Velocity (X, Y, Z)",
+                       temp_parameters.max_vel.data());
+    ImGui::Text(
+      "Each axis maximum allowable acceleration in units per second squared");
+    ImGui::InputFloat3("Max Acceleration (X, Y, Z)",
+                       temp_parameters.max_accel.data());
+    ImGui::InputFloat("Junction Deviation",
+                      &temp_parameters.junction_deviation);
+  }
+
+  if (ImGui::CollapsingHeader("Torch & Probing",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text("The distance the floating head moves off of it's gravity "
+                "stop to where it closes the probe switch. Ohmic sensing "
+                "should have 0.0000 value");
+    ImGui::InputFloat("Floating Head Backlash",
+                      &temp_parameters.floating_head_backlash);
+    ImGui::Text("Velocity in units per minute when probing the torch");
+    ImGui::InputFloat("Z Probe Feed", &temp_parameters.z_probe_feedrate);
+    ImGui::Text("The amount of time after motion starts after a probing "
+                "cycle to consider the arc stabilized. This will affect THC "
+                "accuracy!");
+    ImGui::InputFloat("Arc Stabilization Time (ms)",
+                      &temp_parameters.arc_stabilization_time);
+    ImGui::Text("The calibrated arc voltage divider of your system. This "
+                "affects the DRO and THC settings. 1 means raw arc voltage, "
+                "50 means a 1:50 divider is used.");
+    ImGui::InputFloat("Arc Voltage Divider",
+                      &temp_parameters.arc_voltage_divider);
+  }
+
+  if (ImGui::CollapsingHeader("Consumable Wear",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text("A plasma nozzle is typically rated for around 1000 pierces "
+                "and 2 hours of arc-on time.\nSet a threshold to be warned at "
+                "Run time; 0 disables the warning. Reset after replacing the "
+                "consumable.");
+    const auto fmt_time = [](uint64_t ms) {
+      const uint64_t total_s = ms / 1000;
+      const uint64_t h = total_s / 3600;
+      const uint64_t m = (total_s % 3600) / 60;
+      const uint64_t s = total_s % 60;
+      char buf[64];
+      std::snprintf(buf, sizeof(buf), "%lluh %02llum %02llus",
+                    (unsigned long long)h,
+                    (unsigned long long)m,
+                    (unsigned long long)s);
+      return std::string(buf);
+    };
+
+    ImGui::Text("Pierces: %u    Arc-on time: %s",
+                temp_parameters.consumable_pierce_count,
+                fmt_time(temp_parameters.consumable_arc_on_time_ms).c_str());
+
+    ImGui::InputScalar("Pierce warning threshold (0 = off)",
+                       ImGuiDataType_U32,
+                       &temp_parameters.consumable_pierce_threshold);
+
+    float arc_on_threshold_minutes =
+      static_cast<float>(temp_parameters.consumable_arc_on_threshold_ms) /
+      60000.0f;
+    if (ImGui::InputFloat("Arc-on warning threshold (minutes, 0 = off)",
+                          &arc_on_threshold_minutes)) {
+      if (arc_on_threshold_minutes < 0.0f)
+        arc_on_threshold_minutes = 0.0f;
+      temp_parameters.consumable_arc_on_threshold_ms =
+        static_cast<uint64_t>(arc_on_threshold_minutes * 60000.0f);
+    }
+
+    if (ImGui::Button("Reset consumable counters")) {
+      temp_parameters.consumable_pierce_count = 0;
+      temp_parameters.consumable_arc_on_time_ms = 0;
+    }
+  }
 
   ImGui::Spacing();
   if (ImGui::Button("Save and write to controller")) {
