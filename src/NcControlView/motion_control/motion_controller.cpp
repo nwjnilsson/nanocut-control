@@ -316,7 +316,6 @@ void MotionController::lineHandler(std::string line)
               m_arc_okay_timer = std::chrono::steady_clock::now();
               m_arc_on_start = m_arc_okay_timer;
               m_control_view->m_machine_parameters.consumable_pierce_count++;
-              saveParameters();
             }
           }
           if (m_abort_pending == true && m_dro_data.in_motion == false) {
@@ -676,6 +675,8 @@ void MotionController::programFinished()
   m_motion_sync_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_gcode_queue.clear();
+  // Persist consumable counters accumulated in RAM during the program.
+  saveParameters();
 }
 
 bool MotionController::isHomingSafe() const
@@ -797,7 +798,6 @@ void MotionController::accumulateArcOnTime()
     return;
   m_control_view->m_machine_parameters.consumable_arc_on_time_ms +=
     static_cast<uint64_t>(elapsed_ms);
-  saveParameters();
 }
 
 uint32_t
