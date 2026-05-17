@@ -13,7 +13,11 @@
 #include <imgui.h>
 #include <loguru.hpp>
 
-NcCamView::~NcCamView() { m_background_thread->join(); }
+NcCamView::~NcCamView() {
+  if (m_background_thread && m_background_thread->joinable()) {
+    m_background_thread->join();
+  }
+}
 
 // JSON serialization for ToolData
 void NcCamView::to_json(nlohmann::json& j, const ToolData& tool)
@@ -790,8 +794,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
         ImGui::SameLine();
         if (ImGui::Button(std::string("Delete##Delete-" + tool_name).c_str())) {
           // Show confirmation dialog
+          std::string question {"Delete " + tool_name + "?"};
           m_app->getDialogs().askYesNo(
-            std::format("Delete \"{}\"?", tool_name),
+            question,
             [this, tool_name]() {
               m_tool_library.erase(tool_name);
 
