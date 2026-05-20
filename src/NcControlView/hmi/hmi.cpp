@@ -1286,12 +1286,7 @@ void NcHmi::pageUpKeyCallback(const KeyEvent& e)
     return;
   auto& control_view = m_app->getControlView();
   if (e.action == GLFW_PRESS) {
-    if (control_view.m_machine_parameters.homing_dir_invert[2]) {
-      control_view.m_motion_controller->sendRealTime('<');
-    }
-    else {
       control_view.m_motion_controller->sendRealTime('>');
-    }
   }
   else if (e.action == GLFW_RELEASE) {
     control_view.m_motion_controller->sendRealTime('^');
@@ -1338,12 +1333,7 @@ void NcHmi::pageDownKeyCallback(const KeyEvent& e)
     return;
   auto& control_view = m_app->getControlView();
   if (e.action == GLFW_PRESS) {
-    if (control_view.m_machine_parameters.homing_dir_invert[2]) {
-      control_view.m_motion_controller->sendRealTime('>');
-    }
-    else {
       control_view.m_motion_controller->sendRealTime('<');
-    }
   }
   else if (e.action == GLFW_RELEASE) {
     control_view.m_motion_controller->sendRealTime('^');

@@ -604,7 +604,7 @@ void MotionController::runPop()
 void MotionController::probe()
 {
   sendWithCRC(
-    "G38.3Z" +
+    "G38.3Z-" +
     std::to_string(m_control_view->m_machine_parameters.machine_extents[2] -
                    m_control_view->m_machine_parameters.homing_pull_off) +
     "F" +
@@ -708,7 +708,7 @@ void MotionController::lowerToCutHeightAndRunProgram()
     m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
   }
   m_gcode_queue.push_front("G90");
-  m_gcode_queue.push_front("G91G0 Z" +
+  m_gcode_queue.push_front("G91G0 Z-" +
                            to_string_strip_zeros(m_torch_params.pierce_height -
                                                  m_torch_params.cut_height));
   m_gcode_queue.push_front("G4P" +
@@ -725,10 +725,10 @@ void MotionController::raiseToPierceHeightAndFireTorch()
   m_gcode_queue.push_front("WAIT_FOR_ARC_OKAY");
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front("M3S1000");
-  m_gcode_queue.push_front("G0Z-" +
+  m_gcode_queue.push_front("G0Z" +
                            to_string_strip_zeros(m_torch_params.pierce_height));
   m_gcode_queue.push_front(
-    "G0Z-" + to_string_strip_zeros(
+    "G0Z" + to_string_strip_zeros(
                m_control_view->m_machine_parameters.floating_head_backlash));
   m_gcode_queue.push_front("G91");
   LOG_F(INFO, "Running callback => raise_to_pierce_height_and_fire_torch()");
@@ -743,9 +743,9 @@ void MotionController::touchTorchAndBackOff()
   m_probe_callback = nullptr;
 
   m_gcode_queue.push_front("G90");
-  m_gcode_queue.push_front("G0Z-0.5");
+  m_gcode_queue.push_front("G0Z0.5");
   m_gcode_queue.push_front(
-    "G0Z-" + to_string_strip_zeros(
+    "G0Z" + to_string_strip_zeros(
                m_control_view->m_machine_parameters.floating_head_backlash));
   m_gcode_queue.push_front("G91");
   LOG_F(INFO, "Touching off torch and dry running!");
