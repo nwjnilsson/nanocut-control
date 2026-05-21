@@ -363,8 +363,8 @@ bool NcRender::init(int argc, char** argv)
   ImGuiIO& io = ImGui::GetIO();
   io.IniFilename = m_gui_ini_filename;
   io.LogFilename = m_gui_log_filename;
-  io.ConfigFlags |=
-    ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+  // Keyboard nav intentionally left disabled: arrow keys jog the machine, so
+  // ImGui must not consume them to move button focus in the HMI pane.
   // Theme system now handles styling
   // m_gui_style is kept for backward compatibility but not used
   ImGui_ImplGlfw_InitForOpenGL(m_window, true);
