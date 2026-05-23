@@ -31,6 +31,7 @@ void        Arc::processMouse(float mpos_x, float mpos_y)
     }
   }
 }
+
 void Arc::renderArc(
   double cx, double cy, double radius, double start_angle, double end_angle)
 {

@@ -174,7 +174,7 @@ private:
 
 public:
   std::string m_filename;
-  float       m_smoothing;
+  float       m_simplification;
   double      m_import_scale;
   int         m_import_quality;
   double      m_chain_tolerance;

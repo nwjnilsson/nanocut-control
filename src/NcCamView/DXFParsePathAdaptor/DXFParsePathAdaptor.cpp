@@ -421,7 +421,7 @@ DXFParsePathAdaptor::DXFParsePathAdaptor(
   m_view_callback = view_callback;
   m_mouse_callback = mouse_callback;
   m_cam_view = cam_view;
-  m_smoothing = SCALE(0.25);
+  m_simplification = SCALE(0.02);
   m_import_scale = 1.0;
   m_chain_tolerance = SCALE(0.25);
 }
@@ -438,7 +438,7 @@ void DXFParsePathAdaptor::setImportQuality(int quality)
 
 void DXFParsePathAdaptor::setSmoothing(float smoothing)
 {
-  m_smoothing = smoothing;
+  m_simplification = smoothing;
 }
 
 void DXFParsePathAdaptor::setFilename(std::string f) { m_filename = f; }
@@ -1224,7 +1224,7 @@ void DXFParsePathAdaptor::finish()
   // Create the final primitive with layer-organized structure
   Part* p = m_nc_render_instance->pushPrimitive<Part>(m_filename,
                                                       std::move(part_layers));
-  p->m_control.smoothing = m_smoothing;
+  p->m_control.smoothing = m_simplification;
   p->m_control.scale = 1.0;
   p->mouse_callback = m_mouse_callback;
   p->matrix_callback = m_view_callback;

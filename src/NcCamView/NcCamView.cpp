@@ -1437,6 +1437,21 @@ void NcCamView::reevaluateContours()
 // Action Handler Methods
 // ============================================================================
 
+// Shoelace area of a closed polygon. Returns the absolute area; sign of the
+// signed area indicates orientation but we don't care for THC gating.
+static double polygonArea(const std::vector<Point2d>& path)
+{
+  if (path.size() < 3)
+    return 0.0;
+  double a = 0.0;
+  for (size_t i = 0, n = path.size(); i < n; ++i) {
+    const Point2d& p = path[i];
+    const Point2d& q = path[(i + 1) % n];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return std::fabs(a) * 0.5;
+}
+
 // Generate G-code lines from current toolpath operations
 std::vector<std::string> NcCamView::generateGCode()
 {
@@ -1456,11 +1471,29 @@ std::vector<std::string> NcCamView::generateGCode()
       if (tool_it != m_tool_library.end()) {
         const auto& tool = tool_it->second;
 
-        if (tool.thc > 0) {
-          lines.push_back("$T=" + std::to_string(tool.thc));
+        const bool   thc_enabled = tool.thc > 0;
+        const std::string thc_on_cmd =
+          "$T=" + std::to_string(tool.thc);
+        // Disable THC on contours whose enclosed area is below ~(2.5*kerf)^2.
+        // Voltage-based height control is unreliable on tiny features
+        // (small holes, narrow slots) because the arc spends very little time
+        // at any one position, the readout is noisy, and the torch can dive
+        // into the workpiece. The 2.5x-kerf rule of thumb came from observing
+        // 5 mm diameter holes diving with a 1.2 mm kerf.
+        const double small_area_threshold =
+          (2.5 * tool.kerf_width) * (2.5 * tool.kerf_width) * std::numbers::pi;
+
+        if (thc_enabled) {
+          lines.push_back(thc_on_cmd);
         }
 
         for (size_t x = 0; x < tool_paths.size(); x++) {
+          const bool small_contour =
+            thc_enabled &&
+            polygonArea(tool_paths[x]) < small_area_threshold;
+          if (small_contour) {
+            lines.push_back("$T=0");
+          }
           lines.push_back("G0 X" + std::to_string(-tool_paths[x][0].x) + " Y" +
                           std::to_string(-tool_paths[x][0].y));
           lines.push_back("fire_torch " + std::to_string(tool.pierce_height) +
@@ -1472,6 +1505,9 @@ std::vector<std::string> NcCamView::generateGCode()
                             std::to_string(tool.feed_rate));
           }
           lines.push_back("torch_off");
+          if (small_contour) {
+            lines.push_back(thc_on_cmd);
+          }
         }
       }
       else {

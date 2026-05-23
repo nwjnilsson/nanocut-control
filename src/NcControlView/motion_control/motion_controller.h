@@ -108,7 +108,6 @@ public:
   float getThcOffset() const { return m_thc_offset; }
   float getThcEffective() const { return m_thc_base_value + m_thc_offset; }
   void  adjustThcOffset(float delta);
-  void  resetThcOffset();
 
   // Homing safety check
   bool isHomingSafe() const;

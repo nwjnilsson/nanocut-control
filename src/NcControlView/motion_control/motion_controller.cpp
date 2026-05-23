@@ -574,7 +574,6 @@ void MotionController::runPop()
       float value = std::stof(line.substr(line.find("$T=") + 3));
       if (value > 0.0f) {
         m_thc_base_value = value;
-        m_thc_offset = 0.0f;
         float       effective = m_thc_base_value + m_thc_offset;
         std::string cmd = "$T=" + to_string_strip_zeros(effective);
         LOG_F(INFO,
@@ -729,7 +728,7 @@ void MotionController::raiseToPierceHeightAndFireTorch()
                            to_string_strip_zeros(m_torch_params.pierce_height));
   m_gcode_queue.push_front(
     "G0Z" + to_string_strip_zeros(
-               m_control_view->m_machine_parameters.floating_head_backlash));
+              m_control_view->m_machine_parameters.floating_head_backlash));
   m_gcode_queue.push_front("G91");
   LOG_F(INFO, "Running callback => raise_to_pierce_height_and_fire_torch()");
   m_torch_on = true;
@@ -746,7 +745,7 @@ void MotionController::touchTorchAndBackOff()
   m_gcode_queue.push_front("G0Z0.5");
   m_gcode_queue.push_front(
     "G0Z" + to_string_strip_zeros(
-               m_control_view->m_machine_parameters.floating_head_backlash));
+              m_control_view->m_machine_parameters.floating_head_backlash));
   m_gcode_queue.push_front("G91");
   LOG_F(INFO, "Touching off torch and dry running!");
   runPop();
@@ -789,10 +788,9 @@ void MotionController::accumulateArcOnTime()
 {
   if (!m_arc_on_start)
     return;
-  const auto elapsed_ms =
-    std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() - *m_arc_on_start)
-      .count();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - *m_arc_on_start)
+                            .count();
   m_arc_on_start.reset();
   if (elapsed_ms <= 0)
     return;
@@ -817,7 +815,8 @@ MotionController::calculateCRC32(uint32_t crc, const char* buf, size_t len)
 void MotionController::adjustThcOffset(float delta)
 {
   // Clamping to encourage proper targets in tool library instead
-  m_thc_offset = std::clamp(m_thc_offset + delta, MIN_THC_OFFSET, MAX_THC_OFFSET);
+  m_thc_offset =
+    std::clamp(m_thc_offset + delta, MIN_THC_OFFSET, MAX_THC_OFFSET);
   float new_effective = m_thc_base_value + m_thc_offset;
   new_effective = std::clamp(new_effective, 0.0f, MAX_ARC_VOLTAGE);
   // m_thc_offset = new_effective - m_thc_base_value;
@@ -833,15 +832,6 @@ void MotionController::adjustThcOffset(float delta)
       m_okay_callback = [this]() { runPop(); };
     }
   }
-}
-
-void MotionController::resetThcOffset()
-{
-  m_thc_offset = 0.0f;
-  LOG_F(INFO,
-        "THC offset reset: base=%.1f effective=%.1f",
-        m_thc_base_value,
-        getThcEffective());
 }
 
 void MotionController::logRuntime()

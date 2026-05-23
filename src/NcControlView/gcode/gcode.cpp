@@ -131,7 +131,7 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
   try {
     if (m_current_path.points.size() > 1) {
       std::vector<Point2d> simplified =
-        geo::simplify(m_current_path.points, SCALE(0.25));
+        geo::simplify(m_current_path.points, SCALE(0.1));
       std::vector<Point2d> path;
       int                  point_count = 0;
       for (int i = 0; i < simplified.size(); i++) {
