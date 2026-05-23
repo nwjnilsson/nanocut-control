@@ -583,15 +583,42 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                    ImGuiWindowFlags_NoCollapse);
     ImGui::Text("Material Size");
-    ImGui::InputFloat("Width", &m_job_options.material_size[0]);
-    ImGui::SameLine();
-    ImGui::InputFloat("Height", &m_job_options.material_size[1]);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    float avail_w = ImGui::GetContentRegionAvail().x;
+    float inner_spacing = style.ItemInnerSpacing.x;
+    float item_spacing = style.ItemSpacing.x;
+    float width_label_w = ImGui::CalcTextSize("Width").x;
+    float height_label_w = ImGui::CalcTextSize("Height").x;
+    float pair_input_w = (avail_w - item_spacing - inner_spacing * 2 -
+                          width_label_w - height_label_w) *
+                         0.5f;
+    if (pair_input_w >= 40.0f) {
+      ImGui::SetNextItemWidth(pair_input_w);
+      ImGui::InputFloat("Width", &m_job_options.material_size[0]);
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(pair_input_w);
+      ImGui::InputFloat("Height", &m_job_options.material_size[1]);
+    } else {
+      ImGui::SetNextItemWidth(avail_w - inner_spacing - width_label_w);
+      ImGui::InputFloat("Width", &m_job_options.material_size[0]);
+      ImGui::SetNextItemWidth(avail_w - inner_spacing - height_label_w);
+      ImGui::InputFloat("Height", &m_job_options.material_size[1]);
+    }
     ImGui::Text("Origin Corner");
+    auto same_line_if_fits = [&](const char* next_label) {
+      float next_w = ImGui::GetFrameHeight() + inner_spacing +
+                     ImGui::CalcTextSize(next_label).x;
+      float remaining =
+        ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x -
+        ImGui::GetItemRectMax().x - item_spacing;
+      if (remaining >= next_w)
+        ImGui::SameLine();
+    };
     ImGui::RadioButton("Top Left", &m_job_options.origin_corner, 0);
-    ImGui::SameLine();
+    same_line_if_fits("Top Right");
     ImGui::RadioButton("Top Right", &m_job_options.origin_corner, 1);
     ImGui::RadioButton("Bottom Left", &m_job_options.origin_corner, 2);
-    ImGui::SameLine();
+    same_line_if_fits("Bottom Right");
     ImGui::RadioButton("Bottom Right", &m_job_options.origin_corner, 3);
     switch (m_job_options.origin_corner) {
       case 0:
