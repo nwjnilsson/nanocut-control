@@ -84,6 +84,8 @@ private:
     float       kerf_width = DEFAULT_KERF_WIDTH;
     float       feed_rate = 1.0f;
     float       thc = 0.0f;
+    float       small_hole_feedrate_factor = 0.6f;
+    float       overburn_length = 4.0f;
   };
 
   // JSON serialization for ToolData

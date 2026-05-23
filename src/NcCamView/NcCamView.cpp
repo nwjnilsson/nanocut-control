@@ -13,7 +13,8 @@
 #include <imgui.h>
 #include <loguru.hpp>
 
-NcCamView::~NcCamView() {
+NcCamView::~NcCamView()
+{
   if (m_background_thread && m_background_thread->joinable()) {
     m_background_thread->join();
   }
@@ -28,7 +29,10 @@ void NcCamView::to_json(nlohmann::json& j, const ToolData& tool)
                       { "cut_height", tool.cut_height },
                       { "kerf_width", tool.kerf_width },
                       { "feed_rate", tool.feed_rate },
-                      { "thc", tool.thc } };
+                      { "thc", tool.thc },
+                      { "small_hole_feedrate_factor",
+                        tool.small_hole_feedrate_factor },
+                      { "overburn_length", tool.overburn_length } };
 }
 
 void NcCamView::from_json(const nlohmann::json& j, ToolData& tool)
@@ -40,6 +44,8 @@ void NcCamView::from_json(const nlohmann::json& j, ToolData& tool)
   tool.kerf_width = j.at("kerf_width").get<float>();
   tool.feed_rate = j.at("feed_rate").get<float>();
   tool.thc = j.at("thc").get<float>();
+  tool.small_hole_feedrate_factor = j.value("small_hole_feedrate_factor", 0.6f);
+  tool.overburn_length = j.value("overburn_length", 4.0f);
 }
 
 // Static reference to current instance for callback access
@@ -636,6 +642,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     ImGui::InputFloat("kerf_width", &tool.kerf_width);
     ImGui::InputFloat("feed_rate", &tool.feed_rate);
     ImGui::InputFloat("thc", &tool.thc);
+    ImGui::InputFloat("small_hole_feedrate_factor",
+                      &tool.small_hole_feedrate_factor);
+    ImGui::InputFloat("overburn_length", &tool.overburn_length);
 
     if (ImGui::Button("OK")) {
       bool skip_save = false;
@@ -645,7 +654,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
           tool.cut_height < 0.f || tool.cut_height > 50000.f ||
           tool.kerf_width < 0.f || tool.kerf_width > 50000.f ||
           tool.feed_rate < 0.f || tool.feed_rate > 50000.f || tool.thc < 0.f ||
-          tool.thc > 50000.f) {
+          tool.thc > 50000.f || tool.small_hole_feedrate_factor <= 0.f ||
+          tool.small_hole_feedrate_factor > 1.f || tool.overburn_length < 0.f ||
+          tool.overburn_length > 50000.f) {
         LOG_F(WARNING, "Invalid tool input parameters.");
         skip_save = true;
       }
@@ -697,6 +708,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     ImGui::InputFloat("kerf_width", &edit_tool.kerf_width);
     ImGui::InputFloat("feed_rate", &edit_tool.feed_rate);
     ImGui::InputFloat("thc", &edit_tool.thc);
+    ImGui::InputFloat("small_hole_feedrate_factor",
+                      &edit_tool.small_hole_feedrate_factor);
+    ImGui::InputFloat("overburn_length", &edit_tool.overburn_length);
 
     if (ImGui::Button("OK")) {
       bool skip_save = false;
@@ -706,7 +720,11 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
           edit_tool.cut_height < 0.f || edit_tool.cut_height > 50000.f ||
           edit_tool.kerf_width < 0.f || edit_tool.kerf_width > 50000.f ||
           edit_tool.feed_rate < 0.f || edit_tool.feed_rate > 50000.f ||
-          edit_tool.thc < 0.f || edit_tool.thc > 50000.f) {
+          edit_tool.thc < 0.f || edit_tool.thc > 50000.f ||
+          edit_tool.small_hole_feedrate_factor <= 0.f ||
+          edit_tool.small_hole_feedrate_factor > 1.f ||
+          edit_tool.overburn_length < 0.f ||
+          edit_tool.overburn_length > 50000.f) {
         LOG_F(WARNING, "Invalid tool input parameters.");
         skip_save = true;
       }
@@ -794,7 +812,7 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
         ImGui::SameLine();
         if (ImGui::Button(std::string("Delete##Delete-" + tool_name).c_str())) {
           // Show confirmation dialog
-          std::string question {"Delete " + tool_name + "?"};
+          std::string question{ "Delete " + tool_name + "?" };
           m_app->getDialogs().askYesNo(
             question,
             [this, tool_name]() {
@@ -1471,41 +1489,92 @@ std::vector<std::string> NcCamView::generateGCode()
       if (tool_it != m_tool_library.end()) {
         const auto& tool = tool_it->second;
 
-        const bool   thc_enabled = tool.thc > 0;
-        const std::string thc_on_cmd =
-          "$T=" + std::to_string(tool.thc);
-        // Disable THC on contours whose enclosed area is below ~(2.5*kerf)^2.
-        // Voltage-based height control is unreliable on tiny features
-        // (small holes, narrow slots) because the arc spends very little time
-        // at any one position, the readout is noisy, and the torch can dive
-        // into the workpiece. The 2.5x-kerf rule of thumb came from observing
-        // 5 mm diameter holes diving with a 1.2 mm kerf.
-        const double small_area_threshold =
-          (2.5 * tool.kerf_width) * (2.5 * tool.kerf_width) * std::numbers::pi;
+        const bool        thc_enabled = tool.thc > 0;
+        const std::string thc_on_cmd = "$T=" + std::to_string(tool.thc);
+
+        // Disable THC and reduce feed on contours with small area
+        const double small_area_threshold = (12.5 * tool.kerf_width) *
+                                            (12.5 * tool.kerf_width) *
+                                            std::numbers::pi;
 
         if (thc_enabled) {
           lines.push_back(thc_on_cmd);
         }
 
         for (size_t x = 0; x < tool_paths.size(); x++) {
-          const bool small_contour =
-            thc_enabled &&
-            polygonArea(tool_paths[x]) < small_area_threshold;
-          if (small_contour) {
+          const auto& path = tool_paths[x];
+          const bool  small_contour = polygonArea(path) < small_area_threshold;
+          if (small_contour && thc_enabled) {
             lines.push_back("$T=0");
           }
-          lines.push_back("G0 X" + std::to_string(-tool_paths[x][0].x) + " Y" +
-                          std::to_string(-tool_paths[x][0].y));
+          lines.push_back("G0 X" + std::to_string(-path[0].x) + " Y" +
+                          std::to_string(-path[0].y));
           lines.push_back("fire_torch " + std::to_string(tool.pierce_height) +
                           " " + std::to_string(tool.pierce_delay) + " " +
                           std::to_string(tool.cut_height));
-          for (size_t z = 0; z < tool_paths[x].size(); z++) {
-            lines.push_back("G1 X" + std::to_string(-tool_paths[x][z].x) +
-                            " Y" + std::to_string(-tool_paths[x][z].y) + " F" +
-                            std::to_string(tool.feed_rate));
+
+          const float feed =
+            small_contour ? tool.feed_rate * tool.small_hole_feedrate_factor
+                          : tool.feed_rate;
+
+          // For small contours, skip the trailing lead-out vertex (the
+          // duplicate of path[0] appended by createToolpathLeads) and instead
+          // emit overburn moves continuing along the start of the contour.
+          // For large contours, walk the full path including the lead-out.
+          const size_t cut_end =
+            (small_contour && path.size() >= 2) ? path.size() - 1 : path.size();
+          for (size_t z = 0; z < cut_end; z++) {
+            lines.push_back("G1 X" + std::to_string(-path[z].x) + " Y" +
+                            std::to_string(-path[z].y) + " F" +
+                            std::to_string(feed));
           }
+
+          // Overburn: continue past the closing kerf crossing along the start
+          // of the contour for overburn_length, so the eventual torch-off
+          // dwell lands inside the slug instead of on the finished part.
+          // Path layout from createToolpathLeads is
+          // [lead_pt, c0, c1, ..., cN, lead_pt]; we already cut up to cN
+          // (index size-2). The first contour vertex is at index 1.
+          if (small_contour && tool.overburn_length > 0.0f &&
+              path.size() >= 4) {
+            double  remaining = tool.overburn_length;
+            Point2d prev = path[path.size() - 2]; // == cN, last cut position
+            // Walk forward from c1, wrapping if needed.
+            const size_t contour_first = 1;
+            const size_t contour_last = path.size() - 2;
+            const size_t contour_count = contour_last - contour_first + 1;
+            for (size_t step = 0; step < contour_count && remaining > 0.0;
+                 step++) {
+              const Point2d& next =
+                path[contour_first + (step % contour_count)];
+              const double dx = next.x - prev.x;
+              const double dy = next.y - prev.y;
+              const double seg_len = std::sqrt(dx * dx + dy * dy);
+              if (seg_len <= 0.0) {
+                prev = next;
+                continue;
+              }
+              if (seg_len >= remaining) {
+                const double t = remaining / seg_len;
+                const double ox = prev.x + dx * t;
+                const double oy = prev.y + dy * t;
+                lines.push_back("G1 X" + std::to_string(-ox) + " Y" +
+                                std::to_string(-oy) + " F" +
+                                std::to_string(feed));
+                remaining = 0.0;
+              }
+              else {
+                lines.push_back("G1 X" + std::to_string(-next.x) + " Y" +
+                                std::to_string(-next.y) + " F" +
+                                std::to_string(feed));
+                remaining -= seg_len;
+                prev = next;
+              }
+            }
+          }
+
           lines.push_back("torch_off");
-          if (small_contour) {
+          if (small_contour && thc_enabled) {
             lines.push_back(thc_on_cmd);
           }
         }
