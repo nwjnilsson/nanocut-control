@@ -2,11 +2,11 @@
 #define MOTION_CONTROLLER_H
 
 #include "../serial/NcSerial.h"
-#include <nlohmann/json.hpp>
 #include <NanoCut.h>
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 
@@ -49,6 +49,7 @@ struct TorchParameters {
   double pierce_height{ 0.0 };
   double pierce_delay{ 0.0 };
   double cut_height{ 0.0 };
+  double thc{ 0.0 };
 };
 
 struct RuntimeData {
@@ -58,15 +59,15 @@ struct RuntimeData {
 };
 
 enum class GrblMessageType {
-  DROData,           // JSON status data
-  UnlockRequired,    // [MSG:'$H'|'$X' to unlock]
-  ChecksumFailure,   // [CHECKSUM_FAILURE]
-  Error,             // error:X
-  Alarm,             // ALARM:X
-  Crash,             // [CRASH]
-  ProbeResult,       // [PRB
-  GrblReady,         // Grbl startup message
-  Unknown            // Unidentified message
+  DROData,         // JSON status data
+  UnlockRequired,  // [MSG:'$H'|'$X' to unlock]
+  ChecksumFailure, // [CHECKSUM_FAILURE]
+  Error,           // error:X
+  Alarm,           // ALARM:X
+  Crash,           // [CRASH]
+  ProbeResult,     // [PRB
+  GrblReady,       // Grbl startup message
+  Unknown          // Unidentified message
 };
 
 class MotionController {
@@ -92,10 +93,10 @@ public:
   void triggerReset();
 
   // State queries
-  bool              isReady() const { return m_controller_ready; }
-  bool              isTorchOn() const { return m_torch_on; }
-  bool              needsHoming() const { return m_needs_homed; }
-  bool              isProgramRunning() const
+  bool isReady() const { return m_controller_ready; }
+  bool isTorchOn() const { return m_torch_on; }
+  bool needsHoming() const { return m_needs_homed; }
+  bool isProgramRunning() const
   {
     return m_torch_on || !m_gcode_queue.empty() ||
            m_dro_data.status == MachineStatus::Cycle;
@@ -106,8 +107,11 @@ public:
   // THC baby-stepping
   float getThcBaseValue() const { return m_thc_base_value; }
   float getThcOffset() const { return m_thc_offset; }
-  float getThcEffective() const { return m_thc_base_value + m_thc_offset; }
-  void  adjustThcOffset(float delta);
+  float getThcEffective() const
+  {
+    return m_thc_base_value == 0.f ? 0.f : m_thc_base_value + m_thc_offset;
+  }
+  void adjustThcOffset(float delta);
 
   // Homing safety check
   bool isHomingSafe() const;

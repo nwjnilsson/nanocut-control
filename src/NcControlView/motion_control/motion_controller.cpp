@@ -486,18 +486,22 @@ void MotionController::runPop()
         INFO,
         "[fire_torch] Sending probing cycle! - Waiting for probe to finish!");
       std::vector<std::string> args = split(line, ' ');
-      if (args.size() == 4) {
+      if (args.size() == 5) {
         m_torch_params.pierce_height =
           static_cast<double>(atof(args[1].c_str()));
         m_torch_params.pierce_delay =
           static_cast<double>(atof(args[2].c_str()));
         m_torch_params.cut_height = static_cast<double>(atof(args[3].c_str()));
+        m_torch_params.thc = static_cast<double>(atof(args[4].c_str()));
+        m_thc_base_value = static_cast<float>(m_torch_params.thc);
       }
       else {
         LOG_F(ERROR, "[fire_torch] Invalid arguments - Using defaults!");
         m_torch_params.pierce_height = c_default_pierce_height;
         m_torch_params.pierce_delay = c_default_pierce_delay_s;
         m_torch_params.cut_height = c_default_cut_height;
+        m_torch_params.thc = 0.0;
+        m_thc_base_value = 0.0f;
       }
 
       if (m_arc_retry_count > 3) {
@@ -524,7 +528,7 @@ void MotionController::runPop()
         INFO,
         "[touch_torch] Sending probing cycle! - Waiting for probe to finish!");
       std::vector<std::string> args = split(line, ' ');
-      if (args.size() == 4) {
+      if (args.size() >= 4) {
         m_torch_params.pierce_height =
           static_cast<double>(atof(args[1].c_str()));
         m_torch_params.pierce_delay =
@@ -569,26 +573,6 @@ void MotionController::runPop()
       LOG_F(INFO, "(runpop) internal THC: sending %s", cmd.c_str());
       sendWithCRC(cmd);
     }
-    else if (line.find("$T=") != std::string::npos) {
-      // G-code stream THC command - update base and apply offset
-      float value = std::stof(line.substr(line.find("$T=") + 3));
-      if (value > 0.0f) {
-        m_thc_base_value = value;
-        float       effective = m_thc_base_value + m_thc_offset;
-        std::string cmd = "$T=" + to_string_strip_zeros(effective);
-        LOG_F(INFO,
-              "(runpop) stream THC: base=%.1f offset=%.1f sending %s",
-              m_thc_base_value,
-              m_thc_offset,
-              cmd.c_str());
-        sendWithCRC(cmd);
-      }
-      else {
-        // $T=0 disables THC, pass through as-is
-        LOG_F(INFO, "(runpop) stream THC disable: sending $T=0");
-        sendWithCRC("$T=0");
-      }
-    }
     else {
       line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
       LOG_F(INFO, "(runpop) sending %s", line.c_str());
@@ -604,8 +588,9 @@ void MotionController::probe()
 {
   sendWithCRC(
     "G38.3Z-" +
-    std::to_string(m_control_view->m_machine_parameters.machine_extents[2] -
-                   m_control_view->m_machine_parameters.homing_pull_off) +
+    std::to_string(
+      m_control_view->m_machine_parameters.machine_extents[2] -
+      m_control_view->m_machine_parameters.floating_head_backlash) +
     "F" +
     std::to_string(m_control_view->m_machine_parameters.z_probe_feedrate));
 }
@@ -625,7 +610,8 @@ bool MotionController::arcOkayExpireTimer()
     m_gcode_queue.push_front(
       "fire_torch " + to_string_strip_zeros(m_torch_params.pierce_height) +
       " " + to_string_strip_zeros(m_torch_params.pierce_delay) + " " +
-      to_string_strip_zeros(m_torch_params.cut_height));
+      to_string_strip_zeros(m_torch_params.cut_height) + " " +
+      to_string_strip_zeros(m_torch_params.thc));
     m_gcode_queue.push_front("G0 Z0");
     m_gcode_queue.push_front("M5");
 
@@ -703,9 +689,7 @@ void MotionController::lowerToCutHeightAndRunProgram()
   m_probe_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_arc_retry_count = 0;
-  if (getThcEffective() > 0.0f) {
-    m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
-  }
+  m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front("G91G0 Z-" +
                            to_string_strip_zeros(m_torch_params.pierce_height -
@@ -817,9 +801,6 @@ void MotionController::adjustThcOffset(float delta)
   // Clamping to encourage proper targets in tool library instead
   m_thc_offset =
     std::clamp(m_thc_offset + delta, MIN_THC_OFFSET, MAX_THC_OFFSET);
-  float new_effective = m_thc_base_value + m_thc_offset;
-  new_effective = std::clamp(new_effective, 0.0f, MAX_ARC_VOLTAGE);
-  // m_thc_offset = new_effective - m_thc_base_value;
   LOG_F(INFO,
         "THC offset adjusted: base=%.1f offset=%.1f effective=%.1f",
         m_thc_base_value,

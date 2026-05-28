@@ -1516,29 +1516,24 @@ std::vector<std::string> NcCamView::generateGCode()
       if (tool_it != m_tool_library.end()) {
         const auto& tool = tool_it->second;
 
-        const bool        thc_enabled = tool.thc > 0;
-        const std::string thc_on_cmd = "$T=" + std::to_string(tool.thc);
+        const bool thc_enabled = tool.thc > 0;
 
         // Disable THC and reduce feed on contours with small area
         const double small_area_threshold = (12.5 * tool.kerf_width) *
                                             (12.5 * tool.kerf_width) *
                                             std::numbers::pi;
 
-        if (thc_enabled) {
-          lines.push_back(thc_on_cmd);
-        }
-
         for (size_t x = 0; x < tool_paths.size(); x++) {
           const auto& path = tool_paths[x];
           const bool  small_contour = polygonArea(path) < small_area_threshold;
-          if (small_contour && thc_enabled) {
-            lines.push_back("$T=0");
-          }
+          const float path_thc =
+            (thc_enabled && !small_contour) ? tool.thc : 0.0f;
           lines.push_back("G0 X" + std::to_string(-path[0].x) + " Y" +
                           std::to_string(-path[0].y));
           lines.push_back("fire_torch " + std::to_string(tool.pierce_height) +
                           " " + std::to_string(tool.pierce_delay) + " " +
-                          std::to_string(tool.cut_height));
+                          std::to_string(tool.cut_height) + " " +
+                          std::to_string(path_thc));
 
           const float feed =
             small_contour ? tool.feed_rate * tool.small_hole_feedrate_factor
@@ -1601,9 +1596,6 @@ std::vector<std::string> NcCamView::generateGCode()
           }
 
           lines.push_back("torch_off");
-          if (small_contour && thc_enabled) {
-            lines.push_back(thc_on_cmd);
-          }
         }
       }
       else {
