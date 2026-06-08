@@ -88,11 +88,10 @@ void NcHmi::renderDro()
   if (ImGui::Begin("DRO Panel", nullptr, win_flags)) {
     ImVec4 text_color = m_app->getColor(ThemeColor::Text);
     ImVec4 work_color = m_app->getColor(ThemeColor::PlotLines);
-    ImVec4 abs_color =
-      m_app->getColor(ThemeColor::PlotLinesHovered);
+    ImVec4 abs_color = m_app->getColor(ThemeColor::PlotLinesHovered);
     ImVec4 arc_color =
-      m_dro.arc_ok ? (ImVec4)m_app->getColor(ThemeColor::PlotLinesHovered)
-                   : (ImVec4)m_app->getColor(ThemeColor::PlotLines);
+      m_dro.arc_ok ? (ImVec4) m_app->getColor(ThemeColor::PlotLinesHovered)
+                   : (ImVec4) m_app->getColor(ThemeColor::PlotLines);
     ImVec4 sep_color = m_app->getColor(ThemeColor::Separator);
 
     // Status row: FEED | ARC | SET | RUN
@@ -222,10 +221,9 @@ void NcHmi::renderThcWidget()
     ImVec2 text_size = ImGui::CalcTextSize(m_thc_offset_readout.c_str());
     ImGui::SetCursorPos(
       ImVec2((cell_w - text_size.x) / 2.0f, (btn_height - text_size.y) / 2.0f));
-    ImGui::TextColored(
-      m_app->getColor(ThemeColor::PlotLinesHovered),
-      "%s",
-      m_thc_offset_readout.c_str());
+    ImGui::TextColored(m_app->getColor(ThemeColor::PlotLinesHovered),
+                       "%s",
+                       m_thc_offset_readout.c_str());
     ImGui::EndChild();
     ImGui::PopStyleColor(); // ChildBg
 
@@ -532,7 +530,8 @@ void NcHmi::handleButton(const std::string& id)
 
         case HmiButtonId::Touch:
           LOG_F(INFO, "Clicked Touch");
-          control_view.m_motion_controller->pushGCode("touch_torch");
+          control_view.m_motion_controller->pushGCode(
+            "touch_torch 0.0 0.0 0.5");
           control_view.m_motion_controller->pushGCode("M30");
           control_view.m_motion_controller->runStack();
           break;
@@ -551,7 +550,7 @@ void NcHmi::handleButton(const std::string& id)
               };
 
               const auto& p = control_view.m_machine_parameters;
-              const bool pierce_over =
+              const bool  pierce_over =
                 p.consumable_pierce_threshold > 0 &&
                 p.consumable_pierce_count >= p.consumable_pierce_threshold;
               const bool arc_over =
@@ -561,7 +560,8 @@ void NcHmi::handleButton(const std::string& id)
               if (pierce_over || arc_over) {
                 char msg[256];
                 std::snprintf(
-                  msg, sizeof(msg),
+                  msg,
+                  sizeof(msg),
                   "Consumable wear threshold exceeded:%s%s\nStart program "
                   "anyway?",
                   pierce_over ? "\n - pierces" : "",
@@ -1286,7 +1286,7 @@ void NcHmi::pageUpKeyCallback(const KeyEvent& e)
     return;
   auto& control_view = m_app->getControlView();
   if (e.action == GLFW_PRESS) {
-      control_view.m_motion_controller->sendRealTime('>');
+    control_view.m_motion_controller->sendRealTime('>');
   }
   else if (e.action == GLFW_RELEASE) {
     control_view.m_motion_controller->sendRealTime('^');
@@ -1333,7 +1333,7 @@ void NcHmi::pageDownKeyCallback(const KeyEvent& e)
     return;
   auto& control_view = m_app->getControlView();
   if (e.action == GLFW_PRESS) {
-      control_view.m_motion_controller->sendRealTime('<');
+    control_view.m_motion_controller->sendRealTime('<');
   }
   else if (e.action == GLFW_RELEASE) {
     control_view.m_motion_controller->sendRealTime('^');

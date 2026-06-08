@@ -182,7 +182,7 @@ private:
   void homingDoneCallback();
   void lowerToCutHeightAndRunProgram();
   void raiseToPierceHeightAndFireTorch();
-  void touchTorchAndBackOff();
+  void raiseAfterTouch();
   void torchOffAndAbort();
   void torchOffAndRetract();
   void accumulateArcOnTime();

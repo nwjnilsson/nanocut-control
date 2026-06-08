@@ -7,9 +7,9 @@
 #include <deque>
 #include <sstream>
 
-static constexpr float c_default_pierce_height = SCALE(2.8f);
-static constexpr float c_default_cut_height = SCALE(1.75f);
-static constexpr float c_default_pierce_delay_s = 1.2f;
+static constexpr float c_default_pierce_height = SCALE(3.0f);
+static constexpr float c_default_cut_height = SCALE(1.5f);
+static constexpr float c_default_pierce_delay_s = 1.0f;
 
 void removeSubstrs(std::string& s, std::string p)
 {
@@ -398,9 +398,10 @@ void MotionController::lineHandler(std::string line)
               current_time - m_torch_on_timer);
 
           if (m_torch_on == true &&
-              torch_duration > std::chrono::milliseconds{ 2000 }) {
+              torch_duration > std::chrono::milliseconds{ 200 }) {
             m_control_view->m_app->getDialogs().setInfoValue(
-              "Program was aborted because torch crash was detected!");
+              "Program was aborted because torch crash was detected! Restart "
+              "your controller to be safe.");
             sendCommand("abort");
             m_handling_crash = true;
           }
@@ -542,16 +543,18 @@ void MotionController::runPop()
         m_torch_params.cut_height = c_default_cut_height;
       }
       m_okay_callback = nullptr;
-      m_probe_callback = [this]() { touchTorchAndBackOff(); };
+      m_probe_callback = [this]() { raiseAfterTouch(); };
       probe();
     }
     else if (line.find("WAIT_FOR_ARC_OKAY") != std::string::npos) {
+      const double arc_okay_timeout =
+        1.5 * m_torch_params.pierce_delay * 1000.0;
       LOG_F(INFO,
             "[run_pop] Setting arc_okay callback and arc_okay expire timer => "
             "fires in %.4f ms!",
-            (3 + m_torch_params.pierce_delay) * 1000);
+            arc_okay_timeout);
       m_renderer->pushTimer(
-        (3 + m_torch_params.pierce_delay) * 1000,
+        arc_okay_timeout,
         std::bind(&MotionController::arcOkayExpireTimer, this));
       m_arc_okay_callback = [this]() { lowerToCutHeightAndRunProgram(); };
       m_okay_callback = nullptr;
@@ -588,9 +591,8 @@ void MotionController::probe()
 {
   sendWithCRC(
     "G38.3Z-" +
-    std::to_string(
-      m_control_view->m_machine_parameters.machine_extents[2] -
-      m_control_view->m_machine_parameters.floating_head_backlash) +
+    std::to_string(m_control_view->m_machine_parameters.machine_extents[2] -
+                   m_control_view->m_machine_parameters.homing_pull_off) +
     "F" +
     std::to_string(m_control_view->m_machine_parameters.z_probe_feedrate));
 }
@@ -720,13 +722,13 @@ void MotionController::raiseToPierceHeightAndFireTorch()
   runPop();
 }
 
-void MotionController::touchTorchAndBackOff()
+void MotionController::raiseAfterTouch()
 {
   m_okay_callback = [this]() { runPop(); };
   m_probe_callback = nullptr;
 
   m_gcode_queue.push_front("G90");
-  m_gcode_queue.push_front("G0Z0.5");
+  m_gcode_queue.push_front("G0Z" + std::to_string(m_torch_params.cut_height));
   m_gcode_queue.push_front(
     "G0Z" + to_string_strip_zeros(
               m_control_view->m_machine_parameters.floating_head_backlash));
