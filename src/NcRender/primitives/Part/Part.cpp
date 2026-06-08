@@ -577,17 +577,25 @@ bool Part::createToolpathLeads(std::vector<Point2d>* tpath,
 {
   if (length == 0)
     return true;
-  std::vector<std::vector<Point2d>> lead_offset =
-    offsetPath(*tpath, (double) fabs(length) * (double) direction);
-  for (size_t x = 0; x < lead_offset.size(); x++) {
-    Point2d* point = getClosestPoint(NULL, position, &lead_offset[x]);
-    if (point != NULL) {
-      if (geo::distance(position, (*point)) <= (length * 1.1)) {
-        tpath->insert(tpath->begin(), 1, (*point));
-        tpath->push_back((*point));
-        return true;
+  // Best-effort: shrink the offset distance until Clipper returns a
+  // non-empty inner polygon, so small contours still get a lead that
+  // pierces as deep inside as the geometry allows.
+  const double min_feasible = SCALE(0.05);
+  double       feasible = fabs(length);
+  while (feasible >= min_feasible) {
+    std::vector<std::vector<Point2d>> lead_offset =
+      offsetPath(*tpath, feasible * (double) direction);
+    for (size_t x = 0; x < lead_offset.size(); x++) {
+      Point2d* point = getClosestPoint(NULL, position, &lead_offset[x]);
+      if (point != NULL) {
+        if (geo::distance(position, (*point)) <= (feasible * 1.1)) {
+          tpath->insert(tpath->begin(), 1, (*point));
+          tpath->push_back((*point));
+          return true;
+        }
       }
     }
+    feasible *= 0.5;
   }
   return false; // Could not create a leadin from supplied point!
 }
