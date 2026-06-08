@@ -144,8 +144,19 @@ std::vector<std::vector<Point2d>> Part::offsetPath(std::vector<Point2d> path,
   std::vector<std::vector<Point2d>> ret;
   ClipperLib::Path                  subj;
   ClipperLib::Paths                 solution;
-  for (std::vector<Point2d>::iterator it = path.begin(); it != path.end();
-       ++it) {
+  // Drop a near-duplicate closing vertex. Clipper's own dedup uses exact ==,
+  // which misses sub-ULP seam vertices from chainify and produces spurious
+  // jtRound spikes at the seam.
+  auto end = path.end();
+  if (path.size() > 1) {
+    const double dx = path.front().x - path.back().x;
+    const double dy = path.front().y - path.back().y;
+    // 1e-6 unit (~1 nm) squared — well below any intentional geometry,
+    // well above fp drift from cos/sin and DXF precision noise.
+    if (dx * dx + dy * dy < 1e-12)
+      --end;
+  }
+  for (std::vector<Point2d>::iterator it = path.begin(); it != end; ++it) {
     subj << ClipperLib::FPoint((it->x * scale), (it->y * scale));
   }
   ClipperLib::ClipperOffset co;
