@@ -903,17 +903,6 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
     static ToolOperation operation;
     static std::string   operation_tool;
 
-    // Auto-set lead in/out based on tool kerf width
-    if (!operation_tool.empty() &&
-        operation.lead_in_length == DEFAULT_LEAD_IN &&
-        operation.lead_out_length == DEFAULT_LEAD_OUT) {
-      auto tool_it = m_tool_library.find(operation_tool);
-      if (tool_it != m_tool_library.end()) {
-        operation.lead_in_length = tool_it->second.kerf_width * 1.5;
-        operation.lead_out_length = tool_it->second.kerf_width * 1.5;
-      }
-    }
-
     // Tool selection combo
     if (ImGui::BeginCombo("Tool",
                           operation_tool.empty() ? "Select..."
@@ -922,6 +911,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
         bool is_selected = (tool_name == operation_tool);
         if (ImGui::Selectable(tool_name.c_str(), is_selected)) {
           operation_tool = tool_name;
+          // Auto-set lead in/out based on the newly selected tool's kerf width
+          operation.lead_in_length = tool_data.kerf_width * 1.5;
+          operation.lead_out_length = tool_data.kerf_width * 1.5;
         }
         if (is_selected) {
           ImGui::SetItemDefaultFocus();
