@@ -1474,21 +1474,6 @@ void NcCamView::reevaluateContours()
 // Action Handler Methods
 // ============================================================================
 
-// Shoelace area of a closed polygon. Returns the absolute area; sign of the
-// signed area indicates orientation but we don't care for THC gating.
-static double polygonArea(const std::vector<Point2d>& path)
-{
-  if (path.size() < 3)
-    return 0.0;
-  double a = 0.0;
-  for (size_t i = 0, n = path.size(); i < n; ++i) {
-    const Point2d& p = path[i];
-    const Point2d& q = path[(i + 1) % n];
-    a += p.x * q.y - q.x * p.y;
-  }
-  return std::fabs(a) * 0.5;
-}
-
 // Generate G-code lines from current toolpath operations
 std::vector<std::string> NcCamView::generateGCode()
 {
@@ -1501,8 +1486,7 @@ std::vector<std::string> NcCamView::generateGCode()
           m_toolpath_operations[i].layer.c_str());
 
     forEachVisiblePart([&](Part* part) {
-      std::vector<std::vector<Point2d>> tool_paths =
-        part->getOrderedToolpaths();
+      std::vector<Part::Toolpath> tool_paths = part->getOrderedToolpaths();
 
       auto tool_it = m_tool_library.find(m_toolpath_operations[i].tool_name);
       if (tool_it != m_tool_library.end()) {
@@ -1510,84 +1494,104 @@ std::vector<std::string> NcCamView::generateGCode()
 
         const bool thc_enabled = tool.thc > 0;
 
-        // Disable THC and reduce feed on contours with small area
+        // Disable THC and reduce feed on contours with small area.
         const double small_area_threshold = (12.5 * tool.kerf_width) *
                                             (12.5 * tool.kerf_width) *
                                             std::numbers::pi;
 
         for (size_t x = 0; x < tool_paths.size(); x++) {
-          const auto& path = tool_paths[x];
-          const bool  small_contour = polygonArea(path) < small_area_threshold;
-          const float path_thc =
+          const auto&  tp = tool_paths[x];
+          const auto&  pts = tp.points;
+          if (pts.empty())
+            continue;
+
+          // contour_first / contour_last bound the cyclic contour vertices
+          // inside `pts`. Vertices before contour_first are lead-in (arc or
+          // straight pierce); the vertex at points.size()-1 (when
+          // lead_out_count > 0) is the closing lead-out duplicate.
+          const size_t contour_first = tp.lead_in_count;
+          const size_t contour_last =
+            pts.size() - 1 - (tp.lead_out_count > 0 ? 1 : 0);
+
+          // Area-based gates (THC and feedrate factor) use the contour
+          // vertices only — arc lead-in points would otherwise inflate the
+          // shoelace.
+          const double area = geo::polygonArea(
+            pts, contour_first, contour_last + 1);
+          const bool   small_contour = area < small_area_threshold;
+          const float  path_thc =
             (thc_enabled && !small_contour) ? tool.thc : 0.0f;
-          lines.push_back("G0 X" + std::to_string(-path[0].x) + " Y" +
-                          std::to_string(-path[0].y));
+          const float feed =
+            small_contour ? tool.feed_rate * tool.small_hole_feedrate_factor
+                          : tool.feed_rate;
+
+          lines.push_back("G0 X" + std::to_string(-pts[0].x) + " Y" +
+                          std::to_string(-pts[0].y));
           lines.push_back("fire_torch " + std::to_string(tool.pierce_height) +
                           " " + std::to_string(tool.pierce_delay) + " " +
                           std::to_string(tool.cut_height) + " " +
                           std::to_string(path_thc));
 
-          const float feed =
-            small_contour ? tool.feed_rate * tool.small_hole_feedrate_factor
-                          : tool.feed_rate;
+          if (tp.is_closed_contour && tp.is_inside_contour) {
+            // Inside (hole): cut the lead-in and the contour up to and
+            // including the last unique contour vertex; then turn the
+            // torch off non-blocking and motion-through the closing kerf
+            // + overburn distance so the arc extinguishes mid-flight.
+            for (size_t z = 0; z <= contour_last; z++) {
+              lines.push_back("G1 X" + std::to_string(-pts[z].x) + " Y" +
+                              std::to_string(-pts[z].y) + " F" +
+                              std::to_string(feed));
+            }
+            lines.push_back("torch_off_async");
 
-          // For small contours, skip the trailing lead-out vertex (the
-          // duplicate of path[0] appended by createToolpathLeads) and instead
-          // emit overburn moves continuing along the start of the contour.
-          // For large contours, walk the full path including the lead-out.
-          const size_t cut_end =
-            (small_contour && path.size() >= 2) ? path.size() - 1 : path.size();
-          for (size_t z = 0; z < cut_end; z++) {
-            lines.push_back("G1 X" + std::to_string(-path[z].x) + " Y" +
-                            std::to_string(-path[z].y) + " F" +
-                            std::to_string(feed));
-          }
-
-          // Overburn: continue past the closing kerf crossing along the start
-          // of the contour for overburn_length, so the eventual torch-off
-          // dwell lands inside the slug instead of on the finished part.
-          // Path layout from createToolpathLeads is
-          // [lead_pt, c0, c1, ..., cN, lead_pt]; we already cut up to cN
-          // (index size-2). The first contour vertex is at index 1.
-          if (small_contour && tool.overburn_length > 0.0f &&
-              path.size() >= 4) {
-            double  remaining = tool.overburn_length;
-            Point2d prev = path[path.size() - 2]; // == cN, last cut position
-            // Walk forward from c1, wrapping if needed.
-            const size_t contour_first = 1;
-            const size_t contour_last = path.size() - 2;
-            const size_t contour_count = contour_last - contour_first + 1;
-            for (size_t step = 0; step < contour_count && remaining > 0.0;
-                 step++) {
-              const Point2d& next =
-                path[contour_first + (step % contour_count)];
-              const double dx = next.x - prev.x;
-              const double dy = next.y - prev.y;
-              const double seg_len = std::sqrt(dx * dx + dy * dy);
-              if (seg_len <= 0.0) {
-                prev = next;
-                continue;
-              }
-              if (seg_len >= remaining) {
-                const double t = remaining / seg_len;
-                const double ox = prev.x + dx * t;
-                const double oy = prev.y + dy * t;
-                lines.push_back("G1 X" + std::to_string(-ox) + " Y" +
-                                std::to_string(-oy) + " F" +
-                                std::to_string(feed));
-                remaining = 0.0;
-              }
-              else {
-                lines.push_back("G1 X" + std::to_string(-next.x) + " Y" +
-                                std::to_string(-next.y) + " F" +
-                                std::to_string(feed));
-                remaining -= seg_len;
-                prev = next;
+            if (tool.overburn_length > 0.0f && contour_last > contour_first) {
+              double  remaining = tool.overburn_length;
+              Point2d prev = pts[contour_last];
+              const size_t cycle_count = contour_last - contour_first + 1;
+              // Walk forward through the contour cycle, starting at the
+              // wrap-around vertex contour_first (closes the kerf), then
+              // continuing into the next contour vertices.
+              for (size_t step = 0; step < cycle_count && remaining > 0.0;
+                   step++) {
+                const Point2d& next =
+                  pts[contour_first + (step % cycle_count)];
+                const double dx = next.x - prev.x;
+                const double dy = next.y - prev.y;
+                const double seg_len = std::sqrt(dx * dx + dy * dy);
+                if (seg_len <= 0.0) {
+                  prev = next;
+                  continue;
+                }
+                if (seg_len >= remaining) {
+                  const double t = remaining / seg_len;
+                  const double ox = prev.x + dx * t;
+                  const double oy = prev.y + dy * t;
+                  lines.push_back("G1 X" + std::to_string(-ox) + " Y" +
+                                  std::to_string(-oy) + " F" +
+                                  std::to_string(feed));
+                  remaining = 0.0;
+                }
+                else {
+                  lines.push_back("G1 X" + std::to_string(-next.x) + " Y" +
+                                  std::to_string(-next.y) + " F" +
+                                  std::to_string(feed));
+                  remaining -= seg_len;
+                  prev = next;
+                }
               }
             }
+            lines.push_back("torch_off");
           }
-
-          lines.push_back("torch_off");
+          else {
+            // Outside contours (closed or open): cut every vertex including
+            // any trailing lead-out duplicate, then sync torch off.
+            for (size_t z = 0; z < pts.size(); z++) {
+              lines.push_back("G1 X" + std::to_string(-pts[z].x) + " Y" +
+                              std::to_string(-pts[z].y) + " F" +
+                              std::to_string(feed));
+            }
+            lines.push_back("torch_off");
+          }
         }
       }
       else {

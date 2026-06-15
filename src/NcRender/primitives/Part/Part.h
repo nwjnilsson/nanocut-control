@@ -20,6 +20,19 @@ public:
     const Color4f*       color = &Primitive::s_default_color;
   };
 
+  // A built toolpath with explicit lead-in / lead-out metadata so the
+  // gcode emitter knows where the contour proper starts and ends inside
+  // `points`. contour_first = lead_in_count; contour_last =
+  // points.size() - lead_out_count - 1.
+  struct Toolpath {
+    std::vector<Point2d> points;
+    size_t               lead_in_count = 0;
+    size_t               lead_out_count = 0;
+    bool                 is_closed_contour = false;
+    bool                 is_inside_contour = false;
+    bool                 lead_in_is_arc = false;
+  };
+
   struct Layer {
     std::vector<path_t> paths;
     double              toolpath_offset = 0.0;
@@ -46,7 +59,7 @@ public:
   };
 
   std::unordered_map<std::string, Layer> m_layers;
-  std::vector<std::vector<Point2d>>      m_tool_paths;
+  std::vector<Toolpath>                  m_tool_paths;
   float                                  m_width = 1.0f;
   std::string                            m_style = "solid"; // solid, dashed
   std::string                            m_part_name;
@@ -88,7 +101,7 @@ public:
   bool checkIfPointIsInsidePath(std::vector<Point2d> path, Point2d point);
   bool checkIfPathIsInsidePath(std::vector<Point2d> path1,
                                std::vector<Point2d> path2);
-  std::vector<std::vector<Point2d>> getOrderedToolpaths();
+  std::vector<Toolpath>             getOrderedToolpaths();
   double                            perpendicularDistance(const Point2d& pt,
                                                           const Point2d& lineStart,
                                                           const Point2d& lineEnd);
@@ -97,10 +110,16 @@ public:
                 double                      epsilon);
   Point2d*
   getClosestPoint(size_t* index, Point2d point, std::vector<Point2d>* points);
-  bool createToolpathLeads(std::vector<Point2d>* tpath,
-                           double                length,
-                           Point2d               position,
-                           int                   direction);
+  // Builds a toolpath (lead-in + contour, optionally lead-out) into
+  // `out`. Returns true on success. For inside contours (direction=-1)
+  // the lead is treated as a lead-IN (no trailing lead-out). For outside
+  // contours (direction=+1) a single trailing lead-out vertex matches
+  // today's straight-lead behavior. Tries an arc lead first; falls back
+  // to a straight lead when geometry doesn't support arc tangency.
+  bool createToolpathLeads(Toolpath*                   out,
+                           const std::vector<Point2d>& contour,
+                           double                      radius,
+                           int                         direction);
 };
 
 #endif // PATH_

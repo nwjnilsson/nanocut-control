@@ -108,6 +108,32 @@ Point2d threePointCircleCenter(Point2d p1, Point2d p2, Point2d p3);
 double  measurePolarAngle(Point2d p1, Point2d p2);
 double  measureArcCircumference(double start_angle, double end_angle, double radius);
 
+// Polygon area (shoelace). signedPolygonArea returns positive for CCW,
+// negative for CW. polygonArea over [begin,end) uses only that vertex
+// range so leads-in-path vectors don't pollute the area.
+double signedPolygonArea(const Path& path);
+double polygonArea(const Path& path, size_t begin, size_t end);
+
+// Unit tangent along segment (path[i] -> path[i+1]). Wraps with `closed`.
+Point2d tangentAt(const Path& path, size_t segment_index, bool closed);
+
+// Index of longest segment satisfying length >= min_length AND adjacent
+// segments are within max_kink_deg of collinear. SIZE_MAX if none.
+size_t longestStraightSegment(const Path& path,
+                              double      min_length,
+                              double      max_kink_deg,
+                              bool        closed);
+
+// Build a 2D arc lead polyline that ends exactly at `attach`, tangent
+// to `tangent_dir`. sweep_sign = +1 sweeps CCW, -1 sweeps CW. Last
+// vertex is snapped to `attach` to avoid sub-ULP seam vertices.
+std::vector<Point2d> buildArcLead(Point2d attach,
+                                  Point2d tangent_dir,
+                                  double  radius,
+                                  double  sweep_deg,
+                                  int     sweep_sign,
+                                  int     segments = 16);
+
 // Intersection tests
 bool linesIntersect(const Line& l1, const Line& l2);
 bool lineIntersectsWithCircle(const Line& l, Point2d center, double radius);

@@ -678,4 +678,155 @@ bool polygonIsInsidePolygon(const Path& polygon1, const Path& polygon2)
   return true;
 }
 
+/**********************
+ * POLYGON / LEAD HELPERS
+ **********************/
+
+double signedPolygonArea(const Path& path)
+{
+  if (path.size() < 3)
+    return 0.0;
+  double a = 0.0;
+  const size_t n = path.size();
+  for (size_t i = 0; i < n; ++i) {
+    const Point2d& p = path[i];
+    const Point2d& q = path[(i + 1) % n];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return a * 0.5;
+}
+
+double polygonArea(const Path& path, size_t begin, size_t end)
+{
+  if (end <= begin || end - begin < 3 || end > path.size())
+    return 0.0;
+  double a = 0.0;
+  const size_t n = end - begin;
+  for (size_t i = 0; i < n; ++i) {
+    const Point2d& p = path[begin + i];
+    const Point2d& q = path[begin + ((i + 1) % n)];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return std::fabs(a) * 0.5;
+}
+
+Point2d tangentAt(const Path& path, size_t segment_index, bool closed)
+{
+  if (path.size() < 2)
+    return { 1.0, 0.0 };
+  const size_t n = path.size();
+  const size_t a = segment_index % n;
+  const size_t b = closed ? (a + 1) % n : std::min(a + 1, n - 1);
+  double dx = path[b].x - path[a].x;
+  double dy = path[b].y - path[a].y;
+  double mag = std::sqrt(dx * dx + dy * dy);
+  if (mag <= 0.0)
+    return { 1.0, 0.0 };
+  return { dx / mag, dy / mag };
+}
+
+size_t longestStraightSegment(const Path& path,
+                              double      min_length,
+                              double      max_kink_deg,
+                              bool        closed)
+{
+  const size_t n = path.size();
+  if (n < 2)
+    return SIZE_MAX;
+
+  const size_t seg_count = closed ? n : n - 1;
+  if (seg_count == 0)
+    return SIZE_MAX;
+
+  const double cos_kink_threshold =
+    std::cos(max_kink_deg * 3.1415926535897932 / 180.0);
+
+  size_t best = SIZE_MAX;
+  double best_len = -1.0;
+
+  for (size_t s = 0; s < seg_count; ++s) {
+    const Point2d& a = path[s];
+    const Point2d& b = path[(s + 1) % n];
+    const double dx = b.x - a.x;
+    const double dy = b.y - a.y;
+    const double len = std::sqrt(dx * dx + dy * dy);
+    if (len < min_length || len <= best_len)
+      continue;
+
+    // Kink check at both endpoints. For closed paths neighbours wrap;
+    // for open paths missing neighbours are treated as kink-free.
+    auto kinkOk = [&](size_t prev_idx, size_t cur_idx, size_t next_idx) {
+      Point2d in_dir = { path[cur_idx].x - path[prev_idx].x,
+                         path[cur_idx].y - path[prev_idx].y };
+      Point2d out_dir = { path[next_idx].x - path[cur_idx].x,
+                          path[next_idx].y - path[cur_idx].y };
+      double in_mag = std::sqrt(in_dir.x * in_dir.x + in_dir.y * in_dir.y);
+      double out_mag = std::sqrt(out_dir.x * out_dir.x + out_dir.y * out_dir.y);
+      if (in_mag <= 0.0 || out_mag <= 0.0)
+        return true;
+      double dot = (in_dir.x * out_dir.x + in_dir.y * out_dir.y) /
+                   (in_mag * out_mag);
+      return dot >= cos_kink_threshold;
+    };
+
+    bool ok = true;
+    if (closed) {
+      size_t prev_a = (s + n - 1) % n;
+      size_t b_idx = (s + 1) % n;
+      size_t next_b = (s + 2) % n;
+      ok = kinkOk(prev_a, s, b_idx) && kinkOk(s, b_idx, next_b);
+    }
+    else {
+      if (s > 0)
+        ok &= kinkOk(s - 1, s, s + 1);
+      if (s + 2 < n)
+        ok &= kinkOk(s, s + 1, s + 2);
+    }
+    if (!ok)
+      continue;
+
+    best = s;
+    best_len = len;
+  }
+  return best;
+}
+
+std::vector<Point2d> buildArcLead(Point2d attach,
+                                  Point2d tangent_dir,
+                                  double  radius,
+                                  double  sweep_deg,
+                                  int     sweep_sign,
+                                  int     segments)
+{
+  std::vector<Point2d> out;
+  if (segments < 2 || radius <= 0.0)
+    return out;
+
+  // Center is 90 deg from tangent on the requested sweep side.
+  // sweep_sign = +1 (CCW): normal = rotate(tangent, +90)  = (-ty, tx)
+  // sweep_sign = -1 (CW):  normal = rotate(tangent, -90)  = ( ty,-tx)
+  Point2d normal = sweep_sign >= 0
+                     ? Point2d{ -tangent_dir.y, tangent_dir.x }
+                     : Point2d{ tangent_dir.y, -tangent_dir.x };
+  Point2d center = { attach.x + radius * normal.x,
+                     attach.y + radius * normal.y };
+
+  // attach is at angle theta_end from center; the arc starts at
+  // theta_end - sweep_sign * sweep (so motion ends tangent at attach).
+  double theta_end = std::atan2(attach.y - center.y, attach.x - center.x);
+  double sweep_rad = sweep_deg * 3.1415926535897932 / 180.0;
+  double theta_start = theta_end - sweep_sign * sweep_rad;
+
+  out.reserve(segments + 1);
+  for (int i = 0; i <= segments; ++i) {
+    const double t = static_cast<double>(i) / segments;
+    const double th = theta_start + (theta_end - theta_start) * t;
+    out.push_back({ center.x + radius * std::cos(th),
+                    center.y + radius * std::sin(th) });
+  }
+  // Snap last vertex exactly to attach.
+  out.back() = attach;
+  return out;
+}
+
 } // namespace geo

@@ -560,6 +560,20 @@ void MotionController::runPop()
       m_okay_callback = nullptr;
       m_probe_callback = nullptr;
     }
+    else if (line.find("torch_off_async") != std::string::npos) {
+      // Non-blocking torch off: kills arc + zeroes THC inline so the
+      // overburn G1 moves queued after this can keep popping. Unlike the
+      // blocking torch_off, does NOT register m_motion_sync_callback
+      // (which would otherwise stall the queue until motion stops) and
+      // does NOT retract Z (torch must keep moving in XY at cut height
+      // during overburn so the arc extinguishes mid-flight).
+      accumulateArcOnTime();
+      m_torch_on = false;
+      m_okay_callback = [this]() { runPop(); };
+      m_gcode_queue.push_front("$T!0.0");
+      m_gcode_queue.push_front("M5");
+      runPop();
+    }
     else if (line.find("torch_off") != std::string::npos) {
       m_okay_callback = nullptr;
       m_motion_sync_callback = [this]() { torchOffAndRetract(); };
