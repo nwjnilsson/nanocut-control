@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
@@ -676,6 +677,35 @@ bool polygonIsInsidePolygon(const Path& polygon1, const Path& polygon2)
       return false;
   }
   return true;
+}
+
+double pointToPolygonDistance(const Path& polygon, Point2d point)
+{
+  if (polygon.size() < 2)
+    return std::numeric_limits<double>::infinity();
+  double best_sq = std::numeric_limits<double>::infinity();
+  const size_t N = polygon.size();
+  for (size_t i = 0; i < N; ++i) {
+    const Point2d& a = polygon[i];
+    const Point2d& b = polygon[(i + 1) % N];
+    const double   dx = b.x - a.x;
+    const double   dy = b.y - a.y;
+    const double   len_sq = dx * dx + dy * dy;
+    double         t = 0.0;
+    if (len_sq > 0.0) {
+      t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / len_sq;
+      if (t < 0.0) t = 0.0;
+      else if (t > 1.0) t = 1.0;
+    }
+    const double cx = a.x + t * dx;
+    const double cy = a.y + t * dy;
+    const double ex = point.x - cx;
+    const double ey = point.y - cy;
+    const double d_sq = ex * ex + ey * ey;
+    if (d_sq < best_sq)
+      best_sq = d_sq;
+  }
+  return std::sqrt(best_sq);
 }
 
 /**********************

@@ -9,6 +9,7 @@
 #include <NcRender/gl.h>
 
 #include <algorithm>
+#include <limits>
 #include <optional>
 
 std::string Part::getTypeName() { return "part"; }
@@ -553,28 +554,50 @@ Point2d* Part::getClosestPoint(size_t*               index,
 }
 namespace {
 
-// Straight-lead pierce: shrink the offset distance until Clipper returns
-// a non-empty inner polygon, so small contours still get a lead that
-// pierces as deep inside as the geometry allows. Returns the chosen
-// pierce point (or std::nullopt if none feasible).
+// Straight-lead pierce: walk every contour vertex and pick the attach
+// point whose nearest offset-polygon vertex sits closest to the
+// requested lead length. Only when no vertex on the contour yields a
+// feasible attach at the full radius do we shrink the offset distance
+// -- reducing lead length is a last resort for contours too small to
+// accommodate the user's setting at any vertex. Returns the chosen
+// pierce point and the contour index it attaches to (or std::nullopt
+// if no attach is feasible at any tried radius).
 struct StraightLead {
   Point2d pierce;
+  size_t  attach_index;
 };
 std::optional<StraightLead> findStraightPierce(Part&                       part,
                                                const std::vector<Point2d>& contour,
                                                double                      radius,
-                                               int                         direction,
-                                               Point2d                     position)
+                                               int                         direction)
 {
   const double min_feasible = SCALE(0.05);
   double       feasible = std::fabs(radius);
   while (feasible >= min_feasible) {
-    auto lead_offset = part.offsetPath(contour, feasible * (double) direction);
-    for (size_t x = 0; x < lead_offset.size(); x++) {
-      Point2d* point = part.getClosestPoint(nullptr, position, &lead_offset[x]);
-      if (point && geo::distance(position, *point) <= (feasible * 1.1))
-        return StraightLead{ *point };
+    auto                        lead_offset =
+      part.offsetPath(contour, feasible * (double) direction);
+    std::optional<StraightLead> best;
+    double                      best_score = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < contour.size(); ++i) {
+      for (auto& poly : lead_offset) {
+        Point2d* point = part.getClosestPoint(nullptr, contour[i], &poly);
+        if (!point)
+          continue;
+        const double d = geo::distance(contour[i], *point);
+        if (d > feasible * 1.1)
+          continue;
+        // Prefer attach points where the lead length matches the
+        // requested feasible distance most closely (longest physically
+        // realisable lead without overshooting).
+        const double score = std::fabs(d - feasible);
+        if (score < best_score) {
+          best_score = score;
+          best = StraightLead{ *point, i };
+        }
+      }
     }
+    if (best)
+      return best;
     feasible *= 0.5;
   }
   return std::nullopt;
@@ -709,52 +732,52 @@ bool Part::createToolpathLeads(Toolpath*                   out,
         //
         // (1) Whole-arc side check: every arc vertex (except `attach`,
         // a boundary point pointIsInsidePolygon may classify
-        // ambiguously) must sit on the correct side of the contour.
-        // Catches arcs that exit via tangent-direction errors.
+        // ambiguously) must sit on the correct side of the contour,
+        // with slop to absorb the deviation between the simplified +
+        // Clipper-offset contour and the true geometry. Catches arcs
+        // that exit via tangent-direction errors.
         //
         // (2) Pierce headroom check: the pierce -- the arc's deepest
         // vertex into the slug -- must have room to breathe so the
         // lead-in doesn't end up grazing the opposite wall of a
         // narrow pocket (the divot risk in banana-shaped pockets).
-        // Shrink the contour by `radius_abs * 0.9` in the arc's
-        // curving direction and require the pierce to land inside the
-        // shrunken polygon. We can't apply this check to the entire
-        // arc -- the arc is tangent to the contour at `attach`, so
-        // near-attach vertices sit arbitrarily close to the contour
-        // by construction. The pierce is the worst-case point: in a
-        // locally straight-edged pocket it's at distance `radius_abs`
-        // from the near edge, so the 0.9 factor keeps the typical
-        // pierce just inside the shrunken polygon while still
-        // rejecting cases where the pierce lands within
-        // ~`radius_abs` of any other wall. If the inward offset
-        // collapses entirely (pocket narrower than ~2*radius_abs),
-        // there's no headroom for any arc lead here.
+        // We measure the pierce's distance to the nearest contour
+        // edge directly. For a clean parallel-wall pocket the nearest
+        // edge is the attach edge at distance ~`radius_abs`; if any
+        // other wall comes closer than `radius_abs * 0.5`, that's the
+        // banana case and we reject. Using a direct distance check
+        // (rather than offsetting the contour by 0.9*r and asking
+        // Clipper if the pierce lies inside) means small holes whose
+        // inradius is less than 0.9*r still pass when the arc fits
+        // geometrically -- the side check has already proven that.
+        //
+        // Slop tolerance: RDP simplification with `m_control.smoothing`
+        // permits the polygon to deviate from the true contour by up
+        // to that amount perpendicular, and Clipper's offset rounding
+        // / CleanPolygons add a similar amount of vertex jitter on
+        // top. Allow at least SCALE(0.5) mm of slop or 2x smoothing,
+        // whichever is larger.
+        const double side_slop =
+          std::max(static_cast<double>(SCALE(0.5)),
+                   m_control.smoothing * 2.0);
         bool arc_ok = true;
         for (size_t i = 0; i + 1 < arc_pts.size(); ++i) {
           const bool inside = geo::pointIsInsidePolygon(contour, arc_pts[i]);
-          if (is_inside ? !inside : inside) {
-            arc_ok = false;
-            break;
+          const bool wrong_side = is_inside ? !inside : inside;
+          if (wrong_side) {
+            const double edge_dist =
+              geo::pointToPolygonDistance(contour, arc_pts[i]);
+            if (edge_dist > side_slop) {
+              arc_ok = false;
+              break;
+            }
           }
         }
         if (arc_ok) {
-          const double headroom = radius_abs * 0.9;
-          auto         headroom_polys =
-            offsetPath(contour, direction * headroom);
-          if (is_inside && headroom_polys.empty()) {
+          const double pierce_clearance =
+            geo::pointToPolygonDistance(contour, arc_pts.front());
+          if (pierce_clearance < radius_abs * 0.5) {
             arc_ok = false;
-          }
-          else {
-            bool pierce_in_headroom = false;
-            for (const auto& poly : headroom_polys) {
-              if (geo::pointIsInsidePolygon(poly, arc_pts.front())) {
-                pierce_in_headroom = true;
-                break;
-              }
-            }
-            if (is_inside ? !pierce_in_headroom : pierce_in_headroom) {
-              arc_ok = false;
-            }
           }
         }
         if (!arc_ok) {
@@ -804,10 +827,16 @@ bool Part::createToolpathLeads(Toolpath*                   out,
     return true;
 
   // ---- Fallback: straight lead --------------------------------------------
-  auto straight = findStraightPierce(*this, contour, radius_abs, direction,
-                                     contour.front());
+  auto straight = findStraightPierce(*this, contour, radius_abs, direction);
   if (!straight)
     return false;
+
+  // Rotate the contour so the chosen attach vertex sits at index 0 --
+  // findStraightPierce can land anywhere along the contour, not just at
+  // contour.front(). The assembly layout below assumes rotated[0] is the
+  // attach point that the pierce -> attach segment lands on.
+  std::vector<Point2d> rotated =
+    rotateContour(contour, straight->attach_index);
 
   // Layout: [pierce, c0, c1, ..., c_{N-1}, c0, (pierce if outside)].
   // The explicit closing-c0 vertex matters: contour was stripped of its
@@ -820,10 +849,10 @@ bool Part::createToolpathLeads(Toolpath*                   out,
   // c_{N-1}; torch_off_async fires there, then the overburn loop walks
   // forward from c_{N-1} -> c0 (kerf closing, torch off) and onward into
   // the slug -- mirroring the arc-lead behaviour.
-  out->points.reserve(contour.size() + 3);
+  out->points.reserve(rotated.size() + 3);
   out->points.push_back(straight->pierce);
-  out->points.insert(out->points.end(), contour.begin(), contour.end());
-  out->points.push_back(contour.front());
+  out->points.insert(out->points.end(), rotated.begin(), rotated.end());
+  out->points.push_back(rotated.front());
   out->lead_in_count = 1;
   if (is_inside) {
     out->lead_out_count = 1;

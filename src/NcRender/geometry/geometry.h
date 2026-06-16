@@ -159,6 +159,11 @@ bool lineIntersectsWithCircle(const Line& l, Point2d center, double radius);
 bool pointIsInsidePolygon(const Path& polygon, Point2d point);
 bool polygonIsInsidePolygon(const Path& polygon1, const Path& polygon2);
 
+// Unsigned distance from `point` to the closest edge of `polygon`
+// (treated as closed). Useful for slop-tolerant inside/outside checks
+// against simplified or otherwise approximate contours.
+double pointToPolygonDistance(const Path& polygon, Point2d point);
+
 } // namespace geo
 
 #endif
