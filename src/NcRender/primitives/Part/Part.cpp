@@ -705,26 +705,62 @@ bool Part::createToolpathLeads(Toolpath*                   out,
         geo::buildArcLead(attach, tangent_dir, radius_abs, 90.0, sweep_sign, 16);
 
       if (arc_pts.size() >= 2) {
-        // Verify the whole arc lies on the correct side of the contour:
-        // inside the polygon for inside contours (so the slug contains
-        // the pierce and the whole lead), outside for outside contours.
-        // Test every arc vertex EXCEPT the last one (which is `attach`,
-        // a boundary point that pointIsInsidePolygon may classify
-        // ambiguously). Using the original contour (not the inflated
-        // offset) avoids accepting wrong-side arcs that happen to fall
-        // inside the inflated polygon.
+        // Two checks combined.
+        //
+        // (1) Whole-arc side check: every arc vertex (except `attach`,
+        // a boundary point pointIsInsidePolygon may classify
+        // ambiguously) must sit on the correct side of the contour.
+        // Catches arcs that exit via tangent-direction errors.
+        //
+        // (2) Pierce headroom check: the pierce -- the arc's deepest
+        // vertex into the slug -- must have room to breathe so the
+        // lead-in doesn't end up grazing the opposite wall of a
+        // narrow pocket (the divot risk in banana-shaped pockets).
+        // Shrink the contour by `radius_abs * 0.9` in the arc's
+        // curving direction and require the pierce to land inside the
+        // shrunken polygon. We can't apply this check to the entire
+        // arc -- the arc is tangent to the contour at `attach`, so
+        // near-attach vertices sit arbitrarily close to the contour
+        // by construction. The pierce is the worst-case point: in a
+        // locally straight-edged pocket it's at distance `radius_abs`
+        // from the near edge, so the 0.9 factor keeps the typical
+        // pierce just inside the shrunken polygon while still
+        // rejecting cases where the pierce lands within
+        // ~`radius_abs` of any other wall. If the inward offset
+        // collapses entirely (pocket narrower than ~2*radius_abs),
+        // there's no headroom for any arc lead here.
         bool arc_ok = true;
         for (size_t i = 0; i + 1 < arc_pts.size(); ++i) {
-          const bool inside =
-            geo::pointIsInsidePolygon(contour, arc_pts[i]);
+          const bool inside = geo::pointIsInsidePolygon(contour, arc_pts[i]);
           if (is_inside ? !inside : inside) {
             arc_ok = false;
             break;
           }
         }
+        if (arc_ok) {
+          const double headroom = radius_abs * 0.9;
+          auto         headroom_polys =
+            offsetPath(contour, direction * headroom);
+          if (is_inside && headroom_polys.empty()) {
+            arc_ok = false;
+          }
+          else {
+            bool pierce_in_headroom = false;
+            for (const auto& poly : headroom_polys) {
+              if (geo::pointIsInsidePolygon(poly, arc_pts.front())) {
+                pierce_in_headroom = true;
+                break;
+              }
+            }
+            if (is_inside ? !pierce_in_headroom : pierce_in_headroom) {
+              arc_ok = false;
+            }
+          }
+        }
         if (!arc_ok) {
           LOG_F(INFO,
-                "[createToolpathLeads] Arc lead crosses contour "
+                "[createToolpathLeads] Arc lead rejected -- crosses "
+                "contour or insufficient pierce headroom "
                 "(is_inside=%d, edge_len=%.3f, radius=%.3f); falling "
                 "back to straight lead.",
                 static_cast<int>(is_inside),
