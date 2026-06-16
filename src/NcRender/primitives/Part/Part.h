@@ -119,7 +119,8 @@ public:
   bool createToolpathLeads(Toolpath*                   out,
                            const std::vector<Point2d>& contour,
                            double                      radius,
-                           int                         direction);
+                           int                         direction
+                           );
 };
 
 #endif // PATH_

@@ -124,6 +124,25 @@ size_t longestStraightSegment(const Path& path,
                               double      max_kink_deg,
                               bool        closed);
 
+// A "straight run" is a span [start, end] of contour vertices such that
+// the chord from path[start] to path[end] approximates the contour
+// within dev_tolerance — all intermediate vertices (start, end) lie
+// within dev_tolerance perpendicular distance of the chord. Used to
+// bridge across natural curvature on dense polygons (e.g. circles
+// discretized to many short segments).
+struct StraightRun {
+  size_t start = 0;
+  size_t end = 0;
+  double chord_length = 0.0;
+};
+
+// Find the longest straight run on a closed contour. Returns true and
+// fills `out` if a run with chord length >= min_length is found.
+bool longestStraightRun(const Path&  path,
+                        double       min_length,
+                        double       dev_tolerance,
+                        StraightRun* out);
+
 // Build a 2D arc lead polyline that ends exactly at `attach`, tangent
 // to `tangent_dir`. sweep_sign = +1 sweeps CCW, -1 sweeps CW. Last
 // vertex is snapped to `attach` to avoid sub-ULP seam vertices.

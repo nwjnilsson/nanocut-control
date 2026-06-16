@@ -727,7 +727,7 @@ Point2d tangentAt(const Path& path, size_t segment_index, bool closed)
 
 size_t longestStraightSegment(const Path& path,
                               double      min_length,
-                              double      max_kink_deg,
+                              double      /*max_kink_deg*/,
                               bool        closed)
 {
   const size_t n = path.size();
@@ -738,9 +738,14 @@ size_t longestStraightSegment(const Path& path,
   if (seg_count == 0)
     return SIZE_MAX;
 
-  const double cos_kink_threshold =
-    std::cos(max_kink_deg * 3.1415926535897932 / 180.0);
-
+  // We used to also reject segments whose endpoints met neighbours at
+  // angles above `max_kink_deg`, but that excluded the long sides of
+  // shrunken-inward offset polygons (which keep sharp 90° convex corners
+  // because jtRound doesn't round convex corners under negative offset).
+  // The attach point is placed mid-segment with the arc backward extent
+  // bounded by `min_length >= 2*radius`, so the arc never crosses into
+  // adjacent segments regardless of endpoint angles. Length alone is
+  // a sufficient filter.
   size_t best = SIZE_MAX;
   double best_len = -1.0;
 
@@ -753,42 +758,69 @@ size_t longestStraightSegment(const Path& path,
     if (len < min_length || len <= best_len)
       continue;
 
-    // Kink check at both endpoints. For closed paths neighbours wrap;
-    // for open paths missing neighbours are treated as kink-free.
-    auto kinkOk = [&](size_t prev_idx, size_t cur_idx, size_t next_idx) {
-      Point2d in_dir = { path[cur_idx].x - path[prev_idx].x,
-                         path[cur_idx].y - path[prev_idx].y };
-      Point2d out_dir = { path[next_idx].x - path[cur_idx].x,
-                          path[next_idx].y - path[cur_idx].y };
-      double in_mag = std::sqrt(in_dir.x * in_dir.x + in_dir.y * in_dir.y);
-      double out_mag = std::sqrt(out_dir.x * out_dir.x + out_dir.y * out_dir.y);
-      if (in_mag <= 0.0 || out_mag <= 0.0)
-        return true;
-      double dot = (in_dir.x * out_dir.x + in_dir.y * out_dir.y) /
-                   (in_mag * out_mag);
-      return dot >= cos_kink_threshold;
-    };
-
-    bool ok = true;
-    if (closed) {
-      size_t prev_a = (s + n - 1) % n;
-      size_t b_idx = (s + 1) % n;
-      size_t next_b = (s + 2) % n;
-      ok = kinkOk(prev_a, s, b_idx) && kinkOk(s, b_idx, next_b);
-    }
-    else {
-      if (s > 0)
-        ok &= kinkOk(s - 1, s, s + 1);
-      if (s + 2 < n)
-        ok &= kinkOk(s, s + 1, s + 2);
-    }
-    if (!ok)
-      continue;
-
     best = s;
     best_len = len;
   }
   return best;
+}
+
+bool longestStraightRun(const Path&  path,
+                        double       min_length,
+                        double       dev_tolerance,
+                        StraightRun* out)
+{
+  const size_t n = path.size();
+  if (n < 2 || out == nullptr)
+    return false;
+
+  out->chord_length = -1.0;
+  bool found = false;
+
+  for (size_t i = 0; i < n; ++i) {
+    // Extend j around the cyclic contour while all intermediate vertices
+    // stay within dev_tolerance of the chord (path[i], path[j]).
+    size_t j = (i + 1) % n;
+    while (j != i) {
+      const double dx = path[j].x - path[i].x;
+      const double dy = path[j].y - path[i].y;
+      const double chord_len = std::sqrt(dx * dx + dy * dy);
+      if (chord_len < 1e-9) {
+        // Degenerate chord (likely a closing duplicate vertex); stop
+        // extending from this i but keep searching from the next.
+        break;
+      }
+
+      // Verify every intermediate vertex (i, j) lies within the
+      // tolerance of the chord. O(n) per j; O(n^3) total which is fine
+      // for typical n in the low hundreds.
+      bool   ok = true;
+      size_t k = (i + 1) % n;
+      while (k != j) {
+        const double pvx = path[k].x - path[i].x;
+        const double pvy = path[k].y - path[i].y;
+        const double perp = std::fabs(dx * pvy - dy * pvx) / chord_len;
+        if (perp > dev_tolerance) {
+          ok = false;
+          break;
+        }
+        k = (k + 1) % n;
+      }
+      if (!ok)
+        break;
+
+      if (chord_len >= min_length && chord_len > out->chord_length) {
+        out->start = i;
+        out->end = j;
+        out->chord_length = chord_len;
+        found = true;
+      }
+      j = (j + 1) % n;
+    }
+  }
+
+  if (!found)
+    out->chord_length = 0.0;
+  return found;
 }
 
 std::vector<Point2d> buildArcLead(Point2d attach,
