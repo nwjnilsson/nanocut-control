@@ -21,6 +21,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
+    - name: Show CMake version
+      run: cmake --version
+
     - name: Build NanoCut
       run: |
         .\scripts\build-windows.ps1 -Yes

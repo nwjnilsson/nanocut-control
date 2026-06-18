@@ -8,3 +8,4 @@ NanoCut
 .cache/
 site/
 /bin/
+__pycache__

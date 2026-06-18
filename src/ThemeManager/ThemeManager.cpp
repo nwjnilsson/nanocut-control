@@ -137,6 +137,17 @@ void ThemeManager::Theme::buildColorCache()
   color_cache[static_cast<int>(ThemeColor::CuttablePlaneColor)] = Color4f{
     cuttable_plane_color[0], cuttable_plane_color[1], cuttable_plane_color[2], 1.0f
   };
+
+  // CAM toolpath/gcode preview colors (RGBA straight from the theme).
+  color_cache[static_cast<int>(ThemeColor::ToolpathCutColor)] =
+    Color4f{ toolpath_cut_color[0], toolpath_cut_color[1],
+             toolpath_cut_color[2], toolpath_cut_color[3] };
+  color_cache[static_cast<int>(ThemeColor::ToolpathLeadColor)] =
+    Color4f{ toolpath_lead_color[0], toolpath_lead_color[1],
+             toolpath_lead_color[2], toolpath_lead_color[3] };
+  color_cache[static_cast<int>(ThemeColor::ToolpathArrowColor)] =
+    Color4f{ toolpath_arrow_color[0], toolpath_arrow_color[1],
+             toolpath_arrow_color[2], toolpath_arrow_color[3] };
 }
 
 ThemeManager::ThemeManager(NcApp*             app,
@@ -287,6 +298,28 @@ bool ThemeManager::loadThemeFromFile(const std::string& filename)
                                          cp_color[2].get<float>() };
         }
       }
+    }
+
+    // Load CAM toolpath/gcode preview colors (RGBA, 0-1). Optional section;
+    // anything omitted keeps the Theme's built-in default.
+    if (json_data.contains("gcode_colors") &&
+        json_data["gcode_colors"].is_object()) {
+      auto& gcode_colors = json_data["gcode_colors"];
+
+      auto load_rgba = [&](const std::string&    key,
+                           std::array<float, 4>& target) {
+        if (gcode_colors.contains(key) && gcode_colors[key].is_array() &&
+            gcode_colors[key].size() >= 4) {
+          target = { gcode_colors[key][0].get<float>(),
+                     gcode_colors[key][1].get<float>(),
+                     gcode_colors[key][2].get<float>(),
+                     gcode_colors[key][3].get<float>() };
+        }
+      };
+
+      load_rgba("cut", theme.toolpath_cut_color);
+      load_rgba("lead", theme.toolpath_lead_color);
+      load_rgba("arrow", theme.toolpath_arrow_color);
     }
 
     // Load ImGui style parameters

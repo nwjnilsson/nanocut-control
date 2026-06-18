@@ -444,6 +444,13 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
       }
       ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("View")) {
+      if (ImGui::MenuItem(
+            "Show Kerf Width", "", &m_show_kerf_width)) {
+        LOG_F(INFO, "View->Show Kerf Width: %d", m_show_kerf_width);
+      }
+      ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("Workbench")) {
       if (ImGui::MenuItem("Machine Control", "")) {
         LOG_F(INFO, "Workbench->Machine Control");
@@ -483,10 +490,12 @@ void NcCamView::renderContextMenus(bool& show_edit_contour)
   if (!m_app)
     return;
 
-  // Viewer context menu
+  // Viewer context menu. Driven by the contour captured when the menu opened
+  // (m_context_menu_part/path), NOT the live hover -- moving the cursor onto
+  // the popup clears the hover, which would otherwise dismiss the menu.
   if (m_show_viewer_context_menu.x != -inf<double>() &&
       m_show_viewer_context_menu.y != -inf<double>()) {
-    if (!m_mouse_over_part) {
+    if (!m_context_menu_part) {
       m_show_viewer_context_menu = Point2d::infNeg();
       return;
     }
@@ -498,28 +507,48 @@ void NcCamView::renderContextMenus(bool& show_edit_contour)
                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
     if (ImGui::Button("Edit")) {
       show_edit_contour = true;
-      m_edit_contour_part = m_mouse_over_part;
-      m_edit_contour_path = m_mouse_over_path;
+      m_edit_contour_part = m_context_menu_part;
+      m_edit_contour_path = m_context_menu_path;
+      m_show_viewer_context_menu = Point2d::infNeg();
+    }
+    if (ImGui::Button("Reverse Direction")) {
+      // Find the path by global index and flip its cut direction. The flip is
+      // applied to the offset contour after Clipper (which canonicalizes input
+      // winding); createToolpathLeads then regenerates a valid lead-in /
+      // lead-out / overburn for the reversed direction on the next rebuild.
+      size_t current_index = 0;
+      bool   found = false;
+      for (auto& [layer_name, layer] : m_context_menu_part->m_layers) {
+        for (auto& path : layer.paths) {
+          if (current_index == m_context_menu_path) {
+            path.reversed = !path.reversed;
+            found = true;
+            break;
+          }
+          current_index++;
+        }
+        if (found)
+          break;
+      }
+      m_action_stack.push_back(std::make_unique<RebuildToolpathsAction>());
       m_show_viewer_context_menu = Point2d::infNeg();
     }
     if (ImGui::Button("Delete")) {
-      if (m_mouse_over_part) {
-        // Find and delete path by global index
-        size_t current_index = 0;
-        bool   found = false;
-        for (auto& [layer_name, layer] : m_mouse_over_part->m_layers) {
-          for (auto it = layer.paths.begin(); it != layer.paths.end(); ++it) {
-            if (current_index == m_mouse_over_path) {
-              layer.paths.erase(it);
-              m_mouse_over_part->m_last_control.angle = 1; // Trigger rebuild
-              found = true;
-              break;
-            }
-            current_index++;
-          }
-          if (found)
+      // Find and delete path by global index
+      size_t current_index = 0;
+      bool   found = false;
+      for (auto& [layer_name, layer] : m_context_menu_part->m_layers) {
+        for (auto it = layer.paths.begin(); it != layer.paths.end(); ++it) {
+          if (current_index == m_context_menu_path) {
+            layer.paths.erase(it);
+            m_context_menu_part->m_last_control.angle = 1; // Trigger rebuild
+            found = true;
             break;
+          }
+          current_index++;
         }
+        if (found)
+          break;
       }
       m_show_viewer_context_menu = Point2d::infNeg();
     }
@@ -912,8 +941,8 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
         if (ImGui::Selectable(tool_name.c_str(), is_selected)) {
           operation_tool = tool_name;
           // Auto-set lead in/out based on the newly selected tool's kerf width
-          operation.lead_in_length = tool_data.kerf_width * 1.5;
-          operation.lead_out_length = tool_data.kerf_width * 1.5;
+          operation.lead_in_length = tool_data.kerf_width * 2.f;
+          operation.lead_out_length = tool_data.kerf_width;
         }
         if (is_selected) {
           ImGui::SetItemDefaultFocus();
@@ -1507,11 +1536,10 @@ std::vector<std::string> NcCamView::generateGCode()
 
           // contour_first / contour_last bound the cyclic contour vertices
           // inside `pts`. Vertices before contour_first are lead-in (arc or
-          // straight pierce); the vertex at points.size()-1 (when
-          // lead_out_count > 0) is the closing lead-out duplicate.
+          // straight pierce); the trailing lead_out_count vertices are the
+          // closing duplicate plus any real lead-out (outside contours).
           const size_t contour_first = tp.lead_in_count;
-          const size_t contour_last =
-            pts.size() - 1 - (tp.lead_out_count > 0 ? 1 : 0);
+          const size_t contour_last = pts.size() - 1 - tp.lead_out_count;
 
           // Area-based gates (THC and feedrate factor) use the contour
           // vertices only — arc lead-in points would otherwise inflate the
@@ -1544,39 +1572,53 @@ std::vector<std::string> NcCamView::generateGCode()
             }
             lines.push_back("torch_off_async");
 
-            if (tool.overburn_length > 0.0f && contour_last > contour_first) {
-              double  remaining = tool.overburn_length;
-              Point2d prev = pts[contour_last];
-              const size_t cycle_count = contour_last - contour_first + 1;
-              // Walk forward through the contour cycle, starting at the
-              // wrap-around vertex contour_first (closes the kerf), then
-              // continuing into the next contour vertices.
-              for (size_t step = 0; step < cycle_count && remaining > 0.0;
-                   step++) {
-                const Point2d& next =
-                  pts[contour_first + (step % cycle_count)];
-                const double dx = next.x - prev.x;
-                const double dy = next.y - prev.y;
-                const double seg_len = std::sqrt(dx * dx + dy * dy);
-                if (seg_len <= 0.0) {
-                  prev = next;
-                  continue;
-                }
-                if (seg_len >= remaining) {
-                  const double t = remaining / seg_len;
-                  const double ox = prev.x + dx * t;
-                  const double oy = prev.y + dy * t;
-                  lines.push_back("G1 X" + std::to_string(-ox) + " Y" +
-                                  std::to_string(-oy) + " F" +
-                                  std::to_string(feed));
-                  remaining = 0.0;
-                }
-                else {
-                  lines.push_back("G1 X" + std::to_string(-next.x) + " Y" +
-                                  std::to_string(-next.y) + " F" +
-                                  std::to_string(feed));
-                  remaining -= seg_len;
-                  prev = next;
+            if (contour_last > contour_first) {
+              // (1) Close the kerf: ALWAYS return to the contour start vertex
+              // (pts[contour_first], the closing-duplicate point). This seam
+              // edge must be cut in full or the contour is left open. It is
+              // independent of overburn -- with arc leads the start sits
+              // mid-wall, so the seam can be longer than overburn_length, which
+              // previously stopped the closing motion partway and left the path
+              // open (the symptom seen exclusively on arc-lead contours).
+              lines.push_back("G1 X" + std::to_string(-pts[contour_first].x) +
+                              " Y" + std::to_string(-pts[contour_first].y) +
+                              " F" + std::to_string(feed));
+
+              // (2) Overburn: continue PAST the start vertex into the
+              // already-cut contour so the dying arc overruns the seam. The
+              // budget is measured from the (now closed) start vertex, not from
+              // contour_last, so the seam length no longer eats into it.
+              if (tool.overburn_length > 0.0f) {
+                double       remaining = tool.overburn_length;
+                Point2d      prev = pts[contour_first];
+                const size_t cycle_count = contour_last - contour_first + 1;
+                for (size_t step = 1; step < cycle_count && remaining > 0.0;
+                     step++) {
+                  const Point2d& next =
+                    pts[contour_first + (step % cycle_count)];
+                  const double dx = next.x - prev.x;
+                  const double dy = next.y - prev.y;
+                  const double seg_len = std::sqrt(dx * dx + dy * dy);
+                  if (seg_len <= 0.0) {
+                    prev = next;
+                    continue;
+                  }
+                  if (seg_len >= remaining) {
+                    const double t = remaining / seg_len;
+                    const double ox = prev.x + dx * t;
+                    const double oy = prev.y + dy * t;
+                    lines.push_back("G1 X" + std::to_string(-ox) + " Y" +
+                                    std::to_string(-oy) + " F" +
+                                    std::to_string(feed));
+                    remaining = 0.0;
+                  }
+                  else {
+                    lines.push_back("G1 X" + std::to_string(-next.x) + " Y" +
+                                    std::to_string(-next.y) + " F" +
+                                    std::to_string(feed));
+                    remaining -= seg_len;
+                    prev = next;
+                  }
                 }
               }
             }
@@ -1968,6 +2010,9 @@ void NcCamView::preInit()
   m_outside_contour_color = ThemeColor::Text;
   m_inside_contour_color = ThemeColor::TextDisabled;
   m_open_contour_color = ThemeColor::DragDropTarget;
+  m_toolpath_cut_color = ThemeColor::ToolpathCutColor;
+  m_toolpath_lead_color = ThemeColor::ToolpathLeadColor;
+  m_toolpath_arrow_color = ThemeColor::ToolpathArrowColor;
 
   m_show_viewer_context_menu.x = -inf<double>();
   m_show_viewer_context_menu.y = -inf<double>();
@@ -2027,9 +2072,16 @@ void NcCamView::tick()
     return;
   auto& renderer = m_app->getRenderer();
 
-  // Update mouse mode for all parts
+  // Update mouse mode and inject themed toolpath colors for all parts. Done
+  // every frame because parts can appear at any time (import, duplicate) and
+  // the Part primitive has no access to the ThemeManager. Pointers are into
+  // the stable color cache, so they stay valid across theme switches.
   forEachPart([this](Part* part) {
     part->m_control.mouse_mode = static_cast<int>(m_current_tool);
+    part->m_toolpath_cut_color = &m_app->getColor(m_toolpath_cut_color);
+    part->m_toolpath_lead_color = &m_app->getColor(m_toolpath_lead_color);
+    part->m_toolpath_arrow_color = &m_app->getColor(m_toolpath_arrow_color);
+    part->m_show_kerf_width = m_show_kerf_width;
   });
   // Update toolpath operations
   for (size_t x = 0; x < m_toolpath_operations.size(); x++) {
@@ -2133,9 +2185,13 @@ void NcCamView::handleMouseEvent(const MouseButtonEvent& e,
       // End pan/move view mode
       setMoveViewActive(false);
 
-      // Show context menu if hovering over a part (Contour tool only)
+      // Show context menu if hovering over a part (Contour tool only).
+      // Capture the hovered contour now: once the popup is up and the cursor
+      // moves onto it, the live hover (m_mouse_over_part) clears.
       if (m_current_tool == JetCamTool::Contour) {
         if (m_mouse_over_part != NULL) {
+          m_context_menu_part = m_mouse_over_part;
+          m_context_menu_path = m_mouse_over_path;
           m_show_viewer_context_menu = { io.MousePos.x, io.MousePos.y };
         }
       }

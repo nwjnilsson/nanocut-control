@@ -279,7 +279,11 @@ target_include_directories(NanoCut PRIVATE
 # ------------------------------------------------------------
 #
 if(WIN32)
-    set(CONFIG_DIR "$ENV{APPDATA}/NanoCut")
+    # $ENV{APPDATA} contains backslashes (e.g. C:\Users\...\Roaming) which CMake
+    # would otherwise re-parse as invalid escape sequences (\U, \A, ...) when the
+    # path is baked into the generated cmake_install.cmake. Normalize to forward slashes.
+    file(TO_CMAKE_PATH "$ENV{APPDATA}" APPDATA_DIR)
+    set(CONFIG_DIR "${APPDATA_DIR}/NanoCut")
 elseif(APPLE)
     set(CONFIG_DIR "$ENV{HOME}/Library/NanoCut")
 else() # Linux and other Unix-like systems

@@ -48,17 +48,14 @@ void        Part::processMouse(float mpos_x, float mpos_y)
           continue;
         }
         // Per-path bounding box early-out
-        if (mpos_x < path.bbox.min.x - pad ||
-            mpos_x > path.bbox.max.x + pad ||
-            mpos_y < path.bbox.min.y - pad ||
-            mpos_y > path.bbox.max.y + pad) {
+        if (mpos_x < path.bbox.min.x - pad || mpos_x > path.bbox.max.x + pad ||
+            mpos_y < path.bbox.min.y - pad || mpos_y > path.bbox.max.y + pad) {
           global_index++;
           continue;
         }
         for (size_t i = 1; i < path.built_points.size(); i++) {
           if (geo::lineIntersectsWithCircle(
-                { { path.built_points[i - 1].x,
-                    path.built_points[i - 1].y },
+                { { path.built_points[i - 1].x, path.built_points[i - 1].y },
                   { path.built_points[i].x, path.built_points[i].y } },
                 { mpos_x, mpos_y },
                 pad)) {
@@ -69,10 +66,8 @@ void        Part::processMouse(float mpos_x, float mpos_y)
         }
         if (!mouse_is_over_path && path.is_closed) {
           if (geo::lineIntersectsWithCircle(
-                { { path.built_points.front().x,
-                    path.built_points.front().y },
-                  { path.built_points.back().x,
-                    path.built_points.back().y } },
+                { { path.built_points.front().x, path.built_points.front().y },
+                  { path.built_points.back().x, path.built_points.back().y } },
                 { mpos_x, mpos_y },
                 pad)) {
             path_index = global_index;
@@ -115,8 +110,7 @@ void        Part::processMouse(float mpos_x, float mpos_y)
             global_index++;
             continue;
           }
-          if (checkIfPointIsInsidePath(path.built_points,
-                                       { mpos_x, mpos_y })) {
+          if (checkIfPointIsInsidePath(path.built_points, { mpos_x, mpos_y })) {
             path_index = global_index;
             mouse_is_inside_perimeter = true;
             break;
@@ -266,6 +260,64 @@ void Part::render()
 
     m_number_of_verticies = 0;
     m_tool_paths.clear();
+    m_tool_path_arrows.clear();
+
+    // Build small V-shaped direction arrows along a toolpath's contour proper
+    // (clear of the lead-in / lead-out), indicating cut direction. Mirrors the
+    // control view's gcode arrows (gcode.cpp). One arrow per ~arrow_spacing of
+    // travel, at least one. Both lengths are in built-point space (scaled by
+    // m_control.scale) so they track the geometry.
+    const double arrow_len = SCALE(2.0) * m_control.scale;
+    const double arrow_spacing = SCALE(20.0) * m_control.scale;
+    auto build_arrows =
+      [arrow_len, arrow_spacing](
+        const Toolpath& tp) -> std::vector<std::vector<Point2d>> {
+      const size_t n = tp.points.size();
+      if (n < 2)
+        return {};
+      const size_t cfirst = std::min(tp.lead_in_count, n - 1);
+      const size_t clast =
+        (tp.lead_out_count < n) ? (n - 1 - tp.lead_out_count) : (n - 1);
+      if (clast <= cfirst)
+        return {};
+
+      // Cumulative arc length across the contour-proper segments. cum[k] is the
+      // distance from cfirst to vertex cfirst+k.
+      const size_t        seg_count = clast - cfirst;
+      std::vector<double> cum(seg_count + 1, 0.0);
+      for (size_t k = 0; k < seg_count; ++k)
+        cum[k + 1] = cum[k] + geo::distance(tp.points[cfirst + k],
+                                            tp.points[cfirst + k + 1]);
+      const double total = cum[seg_count];
+      if (total <= 0.0)
+        return {};
+
+      // Divide the contour into `count` equal spans and drop an arrow at each
+      // span's centre, so arrows sit ~arrow_spacing apart and clear of the ends.
+      const long count = std::max<long>(1, std::lround(total / arrow_spacing));
+      const double step = total / static_cast<double>(count);
+
+      std::vector<std::vector<Point2d>> arrows;
+      arrows.reserve(count);
+      size_t seg = 0;
+      for (long a = 0; a < count; ++a) {
+        const double target = (static_cast<double>(a) + 0.5) * step;
+        while (seg + 1 < seg_count && cum[seg + 1] < target)
+          ++seg;
+        const Point2d& pa = tp.points[cfirst + seg];
+        const Point2d& pb = tp.points[cfirst + seg + 1];
+        const double   seg_len = cum[seg + 1] - cum[seg];
+        const double   t = seg_len > 0.0 ? (target - cum[seg]) / seg_len : 0.0;
+        const Point2d  apex = { pa.x + (pb.x - pa.x) * t,
+                                pa.y + (pb.y - pa.y) * t };
+        const double   angle = geo::measurePolarAngle(pb, pa);
+        const Point2d p1 = geo::createPolarLine(apex, angle + 30, arrow_len).end;
+        const Point2d p2 = geo::createPolarLine(apex, angle - 30, arrow_len).end;
+        arrows.push_back({ p1, apex, p2 });
+      }
+      return arrows;
+    };
+
     for (auto& [layer_name, layer] : m_layers) {
       // Skip invisible layers
       if (!layer.visible)
@@ -304,18 +356,66 @@ void Part::render()
               if (path.built_points.size() < 3) {
                 continue;
               }
-              const int    direction = path.is_inside_contour ? -1 : +1;
-              const double radius = path.is_inside_contour
-                                      ? m_control.lead_in_length
-                                      : m_control.lead_out_length;
+              // Lead-IN is sized by lead_in_length for BOTH inside and
+              // outside contours; createToolpathLeads applies the
+              // lead_out_length as a real lead-out on outside contours only.
+              const int base_direction = path.is_inside_contour ? -1 : +1;
               std::vector<std::vector<Point2d>> tpaths = offsetPath(
                 path.built_points,
-                direction * (double) fabs(layer.toolpath_offset));
+                base_direction * (double) fabs(layer.toolpath_offset));
+
+              // A single source contour can offset into MORE than one polygon.
+              // When the kerf offset is large relative to thin features (e.g. a
+              // narrow slot or sliver, or the whole part scaled down), the
+              // offset self-intersects and Clipper emits, alongside the primary
+              // boundary, one or more polygons of OPPOSITE winding: voids
+              // trapped inside the material (outside source) or islands of
+              // material (inside source). These flip the inside/outside sense,
+              // so each result polygon must be classified by its OWN winding
+              // rather than inheriting the source path's -- otherwise a trapped
+              // void gets an outside-style lead-in/lead-out cut into finished
+              // material. Clipper canonicalizes winding and the outermost
+              // boundary encloses the rest, so the largest-|area| polygon is
+              // nesting depth 0; a polygon whose winding is opposite to it sits
+              // at odd depth and flips the source inside/outside flag (this XOR
+              // composes correctly through any nesting depth).
+              // A contour can also offset away to nothing (e.g. a small hole
+              // shrunk past its inradius), leaving no polygons -- skip it.
+              if (tpaths.empty())
+                continue;
+              std::vector<double> tp_area(tpaths.size(), 0.0);
+              size_t              dominant = 0;
               for (size_t x = 0; x < tpaths.size(); x++) {
+                tp_area[x] = geo::signedPolygonArea(tpaths[x]);
+                if (std::fabs(tp_area[x]) > std::fabs(tp_area[dominant]))
+                  dominant = x;
+              }
+              const bool dominant_positive = tp_area[dominant] >= 0.0;
+
+              for (size_t x = 0; x < tpaths.size(); x++) {
+                const bool opposite_winding =
+                  (tp_area[x] >= 0.0) != dominant_positive;
+                const bool tp_is_inside =
+                  path.is_inside_contour != opposite_winding;
+                const int direction = tp_is_inside ? -1 : +1;
+
+                // Flip cut direction by reversing the offset polygon's winding
+                // (Clipper canonicalizes input orientation, so this must happen
+                // AFTER offsetPath). createToolpathLeads then derives a valid
+                // lead-in/lead-out/overburn for the reversed direction.
+                if (path.reversed)
+                  std::reverse(tpaths[x].begin(), tpaths[x].end());
                 Toolpath tp;
-                if (createToolpathLeads(&tp, tpaths[x], radius, direction)) {
+                if (createToolpathLeads(&tp,
+                                        tpaths[x],
+                                        m_control.lead_in_length,
+                                        m_control.lead_out_length,
+                                        direction)) {
                   tp.is_closed_contour = true;
-                  tp.is_inside_contour = path.is_inside_contour;
+                  tp.is_inside_contour = tp_is_inside;
+                  tp.kerf_width = std::fabs(layer.toolpath_offset) * 2.0;
+                  for (auto& arrow : build_arrows(tp))
+                    m_tool_path_arrows.push_back(std::move(arrow));
                   m_tool_paths.push_back(std::move(tp));
                 }
               }
@@ -323,8 +423,13 @@ void Part::render()
             else {
               Toolpath tp;
               tp.points = path.built_points;
+              if (path.reversed)
+                std::reverse(tp.points.begin(), tp.points.end());
               tp.is_closed_contour = false;
               tp.is_inside_contour = false;
+              tp.kerf_width = std::fabs(layer.toolpath_offset) * 2.0;
+              for (auto& arrow : build_arrows(tp))
+                m_tool_path_arrows.push_back(std::move(arrow));
               m_tool_paths.push_back(std::move(tp));
             }
           }
@@ -360,25 +465,127 @@ void Part::render()
       if (path.built_points.empty())
         continue;
       glColor4f(path.color->r, path.color->g, path.color->b, path.color->a);
-      glVertexPointer(
-        2, GL_DOUBLE, sizeof(Point2d), path.built_points.data());
+      glVertexPointer(2, GL_DOUBLE, sizeof(Point2d), path.built_points.data());
       glDrawArrays(path.is_closed ? GL_LINE_LOOP : GL_LINE_STRIP,
                    0,
                    path.built_points.size());
     }
   }
-  glColor4f(0, 1, 0, 0.5);
+  // Toolpaths, colored per segment: lead-ins/lead-outs in the lead color, the
+  // contour proper in the cut color. Sub-strips share their boundary vertex so
+  // there are no gaps. Inside (hole) contours have no real lead-out (just the
+  // closing duplicate), so their trailing vertices stay in the cut color.
+  // With kerf-width display on, each sub-strip is stroked into a filled swath
+  // of the actual kerf (in built-point space, so it scales with zoom); inner
+  // edge sits on the finished contour, outer edge half a kerf into the scrap.
+  const Color4f* cut_c = m_toolpath_cut_color;
+  const Color4f* lead_c = m_toolpath_lead_color;
   for (auto& tp : m_tool_paths) {
-    if (tp.points.empty())
+    const size_t n = tp.points.size();
+    if (n < 2)
       continue;
-    glVertexPointer(2, GL_DOUBLE, sizeof(Point2d), tp.points.data());
-    glDrawArrays(GL_LINE_STRIP, 0, tp.points.size());
+    const Point2d* pts = tp.points.data();
+
+    const bool   has_lead_out = !tp.is_inside_contour && tp.lead_out_count > 1;
+    const size_t contour_end =
+      has_lead_out ? (n - 1 - tp.lead_out_count) : (n - 1);
+    const size_t lead_in_end = std::min(tp.lead_in_count, n - 1);
+
+    const double half_kerf = tp.kerf_width * 0.5;
+    const bool   ribbon = m_show_kerf_width && half_kerf > 0.0;
+
+    auto draw_strip = [&](size_t first, size_t last, const Color4f* c) {
+      if (last <= first)
+        return;
+      glColor4f(c->r, c->g, c->b, c->a);
+      glVertexPointer(2, GL_DOUBLE, sizeof(Point2d), pts + first);
+      glDrawArrays(GL_LINE_STRIP, 0, last - first + 1);
+    };
+
+    // Stroke polyline pts[first..last] into a kerf-width swath. Each vertex is
+    // offset +/- half_kerf along the angle-bisector (miter) normal so adjacent
+    // segments join without gaps; the miter is clamped to keep sharp corners
+    // from spiking. Emitted as one GL_TRIANGLE_STRIP of interleaved
+    // left/right edge vertices.
+    auto seg_normal = [](const Point2d& a, const Point2d& b) -> Point2d {
+      const double dx = b.x - a.x, dy = b.y - a.y;
+      const double len = std::sqrt(dx * dx + dy * dy);
+      if (len <= 1e-12)
+        return { 0.0, 0.0 };
+      return { -dy / len, dx / len }; // left-hand normal
+    };
+    auto draw_ribbon = [&](size_t first, size_t last, const Color4f* c) {
+      if (last <= first)
+        return;
+      constexpr double miter_limit = 3.0;
+      m_ribbon_buf.clear();
+      m_ribbon_buf.reserve((last - first + 1) * 2);
+      for (size_t i = first; i <= last; ++i) {
+        Point2d nrm;
+        double  scale = half_kerf;
+        if (i == first) {
+          nrm = seg_normal(pts[i], pts[i + 1]);
+        }
+        else if (i == last) {
+          nrm = seg_normal(pts[i - 1], pts[i]);
+        }
+        else {
+          const Point2d n1 = seg_normal(pts[i - 1], pts[i]);
+          const Point2d n2 = seg_normal(pts[i], pts[i + 1]);
+          const double  mx = n1.x + n2.x, my = n1.y + n2.y;
+          const double  mlen = std::sqrt(mx * mx + my * my);
+          if (mlen <= 1e-9) {
+            nrm = n1; // ~180 deg turn-back; just use the incoming normal
+          }
+          else {
+            nrm = { mx / mlen, my / mlen };
+            double d = nrm.x * n1.x + nrm.y * n1.y; // cos(half-angle)
+            if (d < 1.0 / miter_limit)
+              d = 1.0 / miter_limit; // clamp to the miter limit
+            scale = half_kerf / d;
+          }
+        }
+        m_ribbon_buf.push_back(
+          { pts[i].x + nrm.x * scale, pts[i].y + nrm.y * scale });
+        m_ribbon_buf.push_back(
+          { pts[i].x - nrm.x * scale, pts[i].y - nrm.y * scale });
+      }
+      glColor4f(c->r, c->g, c->b, c->a);
+      glVertexPointer(2, GL_DOUBLE, sizeof(Point2d), m_ribbon_buf.data());
+      glDrawArrays(GL_TRIANGLE_STRIP, 0, m_ribbon_buf.size());
+    };
+
+    auto draw_seg = [&](size_t first, size_t last, const Color4f* c) {
+      if (ribbon)
+        draw_ribbon(first, last, c);
+      else
+        draw_strip(first, last, c);
+    };
+
+    // Lead-in [0 .. lead_in_end] (joins the first contour vertex).
+    if (lead_in_end > 0)
+      draw_seg(0, lead_in_end, lead_c);
+    // Contour proper [lead_in_end .. contour_end].
+    draw_seg(lead_in_end, contour_end, cut_c);
+    // Lead-out [contour_end .. n-1] (outside contours only).
+    if (has_lead_out)
+      draw_seg(contour_end, n - 1, lead_c);
+  }
+  // Cut-direction arrows over the toolpaths.
+  const Color4f* arrow_c = m_toolpath_arrow_color;
+  glColor4f(arrow_c->r, arrow_c->g, arrow_c->b, arrow_c->a);
+  for (auto& arrow : m_tool_path_arrows) {
+    if (arrow.empty())
+      continue;
+    glVertexPointer(2, GL_DOUBLE, sizeof(Point2d), arrow.data());
+    glDrawArrays(GL_LINE_STRIP, 0, arrow.size());
   }
   glDisableClientState(GL_VERTEX_ARRAY);
   glLineWidth(1);
   glDisable(GL_LINE_STIPPLE);
   glPopMatrix();
 }
+
 nlohmann::json Part::serialize()
 {
   nlohmann::json layers_json;
@@ -554,53 +761,129 @@ Point2d* Part::getClosestPoint(size_t*               index,
 }
 namespace {
 
-// Straight-lead pierce: walk every contour vertex and pick the attach
-// point whose nearest offset-polygon vertex sits closest to the
-// requested lead length. Only when no vertex on the contour yields a
-// feasible attach at the full radius do we shrink the offset distance
-// -- reducing lead length is a last resort for contours too small to
-// accommodate the user's setting at any vertex. Returns the chosen
-// pierce point and the contour index it attaches to (or std::nullopt
-// if no attach is feasible at any tried radius).
 struct StraightLead {
   Point2d pierce;
   size_t  attach_index;
 };
-std::optional<StraightLead> findStraightPierce(Part&                       part,
-                                               const std::vector<Point2d>& contour,
-                                               double                      radius,
-                                               int                         direction)
+
+// Distance from `origin` along the unit vector `dir` to the first crossing
+// of the polygon boundary, ignoring hits within `t_eps` (the two edges that
+// meet at the attach vertex the ray starts on). Returns +inf when the ray
+// never re-crosses the contour -- e.g. it heads out into open scrap. Used to
+// size a straight lead so its pierce stops short of the opposite wall.
+double rayPolygonClearance(const std::vector<Point2d>& poly,
+                           Point2d                     origin,
+                           Point2d                     dir,
+                           double                      t_eps)
 {
-  const double min_feasible = SCALE(0.05);
-  double       feasible = std::fabs(radius);
-  while (feasible >= min_feasible) {
-    auto                        lead_offset =
-      part.offsetPath(contour, feasible * (double) direction);
-    std::optional<StraightLead> best;
-    double                      best_score = std::numeric_limits<double>::max();
-    for (size_t i = 0; i < contour.size(); ++i) {
-      for (auto& poly : lead_offset) {
-        Point2d* point = part.getClosestPoint(nullptr, contour[i], &poly);
-        if (!point)
-          continue;
-        const double d = geo::distance(contour[i], *point);
-        if (d > feasible * 1.1)
-          continue;
-        // Prefer attach points where the lead length matches the
-        // requested feasible distance most closely (longest physically
-        // realisable lead without overshooting).
-        const double score = std::fabs(d - feasible);
-        if (score < best_score) {
-          best_score = score;
-          best = StraightLead{ *point, i };
-        }
-      }
-    }
-    if (best)
-      return best;
-    feasible *= 0.5;
+  const size_t N = poly.size();
+  double       best = std::numeric_limits<double>::infinity();
+  for (size_t i = 0; i < N; ++i) {
+    const Point2d& a = poly[i];
+    const Point2d& b = poly[(i + 1) % N];
+    const double   ex = b.x - a.x;
+    const double   ey = b.y - a.y;
+    const double   det = ex * dir.y - ey * dir.x;
+    if (std::fabs(det) < 1e-12)
+      continue; // ray parallel to this edge
+    const double rx = a.x - origin.x;
+    const double ry = a.y - origin.y;
+    const double t = (ex * ry - ey * rx) / det;       // distance along unit dir
+    const double u = (dir.x * ry - dir.y * rx) / det; // param along edge
+    if (t > t_eps && u >= 0.0 && u <= 1.0 && t < best)
+      best = t;
   }
-  return std::nullopt;
+  return best;
+}
+
+// Straight-lead pierce. A straight lead is fully defined by an attach vertex
+// and the inward normal there (pierce = attach + L * normal), so rather than
+// offsetting the whole polygon and snapping to a vertex we compute the pierce
+// analytically and size L directly. For each contour vertex we shoot the
+// scrap-side normal across the opening; the lead length is the requested
+// radius clamped to half that clearance, so the pierce lands near the middle
+// of the opening instead of grazing the far wall.
+//
+// We then keep the vertex whose pierce sits FARTHEST from every wall (the most
+// centred spot in the scrap), NOT the one with the longest lead. Maximising
+// length rewards shooting down the long axis of a thin sliver and parks the
+// pierce in the narrow wedge at its tip, pointing out toward the corner;
+// maximising pierce clearance instead lands it on the wide centreline aimed
+// into the body. It is also self-limiting: it never lengthens a lead past the
+// point where the pierce starts closing on a wall. Returns the pierce and the
+// attach index, or std::nullopt if no vertex can support even a minimal lead.
+std::optional<StraightLead> findStraightPierce(
+  const std::vector<Point2d>& contour, double radius, int direction)
+{
+  const size_t N = contour.size();
+  if (N < 3)
+    return std::nullopt;
+
+  const double radius_abs = std::fabs(radius);
+  const double min_feasible = SCALE(0.05);
+  const bool   is_inside = direction < 0;
+  // A short probe to pick which normal points into the scrap, and a small
+  // ray epsilon to skip the self-intersection at the attach vertex.
+  const double probe =
+    std::max(static_cast<double>(min_feasible), radius_abs * 0.01);
+  const double t_eps =
+    std::max(static_cast<double>(SCALE(1e-3)), radius_abs * 1e-3);
+  // Clearances within this band count as a tie; break ties toward the longer
+  // lead so we don't pick a stubby one when an equally-centred fuller lead
+  // fits.
+  const double tie_eps = SCALE(1e-3);
+
+  std::optional<StraightLead> best;
+  double                      best_clearance = -1.0;
+  double                      best_len = -1.0;
+
+  for (size_t i = 0; i < N; ++i) {
+    const Point2d attach = contour[i];
+    const Point2d nxt = contour[(i + 1) % N];
+    const double  ex = nxt.x - attach.x;
+    const double  ey = nxt.y - attach.y;
+    const double  elen = std::sqrt(ex * ex + ey * ey);
+    if (elen <= 0.0)
+      continue;
+
+    // Unit normal to the local edge, flipped to the scrap side: the slug
+    // interior for inside contours, the open scrap for outside contours, so
+    // the pierce never sits in finished material.
+    Point2d       n = { -ey / elen, ex / elen };
+    const Point2d probe_pt = { attach.x + n.x * probe, attach.y + n.y * probe };
+    if (geo::pointIsInsidePolygon(contour, probe_pt) != is_inside)
+      n = { -n.x, -n.y };
+
+    // Longest lead this vertex can support. Clamp to half the clearance to
+    // the opposite wall (centres the pierce); open scrap keeps full radius.
+    const double clearance = rayPolygonClearance(contour, attach, n, t_eps);
+    double       len = radius_abs;
+    if (clearance < std::numeric_limits<double>::infinity())
+      len = std::min(len, clearance * 0.5);
+    if (len < min_feasible)
+      continue;
+
+    const Point2d pierce = { attach.x + n.x * len, attach.y + n.y * len };
+    // Drop candidates whose pierce isn't genuinely in the scrap: at a sharp
+    // tip the short probe can cross a near wall and mis-flip the normal, which
+    // would otherwise place the pierce in finished material.
+    if (geo::pointIsInsidePolygon(contour, pierce) != is_inside)
+      continue;
+
+    const double pierce_clearance =
+      geo::pointToPolygonDistance(contour, pierce);
+    const bool better =
+      pierce_clearance > best_clearance + tie_eps ||
+      (pierce_clearance > best_clearance - tie_eps && len > best_len);
+    if (better) {
+      if (pierce_clearance > best_clearance)
+        best_clearance = pierce_clearance;
+      best_len = len;
+      best = StraightLead{ pierce, i };
+    }
+  }
+
+  return best;
 }
 
 // Rotate `contour` so that index `new_first` becomes index 0. If
@@ -617,11 +900,83 @@ std::vector<Point2d> rotateContour(const std::vector<Point2d>& contour,
   return out;
 }
 
+// Build a lead-OUT polyline that departs the contour's start vertex
+// (contour[0], where the cut loop closes) tangent to the direction of
+// travel and curves outward into the scrap. `contour` is the rotated,
+// distinct-vertex offset polygon. Returns the lead-out vertices AFTER the
+// start point (the caller has already appended contour[0] as the closing
+// vertex), or empty if no lead-out stays clear of the part within slop.
+//
+// Mirrors the lead-in: geo::buildArcLead(attach, T, r, 90, s) returns a
+// polyline [pierce ... attach] whose motion ARRIVES at attach along T.
+// Reversing it gives a path that DEPARTS attach along -T, so we pass
+// T = -forward to depart along the forward travel tangent. The correct
+// sweep side (into the scrap) is found by trying both signs and keeping the
+// one whose vertices stay outside the contour.
+std::vector<Point2d> buildLeadOut(const std::vector<Point2d>& contour,
+                                  double                      lead_out_abs,
+                                  double                      side_slop)
+{
+  const size_t N = contour.size();
+  if (N < 3 || lead_out_abs <= 0.0)
+    return {};
+
+  const Point2d start = contour[0];
+  const double  fdx = contour[1].x - start.x;
+  const double  fdy = contour[1].y - start.y;
+  const double  flen = std::sqrt(fdx * fdx + fdy * fdy);
+  if (flen <= 0.0)
+    return {};
+  const Point2d forward = { fdx / flen, fdy / flen };
+
+  // A lead-out vertex is acceptable unless it sits INSIDE the contour by
+  // more than the slop tolerance (i.e. it has cut back into the part).
+  auto stays_in_scrap = [&](const std::vector<Point2d>& pts,
+                            size_t                      first) -> bool {
+    for (size_t i = first; i < pts.size(); ++i) {
+      if (geo::pointIsInsidePolygon(contour, pts[i]) &&
+          geo::pointToPolygonDistance(contour, pts[i]) > side_slop) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // ---- Arc lead-out -------------------------------------------------------
+  const Point2d tangent = { -forward.x, -forward.y };
+  for (int s = 1; s >= -1; s -= 2) {
+    std::vector<Point2d> arc =
+      geo::buildArcLead(start, tangent, lead_out_abs, 90.0, s, 16);
+    if (arc.size() < 2)
+      continue;
+    std::reverse(arc.begin(), arc.end()); // arc.front() == start
+    if (stays_in_scrap(arc, 1))
+      return std::vector<Point2d>(arc.begin() + 1, arc.end());
+  }
+
+  // ---- Straight lead-out (outward normal) ---------------------------------
+  // Last resort when no tangent arc fits: leave along the outward normal so
+  // the torch-off point is guaranteed off the finished edge.
+  Point2d      n = { -forward.y, forward.x };
+  const double probe =
+    std::max(static_cast<double>(SCALE(0.1)), lead_out_abs * 0.05);
+  const Point2d test = { start.x + n.x * probe, start.y + n.y * probe };
+  if (geo::pointIsInsidePolygon(contour, test))
+    n = { forward.y, -forward.x };
+  std::vector<Point2d> line = { { start.x + n.x * lead_out_abs,
+                                  start.y + n.y * lead_out_abs } };
+  if (stays_in_scrap(line, 0))
+    return line;
+
+  return {};
+}
+
 } // namespace
 
 bool Part::createToolpathLeads(Toolpath*                   out,
                                const std::vector<Point2d>& contour_in,
-                               double                      radius,
+                               double                      lead_in_len,
+                               double                      lead_out_len,
                                int                         direction)
 {
   out->points.clear();
@@ -645,222 +1000,170 @@ bool Part::createToolpathLeads(Toolpath*                   out,
   if (contour.size() < 3)
     return false;
 
-  const bool is_inside = direction < 0;
+  const bool   is_inside = direction < 0;
+  const double lead_in_abs = std::fabs(lead_in_len);
+  // Lead-outs are meaningful only on outside contours; inside contours use
+  // overburn in the emitter (so the arc extinguishes inside the falling
+  // slug) and must never get a lead-out.
+  const double lead_out_abs = is_inside ? 0.0 : std::fabs(lead_out_len);
+  const double orientation = geo::signedPolygonArea(contour) >= 0 ? 1.0 : -1.0;
 
-  if (radius == 0.0) {
-    // Zero-length lead: no pierce vertex, just the contour itself.
-    out->points = contour;
-    if (!is_inside) {
-      out->points.push_back(contour.front());
-      out->lead_out_count = 1;
-    }
-    return true;
-  }
+  // Slop tolerance shared by the lead-in and lead-out side checks: RDP
+  // simplification with `m_control.smoothing` plus Clipper offset rounding /
+  // CleanPolygons let the polygon deviate from the true contour, so allow at
+  // least SCALE(0.5) mm of slop or 2x smoothing, whichever is larger.
+  const double side_slop =
+    std::max(static_cast<double>(SCALE(0.5)), m_control.smoothing * 2.0);
 
-  // ---- Attempt arc lead-in ------------------------------------------------
-  const double radius_abs = std::fabs(radius);
-  // Look for a "straight run": a span of vertices [start, end] where
-  // the chord approximates the contour within dev_tolerance. This
-  // bridges the natural curvature of dense polygons (e.g. circles
-  // discretized to many short segments by jtRound + Clipper) where no
-  // single segment would be long enough for an arc lead.
-  // The arc curves AWAY from the contour (inward for inside contours,
-  // outward for outside), so the straight-run length needn't be 2*radius
-  // -- it only needs to give a locally smooth attach vertex. The real
-  // feasibility test is "does the discretized arc lie on the correct
-  // side of the contour", performed below.
-  const double min_segment_len =
-    std::max(static_cast<double>(SCALE(0.5)), radius_abs * 0.5);
-  const double dev_tolerance =
-    std::max(static_cast<double>(SCALE(0.25)), radius_abs * 0.1);
-  geo::StraightRun run;
-  const bool       run_found =
-    geo::longestStraightRun(contour, min_segment_len, dev_tolerance, &run);
-  if (!run_found) {
-    LOG_F(INFO,
-          "[createToolpathLeads] No straight run >= %.3f mm (tol=%.3f) "
-          "in %zu-vertex contour (direction=%d); falling back to straight "
-          "lead.",
-          min_segment_len,
-          dev_tolerance,
-          contour.size(),
-          direction);
-  }
+  // ---- Build the lead-IN --------------------------------------------------
+  // Produces `lead_in_pts` (pierce -> ... -> just before attach) and the
+  // contour index `attach_index` the lead lands on. Empty lead_in_pts means
+  // no lead-in: either lead_in_len == 0, or geometry too tight to attach a
+  // lead -- in which case we start the cut on the contour rather than drop
+  // the toolpath entirely.
+  std::vector<Point2d> lead_in_pts;
+  size_t               attach_index = 0;
 
-  bool arc_built = false;
-  if (run_found) {
-    // Place attach AT an actual contour vertex (mid-run by vertex index)
-    // and use the LOCAL edge direction at that vertex as the tangent.
-    // Putting attach on the chord (instead of on the contour) created a
-    // perpendicular jump between arc-end and the first contour vertex
-    // equal to the local sagitta — that's the "spike" we want to avoid.
-    // With attach on the contour, the cut continues from arc-end into
-    // contour[mid+1] along an actual contour edge, with no jump.
-    const size_t N = contour.size();
-    const size_t run_len_verts =
-      (run.end + N - run.start) % N; // 0 disallowed (chord_len>0)
-    const size_t mid_offset = run_len_verts / 2;
-    const size_t mid = (run.start + mid_offset) % N;
-    const size_t mid_next = (mid + 1) % N;
+  if (lead_in_abs > 0.0) {
+    const double radius_abs = lead_in_abs;
+    // Look for a "straight run": a span of vertices [start, end] where the
+    // chord approximates the contour within dev_tolerance. This bridges the
+    // natural curvature of dense polygons (e.g. circles discretized to many
+    // short segments by jtRound + Clipper) where no single segment would be
+    // long enough for an arc lead. The arc curves AWAY from the contour, so
+    // the run length needn't be 2*radius -- the real feasibility test is the
+    // side check below.
+    const double min_segment_len =
+      std::max(static_cast<double>(SCALE(0.5)), radius_abs * 0.5);
+    const double dev_tolerance =
+      std::max(static_cast<double>(SCALE(0.25)), radius_abs * 0.1);
+    geo::StraightRun run;
+    const bool       run_found =
+      geo::longestStraightRun(contour, min_segment_len, dev_tolerance, &run);
 
-    const Point2d attach = contour[mid];
-    const double  edx = contour[mid_next].x - attach.x;
-    const double  edy = contour[mid_next].y - attach.y;
-    const double  edge_len = std::sqrt(edx * edx + edy * edy);
-    if (edge_len > 0.0) {
-      const Point2d tangent_dir = { edx / edge_len, edy / edge_len };
+    bool arc_built = false;
+    if (run_found) {
+      // Place attach AT an actual contour vertex (mid-run by vertex index)
+      // and use the LOCAL edge direction at that vertex as the tangent, so
+      // the cut continues from arc-end into contour[mid+1] along an actual
+      // contour edge with no perpendicular jump ("spike").
+      const size_t N = contour.size();
+      const size_t run_len_verts =
+        (run.end + N - run.start) % N; // 0 disallowed (chord_len>0)
+      const size_t mid_offset = run_len_verts / 2;
+      const size_t mid = (run.start + mid_offset) % N;
+      const size_t mid_next = (mid + 1) % N;
 
-      // Polygon orientation: positive shoelace = CCW. For a CCW polygon
-      // the interior is on the LEFT of each edge direction; for CW the
-      // interior is on the RIGHT. buildArcLead's sweep_sign chooses the
-      // side the arc curves toward: +1 -> LEFT of tangent, -1 -> RIGHT.
-      // We want the arc on the INTERIOR side for inside contours (so
-      // the pierce ends up in the slug) and on the EXTERIOR side for
-      // outside contours (pierce in the scrap). For CCW this is
-      // sweep_sign = +1 (inside) or -1 (outside); for CW it's the
-      // opposite. Combined: sweep_sign = -direction * orientation.
-      const double orientation =
-        geo::signedPolygonArea(contour) >= 0 ? 1.0 : -1.0;
-      const int sweep_sign = static_cast<int>(-direction * orientation);
+      const Point2d attach = contour[mid];
+      const double  edx = contour[mid_next].x - attach.x;
+      const double  edy = contour[mid_next].y - attach.y;
+      const double  edge_len = std::sqrt(edx * edx + edy * edy);
+      if (edge_len > 0.0) {
+        const Point2d tangent_dir = { edx / edge_len, edy / edge_len };
 
-      // 90 deg sweep, sized at the user's lead_in_length.
-      auto arc_pts =
-        geo::buildArcLead(attach, tangent_dir, radius_abs, 90.0, sweep_sign, 16);
+        // buildArcLead's sweep_sign chooses the side the arc curves toward.
+        // We want the INTERIOR side for inside contours (pierce in the slug)
+        // and the EXTERIOR side for outside contours (pierce in the scrap):
+        // sweep_sign = -direction * orientation.
+        const int sweep_sign = static_cast<int>(-direction * orientation);
 
-      if (arc_pts.size() >= 2) {
-        // Two checks combined.
-        //
-        // (1) Whole-arc side check: every arc vertex (except `attach`,
-        // a boundary point pointIsInsidePolygon may classify
-        // ambiguously) must sit on the correct side of the contour,
-        // with slop to absorb the deviation between the simplified +
-        // Clipper-offset contour and the true geometry. Catches arcs
-        // that exit via tangent-direction errors.
-        //
-        // (2) Pierce headroom check: the pierce -- the arc's deepest
-        // vertex into the slug -- must have room to breathe so the
-        // lead-in doesn't end up grazing the opposite wall of a
-        // narrow pocket (the divot risk in banana-shaped pockets).
-        // We measure the pierce's distance to the nearest contour
-        // edge directly. For a clean parallel-wall pocket the nearest
-        // edge is the attach edge at distance ~`radius_abs`; if any
-        // other wall comes closer than `radius_abs * 0.5`, that's the
-        // banana case and we reject. Using a direct distance check
-        // (rather than offsetting the contour by 0.9*r and asking
-        // Clipper if the pierce lies inside) means small holes whose
-        // inradius is less than 0.9*r still pass when the arc fits
-        // geometrically -- the side check has already proven that.
-        //
-        // Slop tolerance: RDP simplification with `m_control.smoothing`
-        // permits the polygon to deviate from the true contour by up
-        // to that amount perpendicular, and Clipper's offset rounding
-        // / CleanPolygons add a similar amount of vertex jitter on
-        // top. Allow at least SCALE(0.5) mm of slop or 2x smoothing,
-        // whichever is larger.
-        const double side_slop =
-          std::max(static_cast<double>(SCALE(0.5)),
-                   m_control.smoothing * 2.0);
-        bool arc_ok = true;
-        for (size_t i = 0; i + 1 < arc_pts.size(); ++i) {
-          const bool inside = geo::pointIsInsidePolygon(contour, arc_pts[i]);
-          const bool wrong_side = is_inside ? !inside : inside;
-          if (wrong_side) {
-            const double edge_dist =
-              geo::pointToPolygonDistance(contour, arc_pts[i]);
-            if (edge_dist > side_slop) {
-              arc_ok = false;
-              break;
+        // 90 deg sweep, sized at the user's lead-in length.
+        auto arc_pts = geo::buildArcLead(
+          attach, tangent_dir, radius_abs, 90.0, sweep_sign, 16);
+
+        if (arc_pts.size() >= 2) {
+          // (1) Whole-arc side check: every arc vertex (except `attach`, a
+          // boundary point) must sit on the correct side of the contour,
+          // within slop. (2) Pierce headroom: the pierce must clear the
+          // nearest contour edge by >= radius_abs * 0.5 so the lead doesn't
+          // graze the opposite wall of a narrow pocket.
+          bool arc_ok = true;
+          for (size_t i = 0; i + 1 < arc_pts.size(); ++i) {
+            const bool inside = geo::pointIsInsidePolygon(contour, arc_pts[i]);
+            const bool wrong_side = is_inside ? !inside : inside;
+            if (wrong_side) {
+              const double edge_dist =
+                geo::pointToPolygonDistance(contour, arc_pts[i]);
+              if (edge_dist > side_slop) {
+                arc_ok = false;
+                break;
+              }
             }
           }
-        }
-        if (arc_ok) {
-          const double pierce_clearance =
-            geo::pointToPolygonDistance(contour, arc_pts.front());
-          if (pierce_clearance < radius_abs * 0.5) {
-            arc_ok = false;
+          if (arc_ok) {
+            // Pierce headroom: the pierce (arc start) must clear the nearest
+            // contour edge by >= radius_abs * 0.5. pointToPolygonDistance
+            // returns the distance to the closest wall, so in a narrow pocket
+            // this is the OPPOSITE-wall distance -- rejecting here keeps the
+            // pierce from landing right against the far wall.
+            const double pierce_clearance =
+              geo::pointToPolygonDistance(contour, arc_pts.front());
+            if (pierce_clearance < radius_abs * 0.5)
+              arc_ok = false;
+          }
+          // Only commit the arc when it passed BOTH checks; otherwise leave
+          // arc_built false so we fall through to the straight lead-in.
+          if (arc_ok) {
+            // attach == contour[mid]; after rotating the contour to start at
+            // mid, the arc's snapped final vertex == rotated[0], so drop it.
+            attach_index = mid;
+            lead_in_pts.assign(arc_pts.begin(), arc_pts.end() - 1);
+            out->lead_in_is_arc = true;
+            arc_built = true;
           }
         }
-        if (!arc_ok) {
-          LOG_F(INFO,
-                "[createToolpathLeads] Arc lead rejected -- crosses "
-                "contour or insufficient pierce headroom "
-                "(is_inside=%d, edge_len=%.3f, radius=%.3f); falling "
-                "back to straight lead.",
-                static_cast<int>(is_inside),
-                edge_len,
-                radius_abs);
-        }
-        if (arc_ok) {
-          // Rotate the contour so it starts at `mid` (the contour vertex
-          // where the arc lands). Since attach == contour[mid], the arc's
-          // last vertex (snapped to attach) equals rotated[0], so we drop
-          // the arc's final vertex when assembling. No extra `attach`
-          // insertion needed — rotated[0] already serves as the contour's
-          // first vertex after the arc.
-          std::vector<Point2d> rotated = rotateContour(contour, mid);
+      }
+    }
 
-          // Assemble: arc (pierce -> ... -> attach=rotated[0]), then
-          // contour from rotated[0] all the way around back to attach
-          // (closing duplicate at the end).
-          out->points.reserve(arc_pts.size() - 1 + rotated.size() + 1);
-          out->points.insert(out->points.end(), arc_pts.begin(),
-                             arc_pts.end() - 1);
-          // lead_in_count counts the arc-only vertices BEFORE attach.
-          out->lead_in_count = arc_pts.size() - 1;
-          out->points.insert(out->points.end(), rotated.begin(), rotated.end());
-          // Trailing closing vertex marked as lead-out (lead_out_count=1)
-          // for both inside and outside contours. For inside contours the
-          // emitter replaces the closing G1 with overburn (torch off);
-          // for outside contours the emitter walks the closing G1 with
-          // torch on. The duplicate keeps the [contour_first, contour_last]
-          // range describing the cyclic contour vertices.
-          out->points.push_back(attach);
-          out->lead_out_count = 1;
-          out->lead_in_is_arc = true;
-          arc_built = true;
-        }
+    if (!arc_built) {
+      // ---- Fallback: straight lead-in ----
+      auto straight = findStraightPierce(contour, radius_abs, direction);
+      if (straight) {
+        attach_index = straight->attach_index;
+        lead_in_pts = { straight->pierce };
+        out->lead_in_is_arc = false;
+      }
+      else {
+        LOG_F(INFO,
+              "[createToolpathLeads] No feasible straight lead-in; cut will "
+              "start on the contour (no lead-in).");
       }
     }
   }
 
-  if (arc_built)
-    return true;
+  // Rotate the contour so the attach vertex sits at index 0. With no lead-in
+  // this is the identity (attach_index == 0).
+  std::vector<Point2d> rotated = rotateContour(contour, attach_index);
 
-  // ---- Fallback: straight lead --------------------------------------------
-  auto straight = findStraightPierce(*this, contour, radius_abs, direction);
-  if (!straight)
-    return false;
-
-  // Rotate the contour so the chosen attach vertex sits at index 0 --
-  // findStraightPierce can land anywhere along the contour, not just at
-  // contour.front(). The assembly layout below assumes rotated[0] is the
-  // attach point that the pierce -> attach segment lands on.
-  std::vector<Point2d> rotated =
-    rotateContour(contour, straight->attach_index);
-
-  // Layout: [pierce, c0, c1, ..., c_{N-1}, c0, (pierce if outside)].
-  // The explicit closing-c0 vertex matters: contour was stripped of its
-  // closing duplicate early in this function, so without re-adding it the
-  // rendered line strip (and the outside-contour emitter that walks every
-  // vertex) would draw c_{N-1} -> pierce directly across the slug. That's
-  // the "spike" visible in the preview for straight-lead fallbacks.
-  //
-  // For inside contours `lead_out_count = 1` makes contour_last point at
-  // c_{N-1}; torch_off_async fires there, then the overburn loop walks
-  // forward from c_{N-1} -> c0 (kerf closing, torch off) and onward into
-  // the slug -- mirroring the arc-lead behaviour.
-  out->points.reserve(rotated.size() + 3);
-  out->points.push_back(straight->pierce);
+  // ---- Assemble lead-in + contour + closing vertex ------------------------
+  out->points.reserve(lead_in_pts.size() + rotated.size() + 18);
+  out->points.insert(out->points.end(), lead_in_pts.begin(), lead_in_pts.end());
+  out->lead_in_count = lead_in_pts.size();
   out->points.insert(out->points.end(), rotated.begin(), rotated.end());
+  // Closing duplicate: returns to the start vertex so the final contour edge
+  // is cut / the kerf is closed. Marked as lead-out (lead_out_count starts at
+  // 1) so [contour_first, contour_last] bounds the cyclic contour vertices.
+  // For inside contours the emitter fires torch_off here and walks the
+  // overburn forward from this point; for outside contours the lead-out
+  // below continues the cut from here into the scrap.
   out->points.push_back(rotated.front());
-  out->lead_in_count = 1;
-  if (is_inside) {
-    out->lead_out_count = 1;
+  out->lead_out_count = 1;
+
+  // ---- Build the lead-OUT (outside contours only) -------------------------
+  if (lead_out_abs > 0.0) {
+    std::vector<Point2d> lead_out_pts =
+      buildLeadOut(rotated, lead_out_abs, side_slop);
+    if (!lead_out_pts.empty()) {
+      out->points.insert(
+        out->points.end(), lead_out_pts.begin(), lead_out_pts.end());
+      out->lead_out_count += lead_out_pts.size();
+    }
+    else {
+      LOG_F(INFO,
+            "[createToolpathLeads] Lead-out rejected (arc and straight both "
+            "cross the contour); closing without a lead-out.");
+    }
   }
-  else {
-    out->points.push_back(straight->pierce);
-    out->lead_out_count = 1;
-  }
-  out->lead_in_is_arc = false;
+
   return true;
 }

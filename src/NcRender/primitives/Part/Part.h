@@ -17,6 +17,10 @@ public:
     geo::Extents         bbox;              // Bounding box of built_points
     bool                 is_closed;
     bool                 is_inside_contour;
+    // Cut-direction flip. Applied to the offset contour AFTER Clipper (Clipper
+    // canonicalizes input winding, so reversing the source points has no
+    // effect on the generated toolpath). Toggled from the CAM context menu.
+    bool                 reversed = false;
     const Color4f*       color = &Primitive::s_default_color;
   };
 
@@ -31,6 +35,10 @@ public:
     bool                 is_closed_contour = false;
     bool                 is_inside_contour = false;
     bool                 lead_in_is_arc = false;
+    // Full kerf width in built-point space (== 2 * |layer.toolpath_offset|),
+    // captured at build time so render() can draw the toolpath as a swath of
+    // the actual cut width. 0 falls back to a thin centerline.
+    double               kerf_width = 0.0;
   };
 
   struct Layer {
@@ -60,6 +68,26 @@ public:
 
   std::unordered_map<std::string, Layer> m_layers;
   std::vector<Toolpath>                  m_tool_paths;
+  // One V-shaped arrow (3 points) per toolpath, indicating cut direction in
+  // the preview. Rebuilt alongside m_tool_paths.
+  std::vector<std::vector<Point2d>>      m_tool_path_arrows;
+  // Toolpath preview colors, injected by NcCamView from the theme cache (Part
+  // has no access to the ThemeManager itself). Cut = contour motion, Lead =
+  // lead-ins/lead-outs, Arrow = direction arrows. Default to static white so a
+  // Part rendered before wiring is still visible (never null).
+  const Color4f*                         m_toolpath_cut_color =
+    &Primitive::s_default_color;
+  const Color4f*                         m_toolpath_lead_color =
+    &Primitive::s_default_color;
+  const Color4f*                         m_toolpath_arrow_color =
+    &Primitive::s_default_color;
+  // When true, toolpaths render as a filled swath of the actual kerf width
+  // (scales with zoom); when false they fall back to thin centerlines. Set
+  // every frame by NcCamView. Arrows always stay thin overlays.
+  bool                                   m_show_kerf_width = true;
+  // Reused scratch for the per-frame triangle-strip ribbon vertices so the
+  // kerf-swath draw doesn't reallocate each frame.
+  std::vector<Point2d>                   m_ribbon_buf;
   float                                  m_width = 1.0f;
   std::string                            m_style = "solid"; // solid, dashed
   std::string                            m_part_name;
@@ -111,14 +139,17 @@ public:
   Point2d*
   getClosestPoint(size_t* index, Point2d point, std::vector<Point2d>* points);
   // Builds a toolpath (lead-in + contour, optionally lead-out) into
-  // `out`. Returns true on success. For inside contours (direction=-1)
-  // the lead is treated as a lead-IN (no trailing lead-out). For outside
-  // contours (direction=+1) a single trailing lead-out vertex matches
-  // today's straight-lead behavior. Tries an arc lead first; falls back
-  // to a straight lead when geometry doesn't support arc tangency.
+  // `out`. Returns true on success. The lead-IN is sized by `lead_in_len`
+  // for both inside (direction=-1) and outside (direction=+1) contours.
+  // A real lead-OUT (sized by `lead_out_len`) is appended for OUTSIDE
+  // contours only -- inside contours rely on overburn in the emitter and
+  // never get a lead-out. Both the lead-in and the lead-out try an arc
+  // first and fall back to a straight lead when geometry doesn't support
+  // arc tangency.
   bool createToolpathLeads(Toolpath*                   out,
                            const std::vector<Point2d>& contour,
-                           double                      radius,
+                           double                      lead_in_len,
+                           double                      lead_out_len,
                            int                         direction
                            );
 };

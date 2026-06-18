@@ -148,6 +148,17 @@ def get_color_rgba(theme, key, fallback=None):
     return c
 
 
+def get_gcode_color(theme, key):
+    """Get a CAM toolpath color from the optional 'gcode_colors' section
+    (RGBA). Returns None when the theme doesn't define it."""
+    c = theme.get("gcode_colors", {}).get(key)
+    if c is None:
+        return None
+    if len(c) == 3:
+        return list(c) + [1.0]
+    return c
+
+
 def analyze_path_contrast(theme):
     """Original path-vs-plane contrast analysis."""
     cuttable = theme["app_colors"]["cuttable_plane_color"]
@@ -180,6 +191,71 @@ def analyze_path_contrast(theme):
 
     plane_ratio = contrast_ratio(cuttable, machine)
     return checks, plane_ratio
+
+
+def analyze_gcode_contrast(theme):
+    """Contrast of the CAM toolpath preview colors (cut / lead / arrow) against
+    both surfaces they appear over, plus pairwise distinctness so the three stay
+    separable. Cut motion sits on the cuttable plane, but lead-ins/lead-outs and
+    direction arrows extend past the part outline onto the viewport background
+    (the GL clear color, which is the theme's WindowBg) — so each color must read
+    against *both*. Toolpath colors are translucent overlays, so each is
+    alpha-composited over the relevant surface first."""
+    cuttable = theme["app_colors"]["cuttable_plane_color"]
+    window_bg = get_color(theme, "WindowBg")
+    roles = {
+        "Cut motion (cut)": "cut",
+        "Lead-in/out (lead)": "lead",
+        "Direction arrow (arrow)": "arrow",
+    }
+
+    checks = []
+    eff = {}
+    for label, key in roles.items():
+        rgba = get_gcode_color(theme, key)
+        if rgba is None:
+            continue
+        fg = composite_over(rgba, cuttable) if rgba[3] < 1.0 else rgba[:3]
+        eff[key] = fg
+        ratio = contrast_ratio(fg, cuttable)
+        rating, cat = rate_path_contrast(ratio, "highlight")
+        checks.append({
+            "label": f"{label} vs Cuttable Plane",
+            "ratio": ratio,
+            "rating": rating,
+            "category": cat,
+            "fg": fg,
+            "bg": cuttable,
+        })
+
+        # Same color, but composited over and rated against the viewport
+        # background (WindowBg) the leads/arrows spill onto off-part.
+        fg_bg = composite_over(rgba, window_bg) if rgba[3] < 1.0 else rgba[:3]
+        ratio_bg = contrast_ratio(fg_bg, window_bg)
+        rating_bg, cat_bg = rate_path_contrast(ratio_bg, "highlight")
+        checks.append({
+            "label": f"{label} vs Background",
+            "ratio": ratio_bg,
+            "rating": rating_bg,
+            "category": cat_bg,
+            "fg": fg_bg,
+            "bg": window_bg,
+        })
+
+    # Pairwise distinctness: separable if luminance contrast OR hue differ.
+    distinct = []
+    for a, b in (("cut", "lead"), ("cut", "arrow"), ("lead", "arrow")):
+        if a in eff and b in eff:
+            cr = contrast_ratio(eff[a], eff[b])
+            hue_sep = _circular_range([rgb_to_hsl(eff[a])[0],
+                                       rgb_to_hsl(eff[b])[0]])
+            distinct.append({
+                "pair": f"{a} vs {b}",
+                "contrast": cr,
+                "hue_sep": hue_sep,
+                "ok": cr >= 1.3 or hue_sep >= 30,
+            })
+    return checks, distinct
 
 
 def analyze_ui_text(theme):
@@ -339,6 +415,19 @@ def print_path_analysis(name, path_checks, plane_ratio, overall_rating):
     for c in path_checks:
         print(f"      {c['label']}: {c['ratio']:.2f}:1 {c['rating']}")
     print(f"   Plane separation (cuttable vs machine): {plane_ratio:.2f}:1")
+
+
+def print_gcode_analysis(checks, distinct):
+    if not checks:
+        print("   \U0001f6e0️  CAM Toolpath Colors: (no gcode_colors section; using defaults)")
+        return
+    print("   \U0001f6e0️  CAM Toolpath Colors vs Cuttable Plane:")
+    for c in checks:
+        print(f"      {c['label']}: {c['ratio']:.2f}:1 {c['rating']}")
+    for d in distinct:
+        icon = "✅" if d["ok"] else "⚠️ "
+        print(f"      {icon} distinct {d['pair']}: "
+              f"contrast={d['contrast']:.2f}:1 hueΔ={d['hue_sep']:.0f}°")
 
 
 def print_ui_text(checks):
@@ -536,6 +625,12 @@ def main():
         print_path_analysis(name, path_checks, plane_ratio, overall)
 
         if any(c["category"] == "poor" for c in path_checks):
+            any_failure = True
+
+        # --- CAM toolpath color contrast (always shown) ---
+        gcode_checks, gcode_distinct = analyze_gcode_contrast(theme)
+        print_gcode_analysis(gcode_checks, gcode_distinct)
+        if any(c["category"] == "poor" for c in gcode_checks):
             any_failure = True
 
         # --- Detailed checks ---

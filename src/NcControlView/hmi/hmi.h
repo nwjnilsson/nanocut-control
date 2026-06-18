@@ -132,7 +132,6 @@ private:
   bool checkPathBounds();
   void goToWaypoint(Primitive* args);
   void jumpin(Primitive* p);
-  void reverse(Primitive* p);
   bool isHomingAllowed();
   bool isMotionAllowed() const;
   ButtonCategory getButtonCategory(HmiButtonId id) const;

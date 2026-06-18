@@ -25,6 +25,13 @@ public:
     std::array<float, 3> machine_plane_color = { 0.27f, 0.27f, 0.27f };
     std::array<float, 3> cuttable_plane_color = { 0.58f, 0.03f, 0.03f };
 
+    // CAM toolpath/gcode preview colors (RGBA 0-1). Defaults match
+    // THEME_COLOR_DEFAULTS so a theme without a "gcode_colors" section
+    // renders identically to the built-in defaults.
+    std::array<float, 4> toolpath_cut_color   = { 0.10f, 1.0f, 0.20f, 0.65f };
+    std::array<float, 4> toolpath_lead_color  = { 0.20f, 0.85f, 1.0f, 0.90f };
+    std::array<float, 4> toolpath_arrow_color = { 1.0f, 0.85f, 0.20f, 0.95f };
+
     // Cached color array for O(1) lookup (0-255 range)
     std::array<Color4f, static_cast<int>(ThemeColor::COUNT)> color_cache;
 

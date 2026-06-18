@@ -72,6 +72,13 @@ enum class ThemeColor : int {
   MachinePlaneColor,
   CuttablePlaneColor,
 
+  // CAM toolpath/gcode preview colors (RGBA, loaded from the theme's
+  // "gcode_colors" section). Cut = regular contour motion, Lead =
+  // lead-ins/lead-outs, Arrow = direction arrows.
+  ToolpathCutColor,
+  ToolpathLeadColor,
+  ToolpathArrowColor,
+
   COUNT
 };
 
@@ -205,6 +212,10 @@ constexpr Color4f THEME_COLOR_DEFAULTS[] = {
 
   { 69.0f / 255.0f, 69.0f / 255.0f, 69.0f / 255.0f, 1.0f },   // MachinePlaneColor
   { 148.0f / 255.0f, 8.0f / 255.0f, 8.0f / 255.0f, 1.0f },    // CuttablePlaneColor
+
+  { 0.10f, 1.0f, 0.20f, 0.65f },  // ToolpathCutColor (green)
+  { 0.20f, 0.85f, 1.0f, 0.90f },  // ToolpathLeadColor (cyan)
+  { 1.0f, 0.85f, 0.20f, 0.95f },  // ToolpathArrowColor (amber)
 };
 
 static_assert(sizeof(THEME_COLOR_DEFAULTS) / sizeof(THEME_COLOR_DEFAULTS[0]) ==

@@ -10,7 +10,6 @@
 #include "ThemeManager/ThemeManager.h"
 #include <cmath>
 #include <cstdio>
-#include <fstream>
 #include <imgui.h>
 
 // Helper function to parse button ID string into enum
@@ -765,81 +764,6 @@ void NcHmi::jumpin(Primitive* p)
   }
 }
 
-void NcHmi::reverse(Primitive* p)
-{
-  if (!m_app)
-    return;
-  auto&       control_view = m_app->getControlView();
-  const auto& source_lines = control_view.getGCode().getLines();
-  if (source_lines.empty()) {
-    m_app->getDialogs().setInfoValue("No G-code loaded!");
-    return;
-  }
-
-  std::vector<std::string> gcode_lines_before_reverse;
-  std::vector<std::string> gcode_lines_to_reverse;
-  std::vector<std::string> gcode_lines_after_reverse;
-  bool                     found_path_end = false;
-  int                      rapid_line = std::get<int>(p->user_data);
-
-  for (unsigned long count = 0; count < source_lines.size(); count++) {
-    const auto& line = source_lines[count];
-    if (count <= (unsigned long) rapid_line + 1) {
-      gcode_lines_before_reverse.push_back(line);
-    }
-    else {
-      if (line.find("torch_off") != std::string::npos) {
-        found_path_end = true;
-      }
-      if (found_path_end) {
-        gcode_lines_after_reverse.push_back(line);
-      }
-      else {
-        gcode_lines_to_reverse.push_back(line);
-      }
-    }
-  }
-
-  // Build the new line set with the reversed section
-  std::vector<std::string> new_lines;
-  new_lines.reserve(source_lines.size());
-  for (const auto& line : gcode_lines_before_reverse) {
-    new_lines.push_back(line);
-  }
-  for (auto it = gcode_lines_to_reverse.rbegin();
-       it != gcode_lines_to_reverse.rend();
-       ++it) {
-    new_lines.push_back(*it);
-  }
-  for (const auto& line : gcode_lines_after_reverse) {
-    new_lines.push_back(line);
-  }
-
-  // Write back to file if there is a backing file
-  std::string filename = control_view.getGCode().getFilename();
-  if (!filename.empty()) {
-    try {
-      std::ofstream out(filename);
-      for (const auto& line : new_lines) {
-        out << line << std::endl;
-      }
-      out.close();
-    }
-    catch (...) {
-      m_app->getDialogs().setInfoValue("Could not write gcode file to disk!");
-      return;
-    }
-  }
-
-  // Reload from the new lines
-  clearHighlights();
-  if (control_view.getGCode().loadFromLines(std::move(new_lines))) {
-    auto& gcode = control_view.getGCode();
-    m_app->getRenderer().pushTimer(0,
-                                   [&gcode]() { return gcode.parseTimer(); });
-  }
-}
-
 void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
 {
   if (!m_app)
@@ -847,7 +771,9 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
   auto&   control_view = m_app->getControlView();
   Point2d screen_pos = m_app->getInputState().getMousePosition();
 
-  // Handle Ctrl+click on G-code paths for jump-in and reverse
+  // Handle Ctrl+left-click on G-code paths for jump-in (start program at the
+  // clicked path). Cut-direction reversal now lives in NcCamView (reverse the
+  // contour there and re-send), so the control view only jumps in here.
   if (dynamic_cast<Path*>(c) && hasFlag(c->flags, PrimitiveFlags::GCode) &&
       !hasFlag(c->flags, PrimitiveFlags::GCodeArrow)) {
     if (std::holds_alternative<MouseHoverEvent>(e)) {
@@ -874,21 +800,6 @@ void NcHmi::mouseCallback(Primitive* c, const Primitive::MouseEventData& e)
               [this, c]() { jumpin(c); },
               nullptr,
               screen_pos);
-          }
-        }
-      }
-      else if (be.button == GLFW_MOUSE_BUTTON_2) {
-        if (be.mods & GLFW_MOD_CONTROL) {
-          if (be.action == GLFW_RELEASE) {
-            c->color = &m_app->getColor(ThemeColor::PlotLines);
-            m_app->getDialogs().askYesNo(
-              "Are you sure you want to reverse this paths direction?",
-              [this, c]() { reverse(c); },
-              nullptr,
-              screen_pos);
-          }
-          else if (be.action == GLFW_PRESS || be.action == GLFW_REPEAT) {
-            c->color = &m_app->getColor(ThemeColor::PlotLinesHovered);
           }
         }
       }

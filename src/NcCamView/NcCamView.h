@@ -41,7 +41,7 @@ struct FileDeleter {
 
 #define DEFAULT_KERF_WIDTH SCALE(1.5f)
 #define DEFAULT_LEAD_IN (DEFAULT_KERF_WIDTH * 2.0f)
-#define DEFAULT_LEAD_OUT DEFAULT_LEAD_IN
+#define DEFAULT_LEAD_OUT (DEFAULT_LEAD_IN * 0.5f)
 
 enum class BackgroundOperationType {
   None,
@@ -251,11 +251,24 @@ public:
   Part*  m_edit_contour_part = nullptr;
   size_t m_mouse_over_path = 0;
   size_t m_edit_contour_path = 0;
+  // Contour captured when the right-click context menu opens. The menu must
+  // act on this rather than the live hover, since moving the cursor onto the
+  // popup fires MouseOut and clears m_mouse_over_part.
+  Part*  m_context_menu_part = nullptr;
+  size_t m_context_menu_path = 0;
 
   ThemeColor m_mouse_over_color;
   ThemeColor m_outside_contour_color;
   ThemeColor m_inside_contour_color;
   ThemeColor m_open_contour_color;
+  // CAM toolpath preview colors, pushed onto each Part every frame in tick().
+  ThemeColor m_toolpath_cut_color;
+  ThemeColor m_toolpath_lead_color;
+  ThemeColor m_toolpath_arrow_color;
+  // When true, toolpaths preview as a filled swath of the real kerf width
+  // (scales with zoom) rather than thin centerlines. Toggled from View menu,
+  // pushed onto each Part every frame in tick().
+  bool       m_show_kerf_width = true;
 
   JobOptions                      m_job_options;
   std::map<std::string, ToolData> m_tool_library;
