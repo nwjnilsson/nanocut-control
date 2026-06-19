@@ -900,8 +900,10 @@
 <li>A DXF file to cut (or you can use any DXF editor to create one)</li>
 </ul>
 <h2 id="a-note-on-units">A Note on Units</h2>
-<p>NanoCut Control uses <strong>metric units (millimeters)</strong> by default. If you need imperial
-units (inches), the application must be recompiled with the <code>USE_INCH_DEFAULTS</code> flag.</p>
+<p>NanoCut Control works exclusively in <strong>metric units (millimeters)</strong>. There is no
+imperial mode. If you design in inches, you don't need to do anything special: the DXF
+importer auto-detects a drawing's units (inches, centimeters, or meters) and converts
+it to millimeters on import.</p>
 <h2 id="first-launch">First Launch</h2>
 <ol>
 <li>Connect your CNC controller to the computer via USB.</li>
