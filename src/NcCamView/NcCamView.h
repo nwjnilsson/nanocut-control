@@ -39,7 +39,7 @@ struct FileDeleter {
   }
 };
 
-#define DEFAULT_KERF_WIDTH SCALE(1.5f)
+#define DEFAULT_KERF_WIDTH 1.5f
 #define DEFAULT_LEAD_IN (DEFAULT_KERF_WIDTH * 2.0f)
 #define DEFAULT_LEAD_OUT (DEFAULT_LEAD_IN * 0.5f)
 

@@ -7,8 +7,8 @@
 #include <deque>
 #include <sstream>
 
-static constexpr float c_default_pierce_height = SCALE(3.0f);
-static constexpr float c_default_cut_height = SCALE(1.5f);
+static constexpr float c_default_pierce_height = 3.0f;
+static constexpr float c_default_cut_height = 1.5f;
 static constexpr float c_default_pierce_delay_s = 1.0f;
 
 void removeSubstrs(std::string& s, std::string p)

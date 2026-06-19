@@ -105,14 +105,14 @@ public:
     m_control.lead_out_length = 0;
     m_control.offset = { 0, 0 };
     m_control.scale = 1.0f;
-    m_control.smoothing = SCALE(0.25f);
+    m_control.smoothing = 0.25f;
     m_control.angle = 0.0f;
     m_control.mouse_mode = 0; // 0 is paths, 1 is parts
     m_last_control.lead_in_length = 0;
     m_last_control.lead_out_length = 0;
     m_last_control.offset = { -1, -1 };
     m_last_control.scale = 1.0f;
-    m_last_control.smoothing = SCALE(0.25f);
+    m_last_control.smoothing = 0.25f;
     m_last_control.angle = 0.0f;
   }
 

@@ -249,7 +249,7 @@ private:
 
     // Also consider curvature to force subdivision in high-curvature areas
     double curvature = calculate_curvature(u_mid);
-    double curvature_threshold = SCALE(0.001); // Adjust based on your needs
+    double curvature_threshold = 0.001; // Adjust based on your needs
 
     if ((error > max_error || curvature > curvature_threshold) &&
         depth < max_depth) {
@@ -421,9 +421,9 @@ DXFParsePathAdaptor::DXFParsePathAdaptor(
   m_view_callback = view_callback;
   m_mouse_callback = mouse_callback;
   m_cam_view = cam_view;
-  m_simplification = SCALE(0.02);
+  m_simplification = 0.02;
   m_import_scale = 1.0;
-  m_chain_tolerance = SCALE(0.25);
+  m_chain_tolerance = 0.25;
 }
 
 void DXFParsePathAdaptor::setImportScale(double scale)
@@ -825,16 +825,16 @@ void DXFParsePathAdaptor::finish()
   double scale = m_import_scale;
   switch (m_units) {
     case Units::Inch:
-      scale *= SCALE(25.4);
+      scale *= 25.4;
       break;
     case Units::Millimeter:
-      scale *= SCALE(1.0);
+      scale *= 1.0;
       break;
     case Units::Centimeter:
-      scale *= SCALE(10.0);
+      scale *= 10.0;
       break;
     case Units::Meter:
-      scale *= SCALE(1000.0);
+      scale *= 1000.0;
       break;
     default:
       break;
@@ -861,7 +861,7 @@ void DXFParsePathAdaptor::finish()
           fit_spline.addFitPoint(pt);
         }
         sampled_points =
-          fit_spline.interpolateAdaptive(SCALE(0.75), m_import_quality);
+          fit_spline.interpolateAdaptive(0.75, m_import_quality);
       }
       // Use NURBS with control points
       else if (spline.control_points.size() > 0) {
@@ -881,7 +881,7 @@ void DXFParsePathAdaptor::finish()
             nurbs.addKnot(knot);
           }
         }
-        sampled_points = nurbs.sampleAdaptive(SCALE(0.75), m_import_quality);
+        sampled_points = nurbs.sampleAdaptive(0.75, m_import_quality);
       }
 
       if (sampled_points.size() > 1) {

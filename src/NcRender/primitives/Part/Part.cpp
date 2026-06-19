@@ -267,8 +267,8 @@ void Part::render()
     // control view's gcode arrows (gcode.cpp). One arrow per ~arrow_spacing of
     // travel, at least one. Both lengths are in built-point space (scaled by
     // m_control.scale) so they track the geometry.
-    const double arrow_len = SCALE(2.0) * m_control.scale;
-    const double arrow_spacing = SCALE(20.0) * m_control.scale;
+    const double arrow_len = 2.0 * m_control.scale;
+    const double arrow_spacing = 20.0 * m_control.scale;
     auto build_arrows =
       [arrow_len, arrow_spacing](
         const Toolpath& tp) -> std::vector<std::vector<Point2d>> {
@@ -820,18 +820,18 @@ std::optional<StraightLead> findStraightPierce(
     return std::nullopt;
 
   const double radius_abs = std::fabs(radius);
-  const double min_feasible = SCALE(0.05);
+  const double min_feasible = 0.05;
   const bool   is_inside = direction < 0;
   // A short probe to pick which normal points into the scrap, and a small
   // ray epsilon to skip the self-intersection at the attach vertex.
   const double probe =
     std::max(static_cast<double>(min_feasible), radius_abs * 0.01);
   const double t_eps =
-    std::max(static_cast<double>(SCALE(1e-3)), radius_abs * 1e-3);
+    std::max(static_cast<double>(1e-3), radius_abs * 1e-3);
   // Clearances within this band count as a tie; break ties toward the longer
   // lead so we don't pick a stubby one when an equally-centred fuller lead
   // fits.
-  const double tie_eps = SCALE(1e-3);
+  const double tie_eps = 1e-3;
 
   std::optional<StraightLead> best;
   double                      best_clearance = -1.0;
@@ -959,7 +959,7 @@ std::vector<Point2d> buildLeadOut(const std::vector<Point2d>& contour,
   // the torch-off point is guaranteed off the finished edge.
   Point2d      n = { -forward.y, forward.x };
   const double probe =
-    std::max(static_cast<double>(SCALE(0.1)), lead_out_abs * 0.05);
+    std::max(static_cast<double>(0.1), lead_out_abs * 0.05);
   const Point2d test = { start.x + n.x * probe, start.y + n.y * probe };
   if (geo::pointIsInsidePolygon(contour, test))
     n = { forward.y, -forward.x };
@@ -1011,9 +1011,9 @@ bool Part::createToolpathLeads(Toolpath*                   out,
   // Slop tolerance shared by the lead-in and lead-out side checks: RDP
   // simplification with `m_control.smoothing` plus Clipper offset rounding /
   // CleanPolygons let the polygon deviate from the true contour, so allow at
-  // least SCALE(0.5) mm of slop or 2x smoothing, whichever is larger.
+  // least 0.5 mm of slop or 2x smoothing, whichever is larger.
   const double side_slop =
-    std::max(static_cast<double>(SCALE(0.5)), m_control.smoothing * 2.0);
+    std::max(static_cast<double>(0.5), m_control.smoothing * 2.0);
 
   // ---- Build the lead-IN --------------------------------------------------
   // Produces `lead_in_pts` (pierce -> ... -> just before attach) and the
@@ -1034,9 +1034,9 @@ bool Part::createToolpathLeads(Toolpath*                   out,
     // the run length needn't be 2*radius -- the real feasibility test is the
     // side check below.
     const double min_segment_len =
-      std::max(static_cast<double>(SCALE(0.5)), radius_abs * 0.5);
+      std::max(static_cast<double>(0.5), radius_abs * 0.5);
     const double dev_tolerance =
-      std::max(static_cast<double>(SCALE(0.25)), radius_abs * 0.1);
+      std::max(static_cast<double>(0.25), radius_abs * 0.1);
     geo::StraightRun run;
     const bool       run_found =
       geo::longestStraightRun(contour, min_segment_len, dev_tolerance, &run);

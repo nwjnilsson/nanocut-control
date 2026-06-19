@@ -9,8 +9,8 @@ PolyNest::PolyNest()
 {
 
   m_min_extents = PolyPoint(0, 0);
-  m_max_extents = PolyPoint(SCALE(1000), SCALE(1000));
-  m_closed_tolerance = SCALE(0.1);
+  m_max_extents = PolyPoint(1000, 1000);
+  m_closed_tolerance = 0.1;
   constexpr int step_size = 5;
   for (int i = 0; i < 360 / step_size; ++i) {
     m_allowed_rotations.push_back(i * step_size);
@@ -151,10 +151,10 @@ PolyPart PolyNest::PolyNest::buildPart(std::vector<std::vector<PolyPoint>> p,
       ClipperLib::ClipperOffset co;
       co.AddPath(subj, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
       if (polygon.m_is_inside == true) {
-        co.Execute(solution, -SCALE(4.762));
+        co.Execute(solution, -4.762);
       }
       else {
-        co.Execute(solution, SCALE(4.762));
+        co.Execute(solution, 4.762);
       }
 
       if (solution.size() > 0) {
@@ -222,7 +222,7 @@ ClipperLib::Path PolyNest::PolyNest::getBaseContour(const PolyPart& part) const
     return {};
   ClipperLib::Path contour = part.m_polygons.back().m_vertices;
   // Simplify the dense jtRound contour for NFP computation
-  ClipperLib::CleanPolygon(contour, SCALE(1.0));
+  ClipperLib::CleanPolygon(contour, 1.0);
   return contour;
 }
 

@@ -578,8 +578,8 @@ void NcCamView::renderPropertiesWindow(Part*& selected_part)
     ImGui::InputDouble("Angle", &selected_part->m_control.angle);
     ImGui::SliderFloat("Simplification",
                        &selected_part->m_control.smoothing,
-                       SCALE(0.001f),
-                       SCALE(1.f),
+                       0.001f,
+                       1.f,
                        "%.3f",
                        ImGuiSliderFlags_Logarithmic);
     if (ImGui::Button("Close")) {

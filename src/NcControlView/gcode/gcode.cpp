@@ -131,7 +131,7 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
   try {
     if (m_current_path.points.size() > 1) {
       std::vector<Point2d> simplified =
-        geo::simplify(m_current_path.points, SCALE(0.1));
+        geo::simplify(m_current_path.points, 0.1);
       std::vector<Point2d> path;
       int                  point_count = 0;
       for (int i = 0; i < simplified.size(); i++) {
@@ -142,9 +142,9 @@ void GCode::pushCurrentPathToViewer(int rapid_line)
           double  angle =
             geo::measurePolarAngle(simplified[i + 1], simplified[i]);
           Point2d p1 =
-            geo::createPolarLine(midpoint, angle + 30, SCALE(0.5)).end;
+            geo::createPolarLine(midpoint, angle + 30, 0.5).end;
           Point2d p2 =
-            geo::createPolarLine(midpoint, angle - 30, SCALE(0.5)).end;
+            geo::createPolarLine(midpoint, angle - 30, 0.5).end;
           arrow_path.push_back({ p1.x, p1.y });
           arrow_path.push_back({ midpoint.x, midpoint.y });
           arrow_path.push_back({ p2.x, p2.y });

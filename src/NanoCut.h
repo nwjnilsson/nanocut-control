@@ -17,8 +17,6 @@
 #include <sys/types.h>
 #include <vector>
 
-#define DEFAULT_UNIT SCALE(1.f)
-
 template <typename T> struct Point2 {
   T                       x;
   T                       y;

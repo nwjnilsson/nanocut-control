@@ -72,7 +72,7 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
     ImGui::Text(
       "Machine extents is the max distance each axis can travel freely. X0 is "
       "the X negative stop, Y0 is Y negative stop, and Z0 is Z positive stop!");
-    ImGui::InputFloat3("Machine Extents (X, Y, Z).",
+    ImGui::InputFloat3("Machine Extents (mm) (X, Y, Z).",
                        temp_parameters.machine_extents.data());
 
     ImGui::Text("Cutting extents are used to prevent accidentally cutting onto "
@@ -80,17 +80,16 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
                 "should happen.\nX1,Y1 is bottom left hand corner and X2, Y2 "
                 "is top right hand corner, values are incremented off of "
                 "machine extents, i.e X2 and Y2 should be negative");
-    ImGui::InputFloat4("Cutting Extents (X1, Y1, X2, Y2)",
+    ImGui::InputFloat4("Cutting Extents (mm) (X1, Y1, X2, Y2)",
                        temp_parameters.cutting_extents.data());
 
-    ImGui::Text("Scale is in steps per your desired units. E.G. To use machine "
-                "in\nInches, set scales to steps per inch.");
-    ImGui::InputFloat3("Axis Scale (X, Y, Z)",
+    ImGui::Text("Axis scale is in steps per millimeter.");
+    ImGui::InputFloat3("Axis Scale (steps/mm) (X, Y, Z)",
                        temp_parameters.axis_scale.data());
 
     ImGui::Text("Manual precision jogging (ctrl + [MOVE]) can be used for "
                 "small movements. The distance can be adjusted below.");
-    ImGui::InputFloat("Precision jogging distance (units)",
+    ImGui::InputFloat("Precision jogging distance (mm)",
                       &temp_parameters.precise_jog_units);
 
     ImGui::Text("Axis direction inversion:");
@@ -123,23 +122,23 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
     ImGui::SameLine();
     ImGui::Checkbox("Invert homing direction Z",
                     &temp_parameters.homing_dir_invert[2]);
-    ImGui::InputFloat("Homing Feedrate", &temp_parameters.homing_feed);
-    ImGui::InputFloat("Homing Seekrate", &temp_parameters.homing_seek);
-    ImGui::InputFloat("Homing Debounce", &temp_parameters.homing_debounce);
-    ImGui::InputFloat("Homing Pull-Off", &temp_parameters.homing_pull_off);
+    ImGui::InputFloat("Homing Feedrate (mm/min)", &temp_parameters.homing_feed);
+    ImGui::InputFloat("Homing Seekrate (mm/min)", &temp_parameters.homing_seek);
+    ImGui::InputFloat("Homing Debounce (ms)", &temp_parameters.homing_debounce);
+    ImGui::InputFloat("Homing Pull-Off (mm)", &temp_parameters.homing_pull_off);
   }
 
   if (ImGui::CollapsingHeader("Speed & Acceleration",
                               ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::Text("Each axis maximum allowable velocity in units per minute. "
-                "E.g. inch/min or mm/min");
-    ImGui::InputFloat3("Max Velocity (X, Y, Z)",
+    ImGui::Text("Each axis maximum allowable velocity in millimeters per "
+                "minute (mm/min).");
+    ImGui::InputFloat3("Max Velocity (mm/min) (X, Y, Z)",
                        temp_parameters.max_vel.data());
-    ImGui::Text(
-      "Each axis maximum allowable acceleration in units per second squared");
-    ImGui::InputFloat3("Max Acceleration (X, Y, Z)",
+    ImGui::Text("Each axis maximum allowable acceleration in millimeters per "
+                "second squared (mm/s^2).");
+    ImGui::InputFloat3("Max Acceleration (mm/s^2) (X, Y, Z)",
                        temp_parameters.max_accel.data());
-    ImGui::InputFloat("Junction Deviation",
+    ImGui::InputFloat("Junction Deviation (mm)",
                       &temp_parameters.junction_deviation);
   }
 
@@ -148,10 +147,10 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
     ImGui::Text("The distance the floating head moves off of it's gravity "
                 "stop to where it closes the probe switch. Ohmic sensing "
                 "should have 0.0000 value");
-    ImGui::InputFloat("Floating Head Backlash",
+    ImGui::InputFloat("Floating Head Backlash (mm)",
                       &temp_parameters.floating_head_backlash);
-    ImGui::Text("Velocity in units per minute when probing the torch");
-    ImGui::InputFloat("Z Probe Feed", &temp_parameters.z_probe_feedrate);
+    ImGui::Text("Velocity in millimeters per minute when probing the torch");
+    ImGui::InputFloat("Z Probe Feed (mm/min)", &temp_parameters.z_probe_feedrate);
     ImGui::Text("The amount of time after motion starts after a probing "
                 "cycle to consider the arc stabilized. This will affect THC "
                 "accuracy!");

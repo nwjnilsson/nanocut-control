@@ -10,7 +10,7 @@ settings. Changes are written to the controller immediately.
 NanoCut firmware is based on grbl. The following standard parameters are available:
 
 - **Machine extents**: Maximum travel for each axis
-- **Axis scale**: Steps per unit (steps/mm or steps/inch)
+- **Axis scale**: Steps per millimeter (steps/mm)
 - **Max velocity**: Maximum speed for each axis
 - **Max acceleration**: Maximum acceleration for each axis
 - **Homing settings**: Feed rate, seek rate, debounce time, pull-off distance, and

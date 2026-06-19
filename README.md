@@ -56,8 +56,8 @@ The codebase has changed quite a bit since then, with many new features having b
 </div>
 
 ## Important notes on using this software
-- If you intend to use imperial units for your machine, go into `include/config.h`
-and uncomment the `#define USE_INCH_DEFAULTS`.
+- NanoCut works in millimeters. DXF drawings in inches (or cm/m) are auto-detected
+and converted to millimeters on import, so you can still design in imperial units.
 - Negative machine extents is not supported.
 Positioning in the negative quadrant is apparently common traditionally for CNC machines, and GRBL
 reports positions like this by default.

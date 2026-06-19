@@ -11,8 +11,10 @@ Before using NanoCut Control, you need:
 
 ## A Note on Units
 
-NanoCut Control uses **metric units (millimeters)** by default. If you need imperial
-units (inches), the application must be recompiled with the `USE_INCH_DEFAULTS` flag.
+NanoCut Control works exclusively in **metric units (millimeters)**. There is no
+imperial mode. If you design in inches, you don't need to do anything special: the DXF
+importer auto-detects a drawing's units (inches, centimeters, or meters) and converts
+it to millimeters on import.
 
 ## First Launch
 
