@@ -106,6 +106,7 @@ void MotionController::initialize()
 {
   m_controller_ready = false;
   m_torch_on = false;
+  m_thc_active = false;
   m_torch_on_timer = std::chrono::steady_clock::now();
   m_arc_okay_timer = std::chrono::steady_clock::now();
   m_abort_pending = false;
@@ -328,6 +329,7 @@ void MotionController::lineHandler(std::string line)
             m_program_start_time = std::chrono::steady_clock::time_point{};
             m_arc_retry_count = 0;
             m_torch_on = false;
+            m_thc_active = false;
             m_handling_crash = false;
             m_controller_ready = false;
           }
@@ -380,10 +382,33 @@ void MotionController::lineHandler(std::string line)
         }
       } break;
 
-      case GrblMessageType::Error:
+      case GrblMessageType::Error: {
         removeSubstrs(line, "error:");
-        logControllerError(atoi(line.c_str()));
-        break;
+        int error_code = atoi(line.c_str());
+        if (error_code == 18) {
+          // STATUS_THC_ERROR: the firmware rejected a $T= target (machine state
+          // was no longer CYCLE/HOLD, or the voltage was invalid). It is
+          // returned *only* for the $T= command (firmware system.c, case 'T'),
+          // so it can only be a live baby-step that raced the machine state. It
+          // must NOT abort the cut, so we skip logControllerError (which would
+          // clear the queue and halt with the torch still on).
+          //
+          // The firmware withholds the '>' ack for any rejected line
+          // (report.c report_status_message only emits '>' on STATUS_OK), so
+          // the normal runPop chain will not fire on its own. Advance the
+          // stream here to stand in for the ack the firmware did not send,
+          // otherwise the program would stall with the torch dwelling in place.
+          LOG_F(WARNING,
+                "Firmware Error 18 (THC target rejected) - ignoring and "
+                "advancing the stream to keep the cut running.");
+          if (m_okay_callback) {
+            m_okay_callback();
+          }
+        }
+        else {
+          logControllerError(error_code);
+        }
+      } break;
 
       case GrblMessageType::Alarm:
         removeSubstrs(line, "ALARM:");
@@ -569,6 +594,7 @@ void MotionController::runPop()
       // during overburn so the arc extinguishes mid-flight).
       accumulateArcOnTime();
       m_torch_on = false;
+      m_thc_active = false;
       m_okay_callback = [this]() { runPop(); };
       m_gcode_queue.push_front("$T!0.0");
       m_gcode_queue.push_front("M5");
@@ -584,8 +610,16 @@ void MotionController::runPop()
       m_probe_callback = nullptr;
     }
     else if (line.find("$T!") != std::string::npos) {
-      // Internal THC command - send as $T= to hardware, no base update
-      std::string cmd = "$T=" + line.substr(line.find("$T!") + 3);
+      // Internal THC command - send as $T= to hardware, no base update.
+      // This is the single point where THC targets are actually transmitted,
+      // so it is the authoritative place to track engagement: a nonzero target
+      // engages THC, a $T!0.0 disengages it. Tracking at send-time (not at
+      // push-time) keeps the pierce window safe - the engaging $T! is queued
+      // behind the lower-to-cut-height moves, so m_thc_active only flips true
+      // once those have popped and the target actually goes out.
+      std::string value = line.substr(line.find("$T!") + 3);
+      m_thc_active = (atof(value.c_str()) != 0.0);
+      std::string cmd = "$T=" + value;
       cmd.erase(std::remove(cmd.begin(), cmd.end(), ' '), cmd.end());
       LOG_F(INFO, "(runpop) internal THC: sending %s", cmd.c_str());
       sendWithCRC(cmd);
@@ -622,6 +656,7 @@ bool MotionController::arcOkayExpireTimer()
     m_motion_sync_callback = nullptr;
     m_arc_okay_callback = nullptr;
     m_torch_on = false;
+    m_thc_active = false;
 
     m_gcode_queue.push_front(
       "fire_torch " + to_string_strip_zeros(m_torch_params.pierce_height) +
@@ -671,6 +706,7 @@ void MotionController::programFinished()
   m_arc_retry_count = 0;
   m_thc_base_value = 0.0f;
   m_thc_offset = 0.0f;
+  m_thc_active = false;
   m_okay_callback = nullptr;
   m_probe_callback = nullptr;
   m_motion_sync_callback = nullptr;
@@ -759,6 +795,7 @@ void MotionController::torchOffAndAbort()
   m_motion_sync_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_torch_on = false;
+  m_thc_active = false;
   m_thc_offset = 0.0f;
 
   m_gcode_queue.push_front("M30");
@@ -776,6 +813,7 @@ void MotionController::torchOffAndRetract()
   m_motion_sync_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_torch_on = false;
+  m_thc_active = false;
 
   m_gcode_queue.push_front("$T!0.0");
   m_gcode_queue.push_front("G0 Z0");
@@ -823,7 +861,12 @@ void MotionController::adjustThcOffset(float delta)
         m_thc_offset,
         getThcEffective());
 
-  if (m_torch_on) {
+  // Inject a live target only when THC is genuinely engaged AND the machine is
+  // cutting; otherwise just remember the offset (above) - it is applied at the
+  // next fire_torch via getThcEffective(). Gating on m_thc_active (not just
+  // m_torch_on) keeps a click during pierce/idle from sending a $T= the
+  // firmware would reject with error 18.
+  if (m_thc_active && m_dro_data.in_motion && m_thc_base_value != 0.f) {
     m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
     if (!m_okay_callback) {
       m_okay_callback = [this]() { runPop(); };

@@ -147,6 +147,11 @@ private:
   // THC baby-stepping state
   float m_thc_base_value{ 0.0f };
   float m_thc_offset{ 0.0f };
+  // Host-side mirror of the firmware's "THC target is settable" state. True
+  // only while THC is genuinely engaged (a nonzero $T! target has been sent and
+  // not yet cancelled by $T!0.0). Gates live baby-step injection so a click
+  // during pierce/idle never sends a $T= the firmware would reject (error 18).
+  bool m_thc_active{ false };
 
   // Counters and timing
   int                                   m_arc_retry_count{ 0 };
