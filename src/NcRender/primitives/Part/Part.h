@@ -17,9 +17,12 @@ public:
     geo::Extents         bbox;              // Bounding box of built_points
     bool                 is_closed;
     bool                 is_inside_contour;
-    // Cut-direction flip. Applied to the offset contour AFTER Clipper (Clipper
-    // canonicalizes input winding, so reversing the source points has no
-    // effect on the generated toolpath). Toggled from the CAM context menu.
+    // Manual cut-direction override. By default toolpaths run in the
+    // plasma-quality direction (external profiles clockwise, holes
+    // counter-clockwise); this flag flips that default for a single path.
+    // Applied to the offset contour AFTER Clipper (Clipper canonicalizes input
+    // winding, so reversing the source points has no effect). Toggled from the
+    // CAM context menu.
     bool                 reversed = false;
     const Color4f*       color = &Primitive::s_default_color;
   };

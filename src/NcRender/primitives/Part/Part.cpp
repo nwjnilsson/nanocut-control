@@ -399,10 +399,25 @@ void Part::render()
                   path.is_inside_contour != opposite_winding;
                 const int direction = tp_is_inside ? -1 : +1;
 
-                // Flip cut direction by reversing the offset polygon's winding
-                // (Clipper canonicalizes input orientation, so this must happen
-                // AFTER offsetPath). createToolpathLeads then derives a valid
-                // lead-in/lead-out/overburn for the reversed direction.
+                // Default cut direction, for plasma cut quality. The right-hand
+                // side of a plasma kerf comes out square while the left side
+                // bevels, so we keep the finished part on the square side by
+                // running OUTSIDE (external) profiles clockwise and INSIDE
+                // (holes) counter-clockwise -- the same alternation SheetCam
+                // applies automatically. signedPolygonArea is +ve for CCW, -ve
+                // for CW; built-point space is Y-up and the emitter's X/Y
+                // negation is a 180 deg rotation that preserves winding, so this
+                // winding reaches the machine unchanged. Clipper canonicalizes
+                // its own output winding, so normalize explicitly here rather
+                // than rely on it.
+                const bool want_ccw = tp_is_inside; // hole -> CCW, profile -> CW
+                if ((geo::signedPolygonArea(tpaths[x]) >= 0.0) != want_ccw)
+                  std::reverse(tpaths[x].begin(), tpaths[x].end());
+
+                // Manual override (CAM context menu "Reverse Direction") flips
+                // the default winding. Must happen AFTER offsetPath/normalize;
+                // createToolpathLeads then derives a valid
+                // lead-in/lead-out/overburn for the resulting direction.
                 if (path.reversed)
                   std::reverse(tpaths[x].begin(), tpaths[x].end());
                 Toolpath tp;
