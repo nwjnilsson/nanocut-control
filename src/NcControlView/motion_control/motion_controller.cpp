@@ -423,7 +423,7 @@ void MotionController::lineHandler(std::string line)
               current_time - m_torch_on_timer);
 
           if (m_torch_on == true &&
-              torch_duration > std::chrono::milliseconds{ 200 }) {
+              torch_duration > std::chrono::milliseconds{ 1500 }) {
             m_control_view->m_app->getDialogs().setInfoValue(
               "Program was aborted because torch crash was detected! Restart "
               "your controller to be safe.");
