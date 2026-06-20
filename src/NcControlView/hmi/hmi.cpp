@@ -952,27 +952,6 @@ void NcHmi::clearHighlights()
 // invalidateColors() removed - primitives now hold const Color4f* pointers
 // into ThemeManager's stable color cache, which auto-updates on theme change.
 
-void NcHmi::tabKeyUpCallback(const KeyEvent& e)
-{
-  if (!m_app)
-    return;
-  auto& control_view = m_app->getControlView();
-  if (control_view.m_way_point_position.x != std::numeric_limits<int>::min() &&
-      control_view.m_way_point_position.y != std::numeric_limits<int>::min()) {
-    LOG_F(INFO,
-          "Going to waypoint position: X%.4f Y%.4f",
-          control_view.m_way_point_position.x,
-          control_view.m_way_point_position.y);
-    control_view.m_motion_controller->pushGCode(
-      "G53 G0 X" + to_string_strip_zeros(control_view.m_way_point_position.x) +
-      " Y" + to_string_strip_zeros(control_view.m_way_point_position.y));
-    control_view.m_motion_controller->pushGCode("M30");
-    control_view.m_motion_controller->runStack();
-    control_view.m_way_point_position.x = std::numeric_limits<int>::min();
-    control_view.m_way_point_position.y = std::numeric_limits<int>::min();
-  }
-}
-
 bool NcHmi::isMotionAllowed() const
 {
   if (!m_app)
@@ -1016,6 +995,8 @@ void NcHmi::goToWaypoint(Primitive* args)
           "Going to waypoint position: X%.4f Y%.4f",
           control_view.m_way_point_position.x,
           control_view.m_way_point_position.y);
+    // Retract Z to the top before traversing.
+    control_view.m_motion_controller->pushGCode("G53 G0 Z0");
     control_view.m_motion_controller->pushGCode(
       "G53 G0 X-" + to_string_strip_zeros(control_view.m_way_point_position.x) +
       " Y-" + to_string_strip_zeros(control_view.m_way_point_position.y));
@@ -1196,11 +1177,20 @@ void NcHmi::pageUpKeyCallback(const KeyEvent& e)
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
-  if (e.action == GLFW_PRESS) {
-    control_view.m_motion_controller->sendRealTime('>');
+  try {
+    const DROData& dro_data = control_view.m_motion_controller->getDRO();
+    if (dro_data.status == MachineStatus::Idle) {
+      if (e.action == GLFW_PRESS) {
+        control_view.m_motion_controller->sendRealTime('>');
+      }
+    }
+    if (e.action == GLFW_RELEASE) {
+      control_view.m_motion_controller->sendRealTime('^');
+      handleButton("Abort");
+    }
   }
-  else if (e.action == GLFW_RELEASE) {
-    control_view.m_motion_controller->sendRealTime('^');
+  catch (...) {
+    // DRO data not available
   }
   /*try
   {
@@ -1243,11 +1233,20 @@ void NcHmi::pageDownKeyCallback(const KeyEvent& e)
   if (!m_app)
     return;
   auto& control_view = m_app->getControlView();
-  if (e.action == GLFW_PRESS) {
-    control_view.m_motion_controller->sendRealTime('<');
+  try {
+    const DROData& dro_data = control_view.m_motion_controller->getDRO();
+    if (dro_data.status == MachineStatus::Idle) {
+      if (e.action == GLFW_PRESS) {
+        control_view.m_motion_controller->sendRealTime('<');
+      }
+    }
+    if (e.action == GLFW_RELEASE) {
+      control_view.m_motion_controller->sendRealTime('^');
+      handleButton("Abort");
+    }
   }
-  else if (e.action == GLFW_RELEASE) {
-    control_view.m_motion_controller->sendRealTime('^');
+  catch (...) {
+    // DRO data not available
   }
   /*try
   {

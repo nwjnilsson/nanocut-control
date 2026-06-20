@@ -3,9 +3,7 @@
 
 #include <NanoCut.h>
 #include <NcRender/NcRender.h>
-#include <array>
 #include <string>
-#include <vector>
 
 // Forward declarations
 class NcApp;
@@ -144,7 +142,6 @@ private:
   void leftKeyCallback(const KeyEvent& e);
   void pageUpKeyCallback(const KeyEvent& e);
   void pageDownKeyCallback(const KeyEvent& e);
-  void tabKeyUpCallback(const KeyEvent& e);
 
   // Other callbacks
   void mouseMotionCallback(const MouseMoveEvent& e);
