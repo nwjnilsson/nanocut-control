@@ -172,6 +172,11 @@ private:
    */
   bool shouldSkipCurrentEntity();
 
+  // Final DXF->mm scale (import scale * unit conversion).
+  double effectiveScale() const;
+  // "Import resolution" slider (1..10) as a chord tolerance in mm.
+  double sampleToleranceMm() const;
+
 public:
   std::string m_filename;
   float       m_simplification;

@@ -260,7 +260,7 @@ void NcCamView::renderDialogs(std::string& filePathName,
     ImGui::SetWindowFontScale(1.0f);
     ImGui::Separator();
 
-    static int   import_quality = 10;
+    static int   import_quality = 5;
     static float import_scale = 1.0;
 
     ImGui::Dummy(ImVec2{ 0.f, 10.f });
@@ -278,7 +278,7 @@ in the part's properties after importing.
 
     ImGui::Separator();
 
-    ImGui::SliderInt("Import resolution", &import_quality, 8, 16);
+    ImGui::SliderInt("Import resolution", &import_quality, 1, 10);
     ImGui::Separator();
     ImGui::InputFloat("Scale", &import_scale);
     ImGui::Separator();

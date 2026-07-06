@@ -7,6 +7,21 @@
 #include <cmath>
 #include <loguru.hpp>
 
+namespace {
+// Segment count to keep an arc (radius, sweep, tolerance all in mm) within
+// `tol` of the true curve (max chord sagitta). Clamped for degenerate inputs.
+int arcSegments(double radius, double span_rad, double tol)
+{
+  if (radius <= 0.0 || span_rad <= 0.0 || tol <= 0.0)
+    return 2;
+  double ratio = 1.0 - tol / radius;
+  if (ratio < -1.0)
+    ratio = -1.0;
+  const double step = 2.0 * std::acos(ratio);
+  return std::clamp(static_cast<int>(std::ceil(span_rad / step)), 2, 4096);
+}
+} // namespace
+
 // ============================================================================
 // NURBS Implementation for proper DXF spline handling
 // ============================================================================
@@ -176,30 +191,11 @@ public:
     return result;
   }
 
-  // Calculate curvature at parameter u
-  double calculate_curvature(double u) const
-  {
-    const double eps = 1e-6;
-
-    // First derivative (tangent)
-    Point2d p1 = evaluate(u - eps);
-    Point2d p2 = evaluate(u + eps);
-    double  dx = (p2.x - p1.x) / (2.0 * eps);
-    double  dy = (p2.y - p1.y) / (2.0 * eps);
-
-    // Second derivative
-    Point2d p0 = evaluate(u);
-    double  d2x = (p2.x - 2.0 * p0.x + p1.x) / (eps * eps);
-    double  d2y = (p2.y - 2.0 * p0.y + p1.y) / (eps * eps);
-
-    // Curvature formula: |x'y'' - y'x''| / (x'^2 + y'^2)^(3/2)
-    double numerator = fabs(dx * d2y - dy * d2x);
-    double denominator = pow(dx * dx + dy * dy, 1.5);
-
-    return (denominator > 1e-10) ? (numerator / denominator) : 0.0;
-  }
-
-  // Adaptive sampling based on curvature
+  // Adaptive sampling driven solely by chord error (max sagitta). The
+  // deviation test already captures curvature -- a tight bend produces a large
+  // midpoint error and subdivides -- so there is no separate curvature
+  // threshold. (The old threshold fired on any radius < 1 m, forcing
+  // max-depth subdivision independent of tolerance -> exponential blowup.)
   std::vector<Point2d> sampleAdaptive(double max_error, int max_depth)
   {
     std::vector<Point2d> points;
@@ -212,12 +208,18 @@ public:
       }
     }
 
-    double u_start = knots[degree];
-    double u_end = knots[control_points.size()];
-
-    points.push_back(evaluate(u_start));
-    adaptiveSampleSegment(u_start, u_end, max_error, 0, max_depth, points);
-    points.push_back(evaluate(u_end));
+    const int n = static_cast<int>(control_points.size());
+    points.push_back(evaluate(knots[degree]));
+    // Seed at each distinct internal knot (polynomial breakpoint) so the
+    // midpoint test can't skip a feature that straddles a span boundary.
+    for (int i = degree; i < n; ++i) {
+      const double a = knots[i];
+      const double b = knots[i + 1];
+      if (b <= a)
+        continue; // repeated knot -> zero-length span
+      adaptiveSampleSegment(a, b, max_error, 0, max_depth, points);
+      points.push_back(evaluate(b));
+    }
 
     return points;
   }
@@ -247,13 +249,7 @@ private:
     double dy = p_mid.y - p_linear.y;
     double error = sqrt(dx * dx + dy * dy);
 
-    // Also consider curvature to force subdivision in high-curvature areas
-    double curvature = calculate_curvature(u_mid);
-    double curvature_threshold = 0.001; // Adjust based on your needs
-
-    if ((error > max_error || curvature > curvature_threshold) &&
-        depth < max_depth) {
-      // Subdivide
+    if (error > max_error && depth < max_depth) {
       adaptiveSampleSegment(u1, u_mid, max_error, depth + 1, max_depth, points);
       points.push_back(p_mid);
       adaptiveSampleSegment(u_mid, u2, max_error, depth + 1, max_depth, points);
@@ -434,6 +430,31 @@ void DXFParsePathAdaptor::setImportScale(double scale)
 void DXFParsePathAdaptor::setImportQuality(int quality)
 {
   m_import_quality = quality;
+}
+
+double DXFParsePathAdaptor::effectiveScale() const
+{
+  double scale = m_import_scale;
+  switch (m_units) {
+    case Units::Inch:
+      scale *= 25.4;
+      break;
+    case Units::Centimeter:
+      scale *= 10.0;
+      break;
+    case Units::Meter:
+      scale *= 1000.0;
+      break;
+    default:
+      break; // Millimeter / None: no unit conversion
+  }
+  return scale;
+}
+
+double DXFParsePathAdaptor::sampleToleranceMm() const
+{
+  const int r = std::max(1, m_import_quality);
+  return 1.0 / static_cast<double>(r * r); // 1.0 mm (coarse) .. 0.01 mm (fine)
 }
 
 void DXFParsePathAdaptor::setSmoothing(float smoothing)
@@ -822,24 +843,12 @@ void DXFParsePathAdaptor::finish()
     m_current_spline = DxfSpline();
   }
 
-  double scale = m_import_scale;
-  switch (m_units) {
-    case Units::Inch:
-      scale *= 25.4;
-      break;
-    case Units::Millimeter:
-      scale *= 1.0;
-      break;
-    case Units::Centimeter:
-      scale *= 10.0;
-      break;
-    case Units::Meter:
-      scale *= 1000.0;
-      break;
-    default:
-      break;
-  }
-  scaleAllPoints(scale);
+  scaleAllPoints(effectiveScale());
+
+  // "Import resolution" (1..10) -> chord tolerance in mm (smaller = denser).
+  // Drives all curve tessellation below; sampling is post-scale, so in mm.
+  const double sample_tolerance = sampleToleranceMm();
+  const int    sample_max_depth = 16; // safety backstop; tolerance drives it
 
   // Process each layer's geometry independently
   for (auto& [layer_name, layer_data] : m_layers) {
@@ -861,7 +870,7 @@ void DXFParsePathAdaptor::finish()
           fit_spline.addFitPoint(pt);
         }
         sampled_points =
-          fit_spline.interpolateAdaptive(0.75, m_import_quality);
+          fit_spline.interpolateAdaptive(sample_tolerance, sample_max_depth);
       }
       // Use NURBS with control points
       else if (spline.control_points.size() > 0) {
@@ -881,7 +890,7 @@ void DXFParsePathAdaptor::finish()
             nurbs.addKnot(knot);
           }
         }
-        sampled_points = nurbs.sampleAdaptive(0.75, m_import_quality);
+        sampled_points = nurbs.sampleAdaptive(sample_tolerance, sample_max_depth);
       }
 
       if (sampled_points.size() > 1) {
@@ -953,7 +962,8 @@ void DXFParsePathAdaptor::finish()
           if (angle_span < 0.0)
             angle_span += 360.0;
 
-          int    num_segments = 100;
+          int    num_segments =
+            arcSegments(radius, angle_span * M_PI / 180.0, sample_tolerance);
           double angle_increment = angle_span / num_segments;
           double angle_pointer = arc_startAngle + angle_increment;
 
@@ -1058,7 +1068,8 @@ void DXFParsePathAdaptor::finish()
           if (angle_span < 0.0)
             angle_span += 360.0;
 
-          int    num_segments = 100;
+          int    num_segments =
+            arcSegments(radius, angle_span * M_PI / 180.0, sample_tolerance);
           double angle_increment = angle_span / num_segments;
           double angle_pointer = arc_startAngle + angle_increment;
 
@@ -1424,8 +1435,13 @@ void DXFParsePathAdaptor::addArc(const DL_ArcData& data)
     return;
   }
 
+  double span = data.angle2 - data.angle1;
+  if (span < 0.0)
+    span += 360.0;
+  int n = arcSegments(
+    data.radius * effectiveScale(), span * M_PI / 180.0, sampleToleranceMm());
   explodeArcToLines(
-    data.cx, data.cy, data.radius, data.angle1, data.angle2, 100);
+    data.cx, data.cy, data.radius, data.angle1, data.angle2, n);
 }
 
 void DXFParsePathAdaptor::addCircle(const DL_CircleData& data)
@@ -1435,8 +1451,10 @@ void DXFParsePathAdaptor::addCircle(const DL_CircleData& data)
     return;
   }
 
-  explodeArcToLines(data.cx, data.cy, data.radius, 0, 180, 100);
-  explodeArcToLines(data.cx, data.cy, data.radius, 180, 360, 100);
+  int n =
+    arcSegments(data.radius * effectiveScale(), M_PI, sampleToleranceMm());
+  explodeArcToLines(data.cx, data.cy, data.radius, 0, 180, n);
+  explodeArcToLines(data.cx, data.cy, data.radius, 180, 360, n);
 }
 
 void DXFParsePathAdaptor::addEllipse(const DL_EllipseData& data)
@@ -1445,8 +1463,16 @@ void DXFParsePathAdaptor::addEllipse(const DL_EllipseData& data)
     return;
   }
 
-  // Use proper ellipse rendering with major axis, minor axis ratio, and
-  // rotation
+  // Size to the tightest curvature (ends of the major axis) so the whole
+  // ellipse stays within tolerance.
+  const double s = effectiveScale();
+  const double major = std::sqrt(data.mx * data.mx + data.my * data.my) * s;
+  const double minor = major * data.ratio;
+  const double r_curv = (major > 0.0) ? (minor * minor) / major : 0.0;
+  double       span = data.angle2 - data.angle1;
+  if (span < 0.0)
+    span += 2.0 * M_PI; // DXF ellipse angles are in radians
+  int n = arcSegments(r_curv, span, sampleToleranceMm());
   explodeEllipseToLines(data.cx,
                         data.cy,
                         data.mx,
@@ -1454,7 +1480,7 @@ void DXFParsePathAdaptor::addEllipse(const DL_EllipseData& data)
                         data.ratio,
                         data.angle1,
                         data.angle2,
-                        100);
+                        n);
 }
 
 void DXFParsePathAdaptor::addPolyline(const DL_PolylineData& data)
