@@ -1562,15 +1562,15 @@ std::vector<std::string> NcCamView::generateGCode()
 
           if (tp.is_closed_contour && tp.is_inside_contour) {
             // Inside (hole): cut the lead-in and the contour up to and
-            // including the last unique contour vertex; then turn the
-            // torch off non-blocking and motion-through the closing kerf
-            // + overburn distance so the arc extinguishes mid-flight.
+            // including the last unique contour vertex, then close the kerf
+            // and command the torch off non-blocking exactly at the closed
+            // loop, so the arc keeps cutting through the whole contour and
+            // only starts extinguishing during the overburn tail.
             for (size_t z = 0; z <= contour_last; z++) {
               lines.push_back("G1 X" + std::to_string(-pts[z].x) + " Y" +
                               std::to_string(-pts[z].y) + " F" +
                               std::to_string(feed));
             }
-            lines.push_back("torch_off_async");
 
             if (contour_last > contour_first) {
               // (1) Close the kerf: ALWAYS return to the contour start vertex
@@ -1583,6 +1583,14 @@ std::vector<std::string> NcCamView::generateGCode()
               lines.push_back("G1 X" + std::to_string(-pts[contour_first].x) +
                               " Y" + std::to_string(-pts[contour_first].y) +
                               " F" + std::to_string(feed));
+
+              // Command the torch off non-blocking now that the loop is closed
+              // at the contour start vertex. The cut is complete; the arc
+              // extinguishes here, at the very end of the contour, and trails
+              // off during the overburn move below. Firing this before the seam
+              // close (as it once did) let the arc die partway along a long
+              // closing edge -- centimetres early on straight-edged holes.
+              lines.push_back("torch_off_async");
 
               // (2) Overburn: continue PAST the start vertex into the
               // already-cut contour so the dying arc overruns the seam. The
