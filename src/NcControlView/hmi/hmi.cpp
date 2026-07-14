@@ -482,7 +482,10 @@ void NcHmi::handleButton(const std::string& id)
 
         case HmiButtonId::ZeroX:
           LOG_F(INFO, "Clicked Zero X");
-          control_view.m_machine_parameters.work_offset[0] = dro_data.mcs.x;
+          {
+            std::lock_guard<std::mutex> plock(control_view.m_params_mutex);
+            control_view.m_machine_parameters.work_offset[0] = dro_data.mcs.x;
+          }
           control_view.m_motion_controller->pushGCode(
             "G10 L2 P0 X" +
             to_string_strip_zeros(
@@ -494,7 +497,10 @@ void NcHmi::handleButton(const std::string& id)
 
         case HmiButtonId::ZeroY:
           LOG_F(INFO, "Clicked Zero Y");
-          control_view.m_machine_parameters.work_offset[1] = dro_data.mcs.y;
+          {
+            std::lock_guard<std::mutex> plock(control_view.m_params_mutex);
+            control_view.m_machine_parameters.work_offset[1] = dro_data.mcs.y;
+          }
           control_view.m_motion_controller->pushGCode(
             "G10 L2 P0 Y" +
             to_string_strip_zeros(
@@ -549,12 +555,21 @@ void NcHmi::handleButton(const std::string& id)
               };
 
               const auto& p = control_view.m_machine_parameters;
-              const bool  pierce_over =
+              // Counters are mutated by the runtime thread; thresholds are
+              // config (render-only). Snapshot the counters under the lock.
+              uint32_t pierce_count;
+              uint64_t arc_on_time_ms;
+              {
+                std::lock_guard<std::mutex> plock(control_view.m_params_mutex);
+                pierce_count = p.consumable_pierce_count;
+                arc_on_time_ms = p.consumable_arc_on_time_ms;
+              }
+              const bool pierce_over =
                 p.consumable_pierce_threshold > 0 &&
-                p.consumable_pierce_count >= p.consumable_pierce_threshold;
+                pierce_count >= p.consumable_pierce_threshold;
               const bool arc_over =
                 p.consumable_arc_on_threshold_ms > 0 &&
-                p.consumable_arc_on_time_ms >= p.consumable_arc_on_threshold_ms;
+                arc_on_time_ms >= p.consumable_arc_on_threshold_ms;
 
               if (pierce_over || arc_over) {
                 char msg[256];

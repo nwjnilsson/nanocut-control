@@ -46,7 +46,7 @@ void renderControllerHomingWindow(NcControlView::ControllerDialogs& d,
   if (ImGui::Button("Home")) {
     LOG_F(WARNING, "User initiated homing cycle!");
     if (app) {
-      app->getControlView().getMotionController().sendCommand("home");
+      app->getControlView().getMotionController().home();
     }
     d.homing_window->hide();
   }
@@ -225,7 +225,10 @@ void renderMachineParameters(NcControlView::ControllerDialogs& d,
     }
 
     if (not skip_save) {
-      view->m_machine_parameters = temp_parameters;
+      {
+        std::lock_guard<std::mutex> plock(view->m_params_mutex);
+        view->m_machine_parameters = temp_parameters;
+      }
       view->getMotionController().saveParameters();
       view->getMotionController().writeParametersToController();
       d.machine_params_window->hide();

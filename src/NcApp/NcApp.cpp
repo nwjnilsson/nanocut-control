@@ -145,13 +145,15 @@ void NcApp::initialize(int argc, char** argv)
 
 void NcApp::shutdown()
 {
+  // Stop and join the motion-control runtime thread first, before any renderer or
+  // other teardown, so no serial/file I/O outlives the objects it references.
+  if (m_control_view) {
+    m_control_view->close();
+  }
+
   if (m_renderer) {
     logUptime();
     m_renderer->close();
-  }
-
-  if (m_control_view) {
-    m_control_view->close();
   }
 
   if (m_admin_view) {

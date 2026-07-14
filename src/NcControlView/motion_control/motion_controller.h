@@ -3,12 +3,16 @@
 
 #include "../serial/NcSerial.h"
 #include <NanoCut.h>
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <thread>
+#include <vector>
 
 // Type-safe data structures for runtime data (replacing JSON)
 
@@ -70,59 +74,100 @@ enum class GrblMessageType {
   Unknown          // Unidentified message
 };
 
+// Immutable status view published by the machine-runtime thread and consumed by
+// the render/UI thread. The runtime writes m_published under a mutex; the render
+// thread copies it into m_ui_snapshot once per frame (syncUiSnapshot). All public
+// state-query getters read the render-side copy, so the UI never touches live
+// runtime state directly.
+struct MachineSnapshot {
+  DROData     dro;
+  RuntimeData runtime;
+  float       thc_base{ 0.0f };
+  float       thc_offset{ 0.0f };
+  float       thc_effective{ 0.0f };
+  bool        controller_ready{ false };
+  bool        needs_homed{ false };
+  bool        torch_on{ false };
+  bool        program_running{ false };
+  bool        homing_safe{ false };
+  // Continuous UI states (applied every frame by the render thread).
+  bool show_offline{ false };
+  bool want_homing{ false };
+  // Edge-triggered UI signals: the render thread acts only when the sequence
+  // number changes, so a message shows exactly once per occurrence.
+  uint32_t    alarm_seq{ 0 };
+  std::string alarm_text;
+  uint32_t    info_seq{ 0 };
+  std::string info_text;
+};
+
+// UI -> runtime command. User actions on the render thread enqueue these; the
+// runtime thread drains and executes them so all serial/state mutation stays on
+// one thread.
+enum class CommandType {
+  RunProgram,   // run the staged gcode lines
+  RealTime,     // single real-time byte (jog, feed-hold, etc.)
+  Abort,        // sendCommand("abort")
+  Home,         // sendCommand("home")
+  AdjustThc,    // baby-step THC offset
+  TriggerReset, // toggle DTR to reset the controller
+  WriteParams   // push machine parameters to the controller
+};
+
+struct Command {
+  CommandType              type;
+  std::vector<std::string> lines;             // RunProgram
+  char                     rt_byte{ 0 };      // RealTime
+  float                    thc_delta{ 0.0f }; // AdjustThc
+};
+
 class MotionController {
 public:
   // Constructor/Destructor
   MotionController(class NcControlView* nc_view, class NcRender* renderer);
-  ~MotionController() = default;
+  ~MotionController();
 
   // Core interface
   void initialize();
-  void tick();
   void shutdown();
 
-  // Command interface
-  void sendCommand(const std::string& cmd);
-  void pushGCode(const std::string& gcode);
-  void runStack();
+  // Copy the runtime's published status into the render-side cache. Call once
+  // per frame on the render thread before reading any state-query getter.
+  void                   syncUiSnapshot();
+  const MachineSnapshot& uiSnapshot() const { return m_ui_snapshot; }
+
+  // Command interface (render thread). User actions enqueue work for the runtime
+  // thread; nothing here touches the serial port or live state directly.
+  void pushGCode(const std::string& gcode); // stage a line for the next batch
+  void runStack();                          // enqueue the staged batch to run
   void abort();
   void home();
-  void send(const std::string& s);
-  void sendWithCRC(const std::string& s);
   void sendRealTime(char s);
   void triggerReset();
 
-  // State queries
-  bool isReady() const { return m_controller_ready; }
-  bool isTorchOn() const { return m_torch_on; }
-  bool needsHoming() const { return m_needs_homed; }
-  bool isProgramRunning() const
-  {
-    return m_torch_on || !m_gcode_queue.empty() ||
-           m_dro_data.status == MachineStatus::Cycle;
-  }
-  const DROData&    getDRO() const { return m_dro_data; }
-  const RuntimeData getRunTime() const;
+  // State queries. These read the render-side snapshot cache (refreshed once per
+  // frame by syncUiSnapshot), so they are safe to call from the render thread
+  // while the runtime thread mutates live state. Do NOT call them from runtime
+  // code - use the live members / thcEffectiveLive() there instead.
+  bool isReady() const { return m_ui_snapshot.controller_ready; }
+  bool isTorchOn() const { return m_ui_snapshot.torch_on; }
+  bool needsHoming() const { return m_ui_snapshot.needs_homed; }
+  bool isProgramRunning() const { return m_ui_snapshot.program_running; }
+  const DROData&    getDRO() const { return m_ui_snapshot.dro; }
+  const RuntimeData getRunTime() const { return m_ui_snapshot.runtime; }
 
   // THC baby-stepping
-  float getThcBaseValue() const { return m_thc_base_value; }
-  float getThcOffset() const { return m_thc_offset; }
-  float getThcEffective() const
-  {
-    return m_thc_base_value == 0.f ? 0.f : m_thc_base_value + m_thc_offset;
-  }
-  void adjustThcOffset(float delta);
+  float getThcBaseValue() const { return m_ui_snapshot.thc_base; }
+  float getThcOffset() const { return m_ui_snapshot.thc_offset; }
+  float getThcEffective() const { return m_ui_snapshot.thc_effective; }
+  void  adjustThcOffset(float delta);
 
   // Homing safety check
-  bool isHomingSafe() const;
+  bool isHomingSafe() const { return m_ui_snapshot.homing_safe; }
 
   // Parameter management
-  void saveParameters();
-  void writeParametersToController();
-  void setNeedsHomed(bool needs_homed) { m_needs_homed = needs_homed; }
-
-  // Utility functions
-  void clearStack() { m_gcode_queue.clear(); }
+  void saveParameters();              // render thread: update scene + persist file
+  void writeParametersToController(); // enqueues a controller parameter write
   void logRuntime();
 
 private:
@@ -173,6 +218,76 @@ private:
   class NcControlView* m_control_view{ nullptr };
   class NcRender*      m_renderer{ nullptr };
 
+  // --- Render/runtime thread boundary ---
+  // m_published is written by the runtime thread under m_snapshot_mutex;
+  // m_ui_snapshot is the render thread's private copy (refreshed by
+  // syncUiSnapshot). m_cmd_queue carries UI actions to the runtime thread.
+  // m_staging batches pushGCode() lines on the render thread until runStack().
+  MachineSnapshot          m_published;
+  MachineSnapshot          m_ui_snapshot;
+  mutable std::mutex       m_snapshot_mutex;
+  std::deque<Command>      m_cmd_queue;
+  std::mutex               m_cmd_mutex;
+  std::vector<std::string> m_staging;
+
+  // Runtime thread lifecycle. m_running gates the loop; m_heartbeat is the
+  // watchdog liveness timestamp (ms since steady-clock epoch).
+  std::thread           m_runtime_thread;
+  std::thread           m_watchdog_thread;
+  std::atomic<bool>     m_running{ false };
+  std::atomic<uint64_t> m_heartbeat{ 0 };
+
+  // Edge-triggered UI signals recorded by runtime code and surfaced through the
+  // snapshot; the render thread shows each once when the sequence number bumps.
+  std::string m_live_alarm_text;
+  uint32_t    m_alarm_seq{ 0 };
+  std::string m_live_info_text;
+  uint32_t    m_info_seq{ 0 };
+
+  // Runtime-thread timer scheduling (replaces NcRender::pushTimer usage).
+  std::chrono::steady_clock::time_point                m_last_status_poll{};
+  std::optional<std::chrono::steady_clock::time_point> m_arc_expire_deadline;
+
+  // Machine-runtime thread. runtimeLoop spins runtimeStep at ~1 kHz on
+  // m_runtime_thread; watchdogLoop runs the safety net on m_watchdog_thread.
+  void runtimeLoop();
+  void watchdogLoop();
+  void runtimeStep();
+  void serviceTimers();
+  void drainCommands();
+  void publishSnapshot();
+
+  // Push a command onto the UI->runtime queue (render thread).
+  void enqueue(Command cmd);
+
+  // Internal (runtime-thread) program control. startProgram loads a batch and
+  // begins the ok-driven pump; runStackInternal starts the pump on the already
+  // populated queue (used by callbacks that push directly onto m_gcode_queue).
+  void startProgram(std::vector<std::string> lines);
+  void runStackInternal();
+
+  // Runtime-thread implementations behind the enqueue wrappers.
+  void applyThcOffset(float delta);
+  void doTriggerReset();
+  void doWriteParametersToController();
+  void emergencyStop(); // watchdog safe-stop: torch off + hold + soft reset
+
+  // Parameter persistence (file only; safe on the runtime thread). saveParameters
+  // additionally updates render primitives and is render-thread only.
+  void persistParameters();
+
+  // Edge-triggered UI signal recorders (runtime thread).
+  void postInfo(const std::string& msg);
+  void postAlarm(const std::string& msg);
+
+  // Live THC target for runtime-thread code (getThcEffective reads the render
+  // cache and must not be used off the render thread).
+  float thcEffectiveLive() const
+  {
+    return m_thc_base_value == 0.0f ? 0.0f : m_thc_base_value + m_thc_offset;
+  }
+  RuntimeData computeRuntime() const;
+
   // Private helper methods
   void     runPop();
   void     probe();
@@ -181,6 +296,11 @@ private:
   void     logControllerError(int error);
   void     handleAlarm(int alarm);
   uint32_t calculateCRC32(uint32_t crc, const char* buf, size_t len);
+
+  // Raw serial send helpers (runtime thread only).
+  void sendCommand(const std::string& cmd);
+  void send(const std::string& s);
+  void sendWithCRC(const std::string& s);
 
   // Callback implementations (formerly global functions)
   void programFinished();

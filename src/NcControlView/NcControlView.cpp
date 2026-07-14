@@ -154,7 +154,10 @@ void NcControlView::renderUI()
         m_motion_controller && m_motion_controller->isProgramRunning();
       if (ImGui::MenuItem("Machine Parameters", "", false, !params_locked)) {
         LOG_F(INFO, "Edit->Machine Parameters");
-        m_controller_dialogs.machine_params_temp = m_machine_parameters;
+        {
+          std::lock_guard<std::mutex> plock(m_params_mutex);
+          m_controller_dialogs.machine_params_temp = m_machine_parameters;
+        }
         m_controller_dialogs.machine_params_window->show();
       }
       ImGui::EndMenu();
@@ -232,8 +235,31 @@ void NcControlView::init()
 }
 void NcControlView::tick()
 {
-  if (m_motion_controller) {
-    m_motion_controller->tick();
+  if (!m_motion_controller)
+    return;
+
+  // The machine runtime spins on its own thread; the render thread only refreshes
+  // the snapshot cache and applies the runtime's UI intent (all ImGui/dialog
+  // mutation stays on the render thread).
+  m_motion_controller->syncUiSnapshot();
+  const MachineSnapshot& s = m_motion_controller->uiSnapshot();
+
+  m_controller_dialogs.offline_window->visible = s.show_offline;
+
+  if (s.want_homing && !m_controller_dialogs.alarm_window->visible)
+    m_controller_dialogs.homing_window->show();
+  else
+    m_controller_dialogs.homing_window->hide();
+
+  // Edge-triggered: show each alarm/info message exactly once.
+  if (s.alarm_seq != m_last_alarm_seq) {
+    m_last_alarm_seq = s.alarm_seq;
+    m_controller_dialogs.alarm_text = s.alarm_text;
+    m_controller_dialogs.alarm_window->show();
+  }
+  if (s.info_seq != m_last_info_seq) {
+    m_last_info_seq = s.info_seq;
+    m_app->getDialogs().setInfoValue(s.info_text);
   }
 }
 void NcControlView::makeActive()
@@ -263,7 +289,13 @@ void NcControlView::loadGCodeFromLines(std::vector<std::string>&& lines)
   }
 }
 
-void NcControlView::close() {}
+void NcControlView::close()
+{
+  // Stop and join the machine-runtime thread before teardown so no serial I/O
+  // outlives the objects it references.
+  if (m_motion_controller)
+    m_motion_controller->shutdown();
+}
 
 void NcControlView::handleMouseEvent(const MouseButtonEvent& e,
                                      const InputState&       input)

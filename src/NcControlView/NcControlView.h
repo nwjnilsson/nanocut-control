@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 
 // System includes
 #include <NcRender/NcRender.h>
@@ -191,6 +192,13 @@ public:
   Circle*           m_torch_pointer;
   Circle*           m_waypoint_pointer;
   MachineParameters m_machine_parameters;
+  // Guards the fields of m_machine_parameters that are mutated by the motion
+  // runtime thread (consumable counters, work_offset) or read by it at high
+  // frequency (homing_enabled). A leaf mutex: never held while acquiring the
+  // motion controller's snapshot/command mutexes. Hot render reads of immutable
+  // config (extents) and work_offset x/y are left unguarded by design - see the
+  // concurrency notes in motion_controller.cpp.
+  std::mutex        m_params_mutex;
   Point2d           m_way_point_position;
 
   // UI elements
@@ -209,6 +217,11 @@ public:
   // Controller-specific dialogs
   ControllerDialogs m_controller_dialogs;
 
+  // Last edge-triggered UI signal sequence numbers applied from the motion
+  // snapshot, so alarms/info messages are shown exactly once per occurrence.
+  uint32_t m_last_alarm_seq = 0;
+  uint32_t m_last_info_seq = 0;
+
   // Application context dependency (injected)
   NcApp* m_app{ nullptr };
 
@@ -221,11 +234,12 @@ public:
         // Dependency injection constructor
       };
 
-  // Move semantics (non-copyable due to resource management)
+  // Non-copyable and non-movable (owns a std::mutex; only ever held by
+  // unique_ptr, never moved).
   NcControlView(const NcControlView&) = delete;
   NcControlView& operator=(const NcControlView&) = delete;
-  NcControlView(NcControlView&&) = default;
-  NcControlView& operator=(NcControlView&&) = default;
+  NcControlView(NcControlView&&) = delete;
+  NcControlView& operator=(NcControlView&&) = delete;
   void           preInit();
   void           init();
   void           tick() override;

@@ -121,62 +121,209 @@ void MotionController::initialize()
     m_needs_homed = false;
   }
 
-  m_renderer->pushTimer(100, std::bind(&MotionController::statusTimer, this));
+  // Start the machine-runtime thread (owns the serial port and the streaming
+  // pump) and the watchdog. From here on all serial and live-state access happens
+  // on m_runtime_thread; the render thread only reads snapshots and posts
+  // commands. Status polling and the arc-okay timeout are serviced by
+  // serviceTimers() on this thread rather than the render-thread timer stack.
+  m_running.store(true, std::memory_order_relaxed);
+  m_heartbeat.store(static_cast<uint64_t>(NcRender::millis()),
+                    std::memory_order_relaxed);
+  m_runtime_thread = std::thread(&MotionController::runtimeLoop, this);
+  m_watchdog_thread = std::thread(&MotionController::watchdogLoop, this);
 }
 
-void MotionController::tick()
+MotionController::~MotionController() { shutdown(); }
+
+// One iteration of the machine runtime: service the serial port (which dispatches
+// byteHandler/lineHandler and thus the ok-driven streaming pump), apply queued UI
+// commands, run time-based tasks, and publish a fresh status snapshot. Runs on
+// m_runtime_thread via runtimeLoop().
+void MotionController::runtimeStep()
 {
   m_serial.tick();
-  m_control_view->dialogs().offline_window->visible = !m_serial.m_is_connected;
-
-  if (m_needs_homed == true &&
-      m_control_view->m_machine_parameters.homing_enabled == true &&
-      m_serial.m_is_connected == true && m_controller_ready == true &&
-      m_control_view->dialogs().alarm_window->visible == false) {
-    m_control_view->dialogs().homing_window->show();
-  }
-  else {
-    m_control_view->dialogs().homing_window->hide();
-  }
 
   if (m_serial.m_is_connected == false) {
     m_controller_ready = false;
     m_needs_homed = true;
   }
 
-  if (m_torch_on == true) {
-    auto current_time = std::chrono::steady_clock::now();
-    auto arc_stable_duration = std::chrono::milliseconds(static_cast<long>(
-      m_control_view->m_machine_parameters.arc_stabilization_time +
-      (m_torch_params.pierce_delay * 1000)));
+  drainCommands();
+  serviceTimers();
+  publishSnapshot();
 
-    if ((current_time - m_arc_okay_timer) > arc_stable_duration) {
-      // LOG_F(INFO, "Arc is stabalized!");
-      /*
-          Need to implement real-time command that takes 4 bytes.
-          byte 1 -> THC set command
-          byte 2 -> value low bit
-          byte 3 -> value high bit
-          byte 4 -> End THC set command
+  m_heartbeat.store(static_cast<uint64_t>(NcRender::millis()),
+                    std::memory_order_relaxed);
+}
 
-          This way THC can be changed on the fly withouth injecting into the
-         gcode stream which under long line moves could b some time after this
-         event occurs... Also would allow setting thc on the fly manually
-      */
+void MotionController::runtimeLoop()
+{
+  while (m_running.load(std::memory_order_relaxed)) {
+    runtimeStep();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
+// Defense-in-depth safety net. If the runtime loop stops updating its heartbeat
+// while the torch is on, the control stream has wedged mid-cut. The firmware
+// already halts and kills the torch on host-comms loss; this attempts an orderly
+// PC-side stop as well and raises a prominent alarm. The threshold clears the
+// longest intentional runtime stall (the ~600 ms abort dwell) with margin.
+void MotionController::watchdogLoop()
+{
+  constexpr uint64_t c_stall_threshold_ms = 1500;
+  bool               fired = false;
+
+  while (m_running.load(std::memory_order_relaxed)) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    const uint64_t now = static_cast<uint64_t>(NcRender::millis());
+    const uint64_t beat = m_heartbeat.load(std::memory_order_relaxed);
+    const bool     stalled =
+      (now > beat) && ((now - beat) > c_stall_threshold_ms);
+
+    // torch_on as of the last successful publish. If the loop wedged with the
+    // torch on, this reads true. Read under the snapshot lock (race-free); the
+    // wedge is a blocking serial read, which never holds that lock.
+    bool torch_on;
+    {
+      std::lock_guard<std::mutex> lock(m_snapshot_mutex);
+      torch_on = m_published.torch_on;
+    }
+
+    if (stalled && torch_on && !fired) {
+      LOG_F(ERROR,
+            "Runtime watchdog: no heartbeat for %llu ms with torch on - "
+            "attempting emergency stop!",
+            static_cast<unsigned long long>(now - beat));
+      fired = true;
+      emergencyStop();
+    }
+    else if (!stalled) {
+      fired = false;
     }
   }
 }
 
-void MotionController::shutdown()
+void MotionController::emergencyStop()
 {
-  m_gcode_queue.clear();
-  m_okay_callback = nullptr;
-  m_probe_callback = nullptr;
-  m_motion_sync_callback = nullptr;
-  m_arc_okay_callback = nullptr;
+  // Best-effort orderly stop from the watchdog thread. The runtime thread is
+  // presumed wedged, so we touch the serial port directly here. wjwwood/serial
+  // is not thread-safe, so this is the one deliberate cross-thread exception -
+  // justified because the alternative is a torch dwelling in place, and the
+  // firmware is the ultimate backstop if this write also blocks. sendByte /
+  // sendString already swallow their own exceptions and no-op when disconnected.
+  m_serial.sendByte('!');          // feed hold
+  m_serial.sendString("M5\n");     // torch off
+  m_serial.sendString("$T!0.0\n"); // disengage THC
+  m_serial.sendByte(0x18);         // soft reset
+
+  // Surface the alarm through the snapshot directly so the render thread shows it
+  // even though the (wedged) runtime thread cannot publish.
+  std::lock_guard<std::mutex> lock(m_snapshot_mutex);
+  m_published.alarm_text =
+    "Communication watchdog tripped: the control stream stalled while the torch "
+    "was on. An emergency stop was attempted. Verify the machine is safe and "
+    "restart the controller.";
+  m_published.alarm_seq++;
 }
 
-const RuntimeData MotionController::getRunTime() const
+void MotionController::serviceTimers()
+{
+  const auto now = std::chrono::steady_clock::now();
+
+  // 100 ms GRBL status poll + deferred motion-sync callback (formerly statusTimer
+  // on the render-thread timer stack).
+  if (now - m_last_status_poll >= std::chrono::milliseconds{ 100 }) {
+    m_last_status_poll = now;
+    statusTimer();
+  }
+
+  // One-shot arc-okay expiry (formerly a one-shot render-thread pushTimer
+  // scheduled in runPop on WAIT_FOR_ARC_OKAY).
+  if (m_arc_expire_deadline && now >= *m_arc_expire_deadline) {
+    m_arc_expire_deadline.reset();
+    arcOkayExpireTimer();
+  }
+}
+
+void MotionController::drainCommands()
+{
+  std::deque<Command> local;
+  {
+    std::lock_guard<std::mutex> lock(m_cmd_mutex);
+    local.swap(m_cmd_queue);
+  }
+  for (auto& cmd : local) {
+    switch (cmd.type) {
+      case CommandType::RunProgram:
+        startProgram(std::move(cmd.lines));
+        break;
+      case CommandType::RealTime:
+        if (m_controller_ready) {
+          LOG_F(INFO, "(motion_controller_send_rt) Byte: %c\n", cmd.rt_byte);
+          m_serial.sendByte(static_cast<uint8_t>(cmd.rt_byte));
+        }
+        break;
+      case CommandType::Abort:
+        sendCommand("abort");
+        break;
+      case CommandType::Home:
+        sendCommand("home");
+        break;
+      case CommandType::AdjustThc:
+        applyThcOffset(cmd.thc_delta);
+        break;
+      case CommandType::TriggerReset:
+        doTriggerReset();
+        break;
+      case CommandType::WriteParams:
+        doWriteParametersToController();
+        break;
+    }
+  }
+}
+
+void MotionController::publishSnapshot()
+{
+  MachineSnapshot s;
+  s.dro = m_dro_data;
+  s.dro.torch_on = m_torch_on;
+  s.runtime = computeRuntime();
+  s.thc_base = m_thc_base_value;
+  s.thc_offset = m_thc_offset;
+  s.thc_effective = thcEffectiveLive();
+  s.controller_ready = m_controller_ready;
+  s.needs_homed = m_needs_homed;
+  s.torch_on = m_torch_on;
+  s.program_running = m_torch_on || !m_gcode_queue.empty() ||
+                      m_dro_data.status == MachineStatus::Cycle;
+  s.homing_safe = m_controller_ready && !m_homing_in_progress &&
+                  m_okay_callback == nullptr && m_gcode_queue.empty();
+  s.show_offline = !m_serial.m_is_connected;
+  bool homing_enabled;
+  {
+    std::lock_guard<std::mutex> plock(m_control_view->m_params_mutex);
+    homing_enabled = m_control_view->m_machine_parameters.homing_enabled;
+  }
+  s.want_homing = m_needs_homed && homing_enabled && m_serial.m_is_connected &&
+                  m_controller_ready;
+  s.alarm_seq = m_alarm_seq;
+  s.alarm_text = m_live_alarm_text;
+  s.info_seq = m_info_seq;
+  s.info_text = m_live_info_text;
+
+  std::lock_guard<std::mutex> lock(m_snapshot_mutex);
+  m_published = std::move(s);
+}
+
+void MotionController::syncUiSnapshot()
+{
+  std::lock_guard<std::mutex> lock(m_snapshot_mutex);
+  m_ui_snapshot = m_published;
+}
+
+RuntimeData MotionController::computeRuntime() const
 {
   RuntimeData runtime;
   if (m_program_start_time != std::chrono::steady_clock::time_point{}) {
@@ -189,6 +336,33 @@ const RuntimeData MotionController::getRunTime() const
     runtime.hours = (m / (1000 * 60 * 60)) % 24;
   }
   return runtime;
+}
+
+void MotionController::postInfo(const std::string& msg)
+{
+  m_live_info_text = msg;
+  ++m_info_seq;
+}
+
+void MotionController::postAlarm(const std::string& msg)
+{
+  m_live_alarm_text = msg;
+  ++m_alarm_seq;
+}
+
+void MotionController::shutdown()
+{
+  m_running.store(false, std::memory_order_relaxed);
+  if (m_runtime_thread.joinable())
+    m_runtime_thread.join();
+  if (m_watchdog_thread.joinable())
+    m_watchdog_thread.join();
+
+  m_gcode_queue.clear();
+  m_okay_callback = nullptr;
+  m_probe_callback = nullptr;
+  m_motion_sync_callback = nullptr;
+  m_arc_okay_callback = nullptr;
 }
 
 void MotionController::sendCommand(const std::string& cmd)
@@ -212,21 +386,47 @@ void MotionController::sendCommand(const std::string& cmd)
   }
 }
 
-void MotionController::pushGCode(const std::string& gcode)
+void MotionController::enqueue(Command cmd)
 {
-  m_gcode_queue.push_back(gcode);
+  std::lock_guard<std::mutex> lock(m_cmd_mutex);
+  m_cmd_queue.push_back(std::move(cmd));
 }
 
+// Render thread: stage a line for the next batch. Consumed by runStack().
+void MotionController::pushGCode(const std::string& gcode)
+{
+  m_staging.push_back(gcode);
+}
+
+// Render thread: hand the staged batch to the runtime thread to execute.
 void MotionController::runStack()
+{
+  Command cmd{ CommandType::RunProgram };
+  cmd.lines = std::move(m_staging);
+  m_staging.clear();
+  enqueue(std::move(cmd));
+}
+
+// Runtime thread: load a batch onto the queue and begin the ok-driven pump.
+void MotionController::startProgram(std::vector<std::string> lines)
+{
+  for (auto& line : lines)
+    m_gcode_queue.push_back(std::move(line));
+  runStackInternal();
+}
+
+// Runtime thread: start the pump on the already-populated queue. Used by
+// callbacks/bootstrap that push directly onto m_gcode_queue.
+void MotionController::runStackInternal()
 {
   m_program_start_time = std::chrono::steady_clock::now();
   runPop();
   m_okay_callback = [this]() { runPop(); };
 }
 
-void MotionController::abort() { sendCommand("abort"); }
+void MotionController::abort() { enqueue(Command{ CommandType::Abort }); }
 
-void MotionController::home() { sendCommand("home"); }
+void MotionController::home() { enqueue(Command{ CommandType::Home }); }
 
 void MotionController::send(const std::string& s)
 {
@@ -251,15 +451,21 @@ void MotionController::sendWithCRC(const std::string& s)
   }
 }
 
+// Render thread: queue a real-time byte (jog, feed-hold, etc.).
 void MotionController::sendRealTime(char s)
 {
-  if (m_controller_ready == true) {
-    LOG_F(INFO, "(motion_controller_send_rt) Byte: %c\n", s);
-    m_serial.sendByte(s);
-  }
+  Command cmd{ CommandType::RealTime };
+  cmd.rt_byte = s;
+  enqueue(std::move(cmd));
 }
 
 void MotionController::triggerReset()
+{
+  enqueue(Command{ CommandType::TriggerReset });
+}
+
+// Runtime thread: pulse DTR to reset the controller.
+void MotionController::doTriggerReset()
 {
   LOG_F(INFO, "Resetting Motion Controller!");
   m_serial.m_serial.setDTR(true);
@@ -316,7 +522,11 @@ void MotionController::lineHandler(std::string line)
               m_arc_okay_callback = nullptr;
               m_arc_okay_timer = std::chrono::steady_clock::now();
               m_arc_on_start = m_arc_okay_timer;
-              m_control_view->m_machine_parameters.consumable_pierce_count++;
+              {
+                std::lock_guard<std::mutex> plock(
+                  m_control_view->m_params_mutex);
+                m_control_view->m_machine_parameters.consumable_pierce_count++;
+              }
             }
           }
           if (m_abort_pending == true && m_dro_data.in_motion == false) {
@@ -365,9 +575,8 @@ void MotionController::lineHandler(std::string line)
 
         if (m_last_checksum_error > 0 &&
             last_error_duration < std::chrono::milliseconds{ 100 }) {
-          m_control_view->m_app->getDialogs().setInfoValue(
-            "Program aborted due to multiple communication "
-            "checksum errors in a short period of time!");
+          postInfo("Program aborted due to multiple communication "
+                   "checksum errors in a short period of time!");
           sendCommand("abort");
         }
         else {
@@ -424,9 +633,8 @@ void MotionController::lineHandler(std::string line)
 
           if (m_torch_on == true &&
               torch_duration > std::chrono::milliseconds{ 1500 }) {
-            m_control_view->m_app->getDialogs().setInfoValue(
-              "Program was aborted because torch crash was detected! Restart "
-              "your controller to be safe.");
+            postInfo("Program was aborted because torch crash was detected! "
+                     "Restart your controller to be safe.");
             sendCommand("abort");
             m_handling_crash = true;
           }
@@ -454,43 +662,46 @@ void MotionController::lineHandler(std::string line)
   else if (m_controller_ready == false) {
     // Handle messages when controller is not ready
     switch (msg_type) {
-      case GrblMessageType::GrblReady:
+      case GrblMessageType::GrblReady: {
         LOG_F(INFO, "Controller ready!");
         m_controller_ready = true;
-        m_gcode_queue.push_back(
-          "G10 L2 P0 X" +
-          std::to_string(m_control_view->m_machine_parameters.work_offset[0]) +
-          " Y" +
-          std::to_string(m_control_view->m_machine_parameters.work_offset[1]) +
-          " Z" +
-          std::to_string(m_control_view->m_machine_parameters.work_offset[2]));
+        std::array<float, 3> wo;
+        {
+          std::lock_guard<std::mutex> plock(m_control_view->m_params_mutex);
+          wo = m_control_view->m_machine_parameters.work_offset;
+        }
+        m_gcode_queue.push_back("G10 L2 P0 X" + std::to_string(wo[0]) + " Y" +
+                                std::to_string(wo[1]) + " Z" +
+                                std::to_string(wo[2]));
         m_gcode_queue.push_back("M30");
-        runStack();
+        runStackInternal();
         break;
+      }
 
-      case GrblMessageType::UnlockRequired:
-        if (m_control_view->m_machine_parameters.homing_enabled == true) {
+      case GrblMessageType::UnlockRequired: {
+        bool                 homing_enabled;
+        std::array<float, 3> wo;
+        {
+          std::lock_guard<std::mutex> plock(m_control_view->m_params_mutex);
+          homing_enabled = m_control_view->m_machine_parameters.homing_enabled;
+          wo = m_control_view->m_machine_parameters.work_offset;
+        }
+        if (homing_enabled == true) {
           LOG_F(INFO, "Controller ready, but needs homing.");
           m_controller_ready = true;
           m_needs_homed = true;
-          m_gcode_queue.push_back(
-            "G10 L2 P0 X" +
-            std::to_string(
-              m_control_view->m_machine_parameters.work_offset[0]) +
-            " Y" +
-            std::to_string(
-              m_control_view->m_machine_parameters.work_offset[1]) +
-            " Z" +
-            std::to_string(
-              m_control_view->m_machine_parameters.work_offset[2]));
+          m_gcode_queue.push_back("G10 L2 P0 X" + std::to_string(wo[0]) + " Y" +
+                                  std::to_string(wo[1]) + " Z" +
+                                  std::to_string(wo[2]));
           m_gcode_queue.push_back("M30");
-          runStack();
+          runStackInternal();
         }
         else {
           LOG_F(WARNING, "Controller locked out. Unlocking...");
           send("$X");
         }
         break;
+      }
 
       default:
         // Ignore other messages when controller is not ready
@@ -536,7 +747,7 @@ void MotionController::runPop()
               "program!");
         m_okay_callback = nullptr;
         m_motion_sync_callback = [this]() { torchOffAndAbort(); };
-        m_control_view->m_app->getDialogs().setInfoValue(
+        postInfo(
           "Arc Strike Retry max count expired!\nLikely causes are:\n1. Bad or "
           "worn out consumables.\n2. Faulty work clamp connection or wire\n3. "
           "Inadequate pressure and/or moisture in the air system\n4. Dirty "
@@ -578,9 +789,11 @@ void MotionController::runPop()
             "[run_pop] Setting arc_okay callback and arc_okay expire timer => "
             "fires in %.4f ms!",
             arc_okay_timeout);
-      m_renderer->pushTimer(
-        arc_okay_timeout,
-        std::bind(&MotionController::arcOkayExpireTimer, this));
+      // Serviced by serviceTimers() on the runtime thread (was a one-shot
+      // render-thread pushTimer).
+      m_arc_expire_deadline =
+        std::chrono::steady_clock::now() +
+        std::chrono::milliseconds(static_cast<long long>(arc_okay_timeout));
       m_arc_okay_callback = [this]() { lowerToCutHeightAndRunProgram(); };
       m_okay_callback = nullptr;
       m_probe_callback = nullptr;
@@ -621,12 +834,12 @@ void MotionController::runPop()
       m_thc_active = (atof(value.c_str()) != 0.0);
       std::string cmd = "$T=" + value;
       cmd.erase(std::remove(cmd.begin(), cmd.end(), ' '), cmd.end());
-      LOG_F(INFO, "(runpop) internal THC: sending %s", cmd.c_str());
+      DLOG_F(INFO, "(runpop) internal THC: sending %s", cmd.c_str());
       sendWithCRC(cmd);
     }
     else {
       line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
-      LOG_F(INFO, "(runpop) sending %s", line.c_str());
+      DLOG_F(INFO, "(runpop) sending %s", line.c_str());
       sendWithCRC(line);
     }
   }
@@ -712,14 +925,9 @@ void MotionController::programFinished()
   m_motion_sync_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_gcode_queue.clear();
-  // Persist consumable counters accumulated in RAM during the program.
-  saveParameters();
-}
-
-bool MotionController::isHomingSafe() const
-{
-  return m_controller_ready && !m_homing_in_progress &&
-         m_okay_callback == nullptr && m_gcode_queue.empty();
+  // Persist consumable counters accumulated in RAM during the program. File-only
+  // persistence (not saveParameters, which also touches render primitives).
+  persistParameters();
 }
 
 void MotionController::homingDoneCallback()
@@ -728,11 +936,14 @@ void MotionController::homingDoneCallback()
   m_needs_homed = false;
   m_homing_in_progress = false; // Release homing lock
   LOG_F(INFO, "Homing finished! Saving Z work offset...");
-  m_control_view->m_machine_parameters.work_offset[2] = getDRO().mcs.z;
+  {
+    std::lock_guard<std::mutex> plock(m_control_view->m_params_mutex);
+    m_control_view->m_machine_parameters.work_offset[2] = m_dro_data.mcs.z;
+  }
   m_gcode_queue.push_back("G10 L20 P0 Z0");
   m_gcode_queue.push_back("M30");
-  runStack();
-  saveParameters();
+  runStackInternal();
+  persistParameters();
 }
 
 void MotionController::lowerToCutHeightAndRunProgram()
@@ -741,7 +952,7 @@ void MotionController::lowerToCutHeightAndRunProgram()
   m_probe_callback = nullptr;
   m_arc_okay_callback = nullptr;
   m_arc_retry_count = 0;
-  m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
+  m_gcode_queue.push_front("$T!" + to_string_strip_zeros(thcEffectiveLive()));
   m_gcode_queue.push_front("G90");
   m_gcode_queue.push_front("G91G0 Z-" +
                            to_string_strip_zeros(m_torch_params.pierce_height -
@@ -832,6 +1043,7 @@ void MotionController::accumulateArcOnTime()
   m_arc_on_start.reset();
   if (elapsed_ms <= 0)
     return;
+  std::lock_guard<std::mutex> plock(m_control_view->m_params_mutex);
   m_control_view->m_machine_parameters.consumable_arc_on_time_ms +=
     static_cast<uint64_t>(elapsed_ms);
 }
@@ -850,7 +1062,16 @@ MotionController::calculateCRC32(uint32_t crc, const char* buf, size_t len)
   return ~crc;
 }
 
+// Render thread: queue a THC baby-step for the runtime thread to apply.
 void MotionController::adjustThcOffset(float delta)
+{
+  Command cmd{ CommandType::AdjustThc };
+  cmd.thc_delta = delta;
+  enqueue(std::move(cmd));
+}
+
+// Runtime thread: apply the THC baby-step against live state.
+void MotionController::applyThcOffset(float delta)
 {
   // Clamping to encourage proper targets in tool library instead
   m_thc_offset =
@@ -859,15 +1080,15 @@ void MotionController::adjustThcOffset(float delta)
         "THC offset adjusted: base=%.1f offset=%.1f effective=%.1f",
         m_thc_base_value,
         m_thc_offset,
-        getThcEffective());
+        thcEffectiveLive());
 
   // Inject a live target only when THC is genuinely engaged AND the machine is
   // cutting; otherwise just remember the offset (above) - it is applied at the
-  // next fire_torch via getThcEffective(). Gating on m_thc_active (not just
+  // next fire_torch via thcEffectiveLive(). Gating on m_thc_active (not just
   // m_torch_on) keeps a click during pierce/idle from sending a $T= the
   // firmware would reject with error 18.
   if (m_thc_active && m_dro_data.in_motion && m_thc_base_value != 0.f) {
-    m_gcode_queue.push_front("$T!" + to_string_strip_zeros(getThcEffective()));
+    m_gcode_queue.push_front("$T!" + to_string_strip_zeros(thcEffectiveLive()));
     if (!m_okay_callback) {
       m_okay_callback = [this]() { runPop(); };
     }
@@ -1060,7 +1281,7 @@ void MotionController::logControllerError(int error)
       break;
   }
   LOG_F(ERROR, "Firmware Error %d => %s", error, ret.c_str());
-  m_control_view->m_app->getDialogs().setInfoValue(ret.c_str());
+  postInfo(ret);
   m_gcode_queue.clear();
 }
 
@@ -1117,18 +1338,16 @@ void MotionController::handleAlarm(int alarm)
   }
   m_controller_ready = false;
   LOG_F(ERROR, "Alarm %d => %s", alarm, ret.c_str());
-  m_control_view->dialogs().alarm_text = ret;
-  m_control_view->dialogs().alarm_window->show();
+  postAlarm(ret);
   m_gcode_queue.clear();
 }
 
+// Render thread only: refresh the machine/cuttable plane render primitives from
+// the current parameters, then persist to disk. Called after the user edits
+// parameters or zeroes an axis.
 void MotionController::saveParameters()
 {
-  // Use automatic serialization via to_json
-  nlohmann::json preferences;
-  NcControlView::to_json(preferences, m_control_view->m_machine_parameters);
-
-  // Update machine plane parameters
+  // Update machine plane parameters (render primitives - render thread only).
   m_control_view->m_machine_plane->m_bottom_left.x = 0;
   m_control_view->m_machine_plane->m_bottom_left.y = 0;
   m_control_view->m_machine_plane->m_width =
@@ -1148,6 +1367,18 @@ void MotionController::saveParameters()
      m_control_view->m_machine_parameters.cutting_extents[3]) -
     m_control_view->m_machine_parameters.cutting_extents[1];
 
+  persistParameters();
+}
+
+// Serialize the machine parameters to disk. No render-primitive access, so it is
+// safe to call from the runtime thread (programFinished, homingDoneCallback).
+void MotionController::persistParameters()
+{
+  nlohmann::json preferences;
+  {
+    std::lock_guard<std::mutex> plock(m_control_view->m_params_mutex);
+    NcControlView::to_json(preferences, m_control_view->m_machine_parameters);
+  }
   try {
     std::ofstream out(m_renderer->getConfigDirectory() +
                       "machine_parameters.json");
@@ -1159,7 +1390,14 @@ void MotionController::saveParameters()
   }
 }
 
+// Render thread: queue the controller-parameter write for the runtime thread.
 void MotionController::writeParametersToController()
+{
+  enqueue(Command{ CommandType::WriteParams });
+}
+
+// Runtime thread: push all $ settings from the current parameters and run them.
+void MotionController::doWriteParametersToController()
 {
   if (m_serial.m_is_connected) {
     uint8_t dir_invert_mask = 0b00000000;
@@ -1259,6 +1497,6 @@ void MotionController::writeParametersToController()
       "$132=" + std::to_string(fabs(
                   m_control_view->m_machine_parameters.machine_extents[2])));
     m_gcode_queue.push_back("M30");
-    runStack();
+    runStackInternal();
   }
 }

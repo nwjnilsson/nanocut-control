@@ -373,6 +373,12 @@ target_link_libraries(NanoCut PRIVATE
     serial
 )
 
+# Threads: the motion controller runs its serial/streaming runtime on a dedicated
+# std::thread, so link pthreads explicitly rather than relying on transitive deps.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(NanoCut PRIVATE Threads::Threads)
+
 #
 # ------------------------------------------------------------
 # GLFW (prefer CONFIG, fallback to pkg-config behavior)
