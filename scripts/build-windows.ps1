@@ -8,18 +8,17 @@
 .EXAMPLE
     .\scripts\build-windows.ps1
     .\scripts\build-windows.ps1 -Yes
-    .\scripts\build-windows.ps1 -Inches -VcpkgPath C:\vcpkg
+    .\scripts\build-windows.ps1 -VcpkgPath C:\vcpkg
 #>
 
 param(
     [switch]$Yes,
-    [switch]$Inches,
     [string]$VcpkgPath
 )
 
 $ErrorActionPreference = "Stop"
 $Script:StepNum = 0
-$Script:TotalSteps = 5
+$Script:TotalSteps = 4
 
 # ---------------------------------------------------------------------------
 # Helper functions
@@ -93,6 +92,55 @@ function Invoke-Checked {
     }
 }
 
+function Get-VsInstallPath {
+    # Locate a Visual Studio / Build Tools install that has the C++ toolset.
+    $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vsWhere) {
+        $path = & $vsWhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath 2>$null
+        if ($path) { return ($path | Select-Object -First 1).Trim() }
+    }
+    # Fall back to an already-active developer environment (e.g. a Developer
+    # PowerShell prompt).
+    if ($env:VSINSTALLDIR) { return $env:VSINSTALLDIR.TrimEnd('\') }
+    return $null
+}
+
+function Import-VsDevEnvironment {
+    # Import the MSVC "x64 Native Tools" environment into this process. This is
+    # what puts cl.exe on PATH and sets INCLUDE/LIB so the compiler can actually
+    # find the standard headers and libraries. Without it, CMake's Ninja
+    # generator either can't find a compiler at all ("CMAKE_CXX_COMPILER not
+    # set") or, if pointed at cl.exe manually, fails the compiler check because
+    # INCLUDE/LIB are missing.
+    param([string]$InstallPath)
+
+    $vcvars = Join-Path $InstallPath "VC\Auxiliary\Build\vcvars64.bat"
+    if (-not (Test-Path $vcvars)) {
+        Exit-WithError "Could not find vcvars64.bat at '$vcvars'. Your Visual Studio install may be missing the C++ build tools (VC.Tools.x86.x64)."
+    }
+
+    Write-Host "  Importing MSVC build environment (vcvars64.bat)" -ForegroundColor Gray
+
+    # Run vcvars64.bat in a child cmd, then dump the resulting environment with
+    # `set` and copy each variable back into this PowerShell process.
+    $applied = $false
+    cmd.exe /c "call `"$vcvars`" && set" | ForEach-Object {
+        if ($_ -match '^([^=\s]+)=(.*)$') {
+            [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
+            $applied = $true
+        }
+    }
+
+    if (-not $applied) {
+        Exit-WithError "Failed to import the MSVC build environment from '$vcvars'."
+    }
+    if (-not (Test-Command "cl")) {
+        Exit-WithError "cl.exe is still not on PATH after importing the MSVC environment. Try opening 'Developer PowerShell for VS 2022' and running this script again."
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Resolve project root (script lives in scripts/)
 # ---------------------------------------------------------------------------
@@ -137,17 +185,9 @@ foreach ($tool in $tools) {
 }
 
 # Visual Studio Build Tools / cl.exe
-$vsFound = $false
-$vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-if (Test-Path $vsWhere) {
-    $vsInstall = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
-    if ($vsInstall) { $vsFound = $true }
-}
-if (-not $vsFound -and $env:VSINSTALLDIR) {
-    $vsFound = $true
-}
+$vsInstallPath = Get-VsInstallPath
 
-if ($vsFound) {
+if ($vsInstallPath) {
     Write-Host "  [OK] Visual Studio Build Tools found" -ForegroundColor Green
 } else {
     Write-Host "  [!!] Visual Studio Build Tools not found" -ForegroundColor Yellow
@@ -156,12 +196,22 @@ if ($vsFound) {
             winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-source-agreements --accept-package-agreements `
                 --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
         }
+        Refresh-Path
+        $vsInstallPath = Get-VsInstallPath
+        if (-not $vsInstallPath) {
+            Exit-WithError "Visual Studio Build Tools were installed but could not be located. Please restart your terminal and run this script again."
+        }
         Write-Host "  [OK] Visual Studio Build Tools installed" -ForegroundColor Green
-        Write-Host "  NOTE: You may need to restart your terminal for the VS environment to be detected." -ForegroundColor Yellow
     } else {
         Exit-WithError "Visual Studio Build Tools are required to build NanoCut. Please install them and try again."
     }
 }
+
+# Activate the MSVC toolchain in this session so CMake/Ninja and vcpkg can find
+# cl.exe with a working INCLUDE/LIB. On the GitHub windows-latest runner a
+# MinGW gcc happens to be on PATH, which is why this step was never needed
+# there; a plain local PowerShell has no compiler environment at all.
+Import-VsDevEnvironment $vsInstallPath
 
 # ===================================================================
 # Phase 2: vcpkg setup
@@ -221,43 +271,7 @@ Invoke-Checked "Installing vcpkg packages" {
 Write-Host "  [OK] vcpkg packages installed" -ForegroundColor Green
 
 # ===================================================================
-# Phase 3: Unit system (inches vs millimeters)
-# ===================================================================
-
-Write-Step "Configuring unit system"
-
-$configFile = Join-Path $ProjectRoot "include\config.h"
-$useInches = $false
-
-if ($Inches) {
-    $useInches = $true
-    Write-Host "  Using inches (--Inches flag)" -ForegroundColor Gray
-} elseif (-not $Yes) {
-    Write-Host "  Will your machine use inches or millimeters?" -ForegroundColor Yellow
-    Write-Host "  This affects the default pierce and cut height values." -ForegroundColor Gray
-    $unitAnswer = Read-Host "  Enter 'inches' or 'mm' (default: mm)"
-    if ($unitAnswer -eq 'inches' -or $unitAnswer -eq 'inch' -or $unitAnswer -eq 'in') {
-        $useInches = $true
-    }
-} else {
-    Write-Host "  Using millimeters (default)" -ForegroundColor Gray
-}
-
-if ($useInches) {
-    $content = Get-Content $configFile -Raw
-    if ($content -match '//\s*#define USE_INCH_DEFAULTS') {
-        $content = $content -replace '//\s*#define USE_INCH_DEFAULTS', '#define USE_INCH_DEFAULTS'
-        Set-Content -Path $configFile -Value $content -NoNewline
-        Write-Host "  [OK] Enabled USE_INCH_DEFAULTS in config.h" -ForegroundColor Green
-    } elseif ($content -match '#define USE_INCH_DEFAULTS') {
-        Write-Host "  [OK] USE_INCH_DEFAULTS already enabled" -ForegroundColor Green
-    }
-} else {
-    Write-Host "  [OK] Using millimeters (no change needed)" -ForegroundColor Green
-}
-
-# ===================================================================
-# Phase 4: Configure (CMake)
+# Phase 3: Configure (CMake)
 # ===================================================================
 
 Write-Step "Configuring with CMake"
@@ -280,6 +294,8 @@ $cmakeArgs = @(
     "-G", "Ninja"
     "-DCMAKE_TOOLCHAIN_FILE=$vcpkgToolchain"
     "-DCMAKE_BUILD_TYPE=Release"
+    "-DCMAKE_C_COMPILER=cl"
+    "-DCMAKE_CXX_COMPILER=cl"
 )
 
 Write-Host "  Command: cmake $($cmakeArgs -join ' ')" -ForegroundColor DarkGray
@@ -296,7 +312,7 @@ try {
 Write-Host "  [OK] CMake configuration complete" -ForegroundColor Green
 
 # ===================================================================
-# Phase 5: Build & Install
+# Phase 4: Build & Install
 # ===================================================================
 
 Write-Step "Building and installing NanoCut"
