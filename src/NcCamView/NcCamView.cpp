@@ -14,7 +14,7 @@
 #include <loguru.hpp>
 #include <algorithm>
 #include <cctype>
-
+#include <numbers>
 NcCamView::~NcCamView()
 {
   if (m_background_thread && m_background_thread->joinable()) {
