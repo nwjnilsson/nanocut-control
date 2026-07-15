@@ -443,8 +443,17 @@ else() # Linux and other Unix-like systems
     target_link_libraries(NanoCut PRIVATE ${OPENGL_LIBRARIES} dl pthread)
 endif()
 
-# Always link z and m like the Makefile
-target_link_libraries(NanoCut PRIVATE z m)
+# zlib: link via the imported target so it resolves everywhere — vcpkg's
+# zlib.lib on Windows, system libz on Unix. The bare name "z" only works on
+# Unix and becomes a nonexistent "z.lib" on MSVC (LNK1181).
+find_package(ZLIB REQUIRED)
+target_link_libraries(NanoCut PRIVATE ZLIB::ZLIB)
+
+# libm is a separate library only on Unix; on Windows the math functions live
+# in the CRT, so there is no m.lib to link.
+if(NOT WIN32)
+    target_link_libraries(NanoCut PRIVATE m)
+endif()
 
 #
 # ------------------------------------------------------------
