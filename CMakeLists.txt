@@ -295,7 +295,9 @@ else() # Linux and other Unix-like systems
     set(CONFIG_DIR "$ENV{HOME}/.config/NanoCut")
 endif()
 
-target_compile_definitions(NanoCut PRIVATE)
+if(WIN32)
+    target_compile_definitions(NanoCut PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+endif()
 
 #
 # ------------------------------------------------------------
