@@ -2,13 +2,11 @@
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <ftw.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <string>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <thread>
 #include <vector>

@@ -1,6 +1,7 @@
 #include "DXFParsePathAdaptor.h"
 #include "NanoCut.h"
 #include "NcCamView/NcCamView.h"
+#include "NcCamView/PathImportCommon.h"
 #include "NcApp/NcApp.h"
 #include <algorithm>
 #include <cctype>
@@ -472,88 +473,6 @@ void DXFParsePathAdaptor::setChainTolerance(double chain_tolerance)
 void DXFParsePathAdaptor::setProgressTracking(std::atomic<float>* progress)
 {
   m_progress_ptr = progress;
-}
-
-void DXFParsePathAdaptor::getApproxBoundingBox(Point2d& bbox_min,
-                                               Point2d& bbox_max,
-                                               size_t&  vertex_count)
-{
-  vertex_count = 0;
-  bbox_max.x = -std::numeric_limits<double>::infinity();
-  bbox_max.y = -std::numeric_limits<double>::infinity();
-  bbox_min.x = std::numeric_limits<double>::infinity();
-  bbox_min.y = std::numeric_limits<double>::infinity();
-
-  auto visit = [&](Point2d point) {
-    bbox_min.x = std::min(point.x, bbox_min.x);
-    bbox_max.x = std::max(point.x, bbox_max.x);
-    bbox_min.y = std::min(point.y, bbox_min.y);
-    bbox_max.y = std::max(point.y, bbox_max.y);
-    vertex_count++;
-  };
-
-  // Visit all geometry across all layers
-  for (const auto& [layer_name, layer_data] : m_layers) {
-    for (const auto& line : layer_data.lines) {
-      visit(line.start);
-      visit(line.end);
-    }
-
-    for (const auto& polyline : layer_data.polylines) {
-      for (const auto& vertex : polyline.points) {
-        visit(vertex.point);
-      }
-    }
-
-    for (const auto& spline : layer_data.splines) {
-      for (const auto& point : spline.control_points) {
-        visit(point);
-      }
-      for (const auto& point : spline.fit_points) {
-        visit(point);
-      }
-    }
-  }
-}
-
-void DXFParsePathAdaptor::getBoundingBox(
-  const std::vector<std::vector<Point2d>>& path_stack,
-  Point2d&                                 bbox_min,
-  Point2d&                                 bbox_max)
-{
-  bbox_max.x = -std::numeric_limits<double>::infinity();
-  bbox_max.y = -std::numeric_limits<double>::infinity();
-  bbox_min.x = std::numeric_limits<double>::infinity();
-  bbox_min.y = std::numeric_limits<double>::infinity();
-
-  for (const auto& path : path_stack) {
-    for (const auto& point : path) {
-      bbox_min.x = std::min(point.x, bbox_min.x);
-      bbox_max.x = std::max(point.x, bbox_max.x);
-      bbox_min.y = std::min(point.y, bbox_min.y);
-      bbox_max.y = std::max(point.y, bbox_max.y);
-    }
-  }
-}
-
-bool DXFParsePathAdaptor::checkIfPointIsInsidePath(std::vector<Point2d> path,
-                                                   Point2d              point)
-{
-  // Delegate to geo namespace
-  return geo::pointIsInsidePolygon(path, point);
-}
-
-bool DXFParsePathAdaptor::checkIfPathIsInsidePath(std::vector<Point2d> path1,
-                                                  std::vector<Point2d> path2)
-{
-  // Check if ANY point of path1 is inside path2 (partial containment)
-  // Note: For full containment, use geo::polygonIsInsidePolygon
-  for (const auto& pt : path1) {
-    if (geo::pointIsInsidePolygon(path2, pt)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 struct PointHash {
@@ -1120,125 +1039,30 @@ void DXFParsePathAdaptor::finish()
     }
   }
 
-  // Calculate global bounding box
-  Point2d bb_min, bb_max;
-  getBoundingBox(all_chains, bb_min, bb_max);
+  // Bounding box, inside/outside classification, coloring and primitive
+  // creation are shared with the SVG importer.
+  Part* p = path_import::buildAndPushPart(m_nc_render_instance,
+                                          m_cam_view,
+                                          m_filename,
+                                          m_simplification,
+                                          m_view_callback,
+                                          m_mouse_callback,
+                                          all_chains,
+                                          chain_layers,
+                                          m_chain_tolerance);
 
-  // Create layer-organized structure
-  std::unordered_map<std::string, Part::Layer> part_layers;
-
-  // Create paths from all chains, organized by layer
-  for (size_t i = 0; i < all_chains.size(); i++) {
-    Part::path_t path;
-    path.is_inside_contour = false;
-
-    if (geo::distance(all_chains[i].front(), all_chains[i].back()) >
-        m_chain_tolerance) {
-      path.is_closed = false;
-    }
-    else {
-      path.is_closed = true;
-    }
-
-    path.color = &m_cam_view->m_app->getColor(m_cam_view->m_outside_contour_color);
-
-    // Adjust coordinates relative to bounding box
-    for (size_t j = 0; j < all_chains[i].size(); j++) {
-      const double px = all_chains[i][j].x - bb_min.x;
-      const double py = all_chains[i][j].y - bb_min.y;
-      path.points.push_back({ px, py });
-    }
-
-    // Add path to appropriate layer
-    const std::string& layer_name = chain_layers[i];
-    part_layers[layer_name].paths.push_back(path);
-  }
-
-  // Determine inside/outside contours (check across ALL layers)
-  // Create temporary flat list for containment checking
-  struct PathRef {
-    std::string  layer_name;
-    size_t       path_index;
-    bool         is_closed;
-    geo::Extents bbox;
-  };
-  std::vector<PathRef> path_refs;
-
-  for (auto& [layer_name, layer] : part_layers) {
-    for (size_t i = 0; i < layer.paths.size(); i++) {
-      PathRef ref;
-      ref.layer_name = layer_name;
-      ref.path_index = i;
-      ref.is_closed = layer.paths[i].is_closed;
-      ref.bbox = geo::calculateBoundingBox(layer.paths[i].points);
-
-      path_refs.push_back(ref);
-    }
-  }
-
-  for (size_t x = 0; x < path_refs.size(); x++) {
-    auto& path_x =
-      part_layers[path_refs[x].layer_name].paths[path_refs[x].path_index];
-
-    size_t containing_path_count = 0;
-
-    for (size_t i = 0; i < path_refs.size(); i++) {
-      if (i == x)
-        continue;
-
-      // Skip non-closed paths - they can't contain other paths
-      if (!path_refs[i].is_closed)
-        continue;
-
-      // Bounding box pre-check: if path_x's bbox isn't inside path_i's bbox,
-      // skip expensive check
-      if (!geo::extentsContain(path_refs[i].bbox, path_refs[x].bbox)) {
-        continue;
-      }
-
-      auto& path_i =
-        part_layers[path_refs[i].layer_name].paths[path_refs[i].path_index];
-
-      if (checkIfPathIsInsidePath(path_x.points, path_i.points)) {
-        containing_path_count++;
+  // Apply DXF layer freeze flags (bit 0): frozen layers import hidden. This is
+  // DXF-specific, so it lives here rather than in the shared import thread.
+  if (p) {
+    for (const auto& [layer_name, layer_props] : m_layer_props) {
+      const bool is_frozen = (layer_props.flags & 0x01) != 0;
+      if (is_frozen) {
+        auto it = p->m_layers.find(layer_name);
+        if (it != p->m_layers.end())
+          it->second.visible = false;
       }
     }
-
-    // Even-odd rule: inside if contained by an odd number of closed contours
-    path_x.is_inside_contour = (containing_path_count % 2) == 1;
-    if (path_x.is_inside_contour) {
-      if (path_x.is_closed) {
-        path_x.color =
-          &m_cam_view->m_app->getColor(m_cam_view->m_inside_contour_color);
-      }
-      else {
-        path_x.color =
-          &m_cam_view->m_app->getColor(m_cam_view->m_open_contour_color);
-      }
-    }
-    else {
-      path_x.color =
-        &m_cam_view->m_app->getColor(m_cam_view->m_outside_contour_color);
-    }
   }
-
-  size_t total_paths = 0;
-  for (const auto& [layer_name, layer] : part_layers) {
-    total_paths += layer.paths.size();
-  }
-
-  LOG_F(INFO,
-        "(DXFParsePathAdaptor::Finish) Created %lu paths from %lu layers",
-        total_paths,
-        part_layers.size());
-
-  // Create the final primitive with layer-organized structure
-  Part* p = m_nc_render_instance->pushPrimitive<Part>(m_filename,
-                                                      std::move(part_layers));
-  p->m_control.smoothing = m_simplification;
-  p->m_control.scale = 1.0;
-  p->mouse_callback = m_mouse_callback;
-  p->matrix_callback = m_view_callback;
 }
 
 void DXFParsePathAdaptor::explodeArcToLines(double cx,

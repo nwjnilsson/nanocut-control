@@ -7,14 +7,15 @@ Before using NanoCut Control, you need:
 - A CNC plasma cutting machine with a compatible grbl controller
 - [NanoCut firmware](https://github.com/nwjnilsson/nanocut-firmware) flashed on the controller
 - A USB connection between the controller and your computer
-- A DXF file to cut (or you can use any DXF editor to create one)
+- A DXF or SVG file to cut (or you can use any DXF/vector editor to create one)
 
 ## A Note on Units
 
 NanoCut Control works exclusively in **metric units (millimeters)**. There is no
 imperial mode. If you design in inches, you don't need to do anything special: the DXF
 importer auto-detects a drawing's units (inches, centimeters, or meters) and converts
-it to millimeters on import.
+it to millimeters on import. SVG files are assumed to be in millimeters; use the Scale
+field in the import dialog to correct drawings authored in pixels.
 
 ## First Launch
 
@@ -31,10 +32,11 @@ A typical cutting job follows these steps:
 
 Press **Tab** to switch to [CAM View](cam-view.md), the toolpath design workspace.
 
-### 2. Import a DXF File
+### 2. Import a Part
 
 Use **File > Import Part** (or the import button in the left pane) to load your DXF
-file. The importer will auto-detect units and convert geometry.
+or SVG file. The importer will detect DXF units (or assume millimeters for SVG) and
+convert geometry.
 
 ### 3. Set Up Job Options
 

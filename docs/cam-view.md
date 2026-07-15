@@ -2,30 +2,32 @@
 
 ## Overview
 
-CAM View is where you design toolpaths from DXF files. Here you import parts, configure
-cutting tools, create operations, arrange parts on the material sheet, and generate
-G-code for the controller.
+CAM View is where you design toolpaths from DXF and SVG files. Here you import parts,
+configure cutting tools, create operations, arrange parts on the material sheet, and
+generate G-code for the controller.
 
 Switch to CAM View by pressing **Tab** from Control View.
 
-## Importing a DXF
+## Importing a Part
 
 Open **File > Import Part** (or use the import button in the left pane) to load a DXF
-file.
+or SVG file.
 
-### DXF Importer Dialog
+### Importer Dialog
 
 When importing, you can configure:
 
 - **Quality** (8--16): Controls curve approximation resolution. Higher values produce
   smoother curves with more line segments.
 - **Scale factor**: Multiplier applied to the imported geometry.
-- **Unit auto-detection**: The importer reads the DXF header to determine whether the
-  file uses millimeters or inches and converts accordingly.
+- **Unit handling**: For DXF, the importer reads the file header to determine whether
+  the file uses millimeters or inches and converts accordingly. SVG files are assumed
+  to be in millimeters; if a drawing was authored in pixels and comes in the wrong
+  size, correct it with the Scale factor.
 
 ### Supported Geometry
 
-The importer handles the following DXF entities:
+For **DXF**, the importer handles the following entities:
 
 - Lines
 - Arcs
@@ -34,10 +36,16 @@ The importer handles the following DXF entities:
 - Splines
 - Ellipses
 
+For **SVG**, all standard shapes (path, rect, circle, ellipse, line, polyline,
+polygon), curves and transforms are supported. Two limitations to be aware of:
+
+- **Text is not imported.** Convert text to paths in your design tool before exporting.
+- **Layers/groups are flattened.** All SVG geometry is imported onto a single layer.
+
 ### Layer Filtering
 
-Layers named "Construction" and entities with non-continuous linetypes are automatically
-skipped during import.
+For DXF, layers named "Construction" and entities with non-continuous linetypes are
+automatically skipped during import.
 
 ## Parts Panel (Left Pane)
 

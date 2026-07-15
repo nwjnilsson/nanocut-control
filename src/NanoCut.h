@@ -4,7 +4,6 @@
 #include <../include/config.h>
 #include <algorithm>
 #include <fstream>
-#include <ftw.h>
 #include <imgui.h>
 #include <iomanip>
 #include <iostream>
@@ -13,8 +12,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <vector>
 
 template <typename T> struct Point2 {

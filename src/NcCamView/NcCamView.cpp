@@ -12,6 +12,8 @@
 #include <dxflib/dl_dxf.h>
 #include <imgui.h>
 #include <loguru.hpp>
+#include <algorithm>
+#include <cctype>
 
 NcCamView::~NcCamView()
 {
@@ -249,12 +251,12 @@ void NcCamView::renderDialogs(std::string& filePathName,
       renderer.stringToFile(renderer.getConfigDirectory() +
                               "last_dxf_open_path.conf",
                             filePath + "/");
-      ImGui::OpenPopup("DXF Importer");
+      ImGui::OpenPopup("Import Part");
     }
     ImGuiFileDialog::Instance()->Close();
   }
   if (ImGui::BeginPopupModal(
-        "DXF Importer", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        "Import Part", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::SetWindowFontScale(1.2f);
     ImGui::Text("Import Parameters");
     ImGui::SetWindowFontScale(1.0f);
@@ -265,14 +267,18 @@ void NcCamView::renderDialogs(std::string& filePathName,
 
     ImGui::Dummy(ImVec2{ 0.f, 10.f });
     ImGui::Text(R"(
-The importer will detect the units of the DXF and scale it
-accordingly. If the original model is very tiny, it is
-recommended to apply additional scaling below. Otherwise,
-the line segments may not be generated appropriately.
+The importer will detect the units of the file (DXF) or assume
+millimeters (SVG) and scale accordingly. If the original model
+is very tiny, it is recommended to apply additional scaling
+below. Otherwise, the line segments may not be generated
+appropriately.
 
 The default import resolution is usually more than enough.
 Note that the simplification of the model can be adjusted
 in the part's properties after importing.
+
+Note for SVG: text must be converted to paths before export,
+and all geometry is imported onto a single layer.
 )");
     ImGui::Dummy(ImVec2{ 0.f, 30.f });
 
@@ -286,7 +292,17 @@ in the part's properties after importing.
     ImGui::Spacing();
 
     if (ImGui::Button("Import", ImVec2{ 120, 0 })) {
-      dxfFileOpen(filePathName, fileName, import_quality, import_scale);
+      // Route to the SVG or DXF importer based on file extension.
+      std::string ext = filePathName;
+      std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
+      const bool is_svg =
+        ext.size() >= 4 && ext.compare(ext.size() - 4, 4, ".svg") == 0;
+      if (is_svg)
+        svgFileOpen(filePathName, fileName, import_quality, import_scale);
+      else
+        dxfFileOpen(filePathName, fileName, import_quality, import_scale);
       ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
@@ -421,7 +437,12 @@ void NcCamView::renderMenuBar(bool& show_job_options, bool& show_tool_library)
         IGFD::FileDialogConfig config;
         config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
-          "ImportPartDialog", "Choose File", ".dxf", config);
+          "ImportPartDialog",
+          "Choose File",
+          // Default filter matches both extensions so DXF and SVG files show
+          // together; the extra single-extension entries let the user narrow.
+          "Vector files (*.dxf *.svg){.dxf,.svg},.dxf,.svg",
+          config);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Close", "")) {
@@ -1063,6 +1084,9 @@ void NcCamView::renderLeftPane(bool&  show_create_operation,
       case BackgroundOperationType::DxfImport:
         operation_title = "Importing DXF";
         break;
+      case BackgroundOperationType::SvgImport:
+        operation_title = "Importing SVG";
+        break;
       case BackgroundOperationType::ToolpathGeneration:
         operation_title = "Generating Toolpaths";
         break;
@@ -1161,7 +1185,12 @@ void NcCamView::renderPartsViewer(Part*& selected_part)
         IGFD::FileDialogConfig config;
         config.path = path;
         ImGuiFileDialog::Instance()->OpenDialog(
-          "ImportPartDialog", "Choose File", ".dxf", config);
+          "ImportPartDialog",
+          "Choose File",
+          // Default filter matches both extensions so DXF and SVG files show
+          // together; the extra single-extension entries let the user narrow.
+          "Vector files (*.dxf *.svg){.dxf,.svg},.dxf,.svg",
+          config);
       }
       ImGui::Separator();
       if (ImGui::MenuItem("New Duplicate")) {
@@ -1889,7 +1918,10 @@ void NcCamView::startNestingThread()
   });
 }
 
-void NcCamView::startImportThread()
+void NcCamView::startImportThread(BackgroundOperationType type,
+                                  std::string             status_text,
+                                  std::string             part_name,
+                                  std::function<void()>   do_import)
 {
   // Join any previous background thread
   if (m_background_thread && m_background_thread->joinable()) {
@@ -1898,75 +1930,49 @@ void NcCamView::startImportThread()
 
   // Setup operation state BEFORE starting thread
   m_operation.reset();
-  m_operation.type = BackgroundOperationType::DxfImport;
-  m_operation.status_text = "Processing DXF geometry...";
+  m_operation.type = type;
+  m_operation.status_text = std::move(status_text);
   m_operation.in_progress = true;
   m_operation.progress = 0.0f;
 
-  // Pass progress pointer to DXF adaptor
-  m_dxf_creation_interface->setProgressTracking(&m_operation.progress);
-
   // Launch background thread
-  m_background_thread = std::make_unique<std::thread>([this]() {
-    if (!m_app)
-      return;
-    auto& renderer = m_app->getRenderer();
+  m_background_thread = std::make_unique<std::thread>(
+    [this, part_name = std::move(part_name), do_import = std::move(do_import)]() {
+      if (!m_app)
+        return;
+      auto& renderer = m_app->getRenderer();
 
-    // Parse DXF file (blocking while loop reading groups)
-    while (
-      m_dl_dxf->readDxfGroups(m_dxf_fp.get(), m_dxf_creation_interface.get())) {
-      // Progress updates happen in finish() method
-    }
-    LOG_F(INFO, "Successfully parsed DXF groups.");
+      // Parse the source file and build/push the Part (importer-specific).
+      do_import();
 
-    // Process geometry (heavy work with 5 progress checkpoints)
-    m_dxf_creation_interface->finish();
-
-    // Post-processing: handle frozen layers
-    for (auto& pPrimitive : renderer.getPrimitiveStack()) {
-      auto* part = dynamic_cast<Part*>(pPrimitive.get());
-      if (part && pPrimitive->view == renderer.getCurrentView() &&
-          part->m_part_name == m_dxf_creation_interface->m_filename) {
-        for (const auto& [layer_name, layer_props] :
-             m_dxf_creation_interface->m_layer_props) {
-          bool is_frozen = (layer_props.flags & 0x01) != 0;
-          if (is_frozen) {
-            auto layer_it = part->m_layers.find(layer_name);
-            if (layer_it != part->m_layers.end()) {
-              layer_it->second.visible = false;
-            }
-          }
+      // Setup nesting with the imported part(s), matched by name.
+      for (auto& pPrimitive : renderer.getPrimitiveStack()) {
+        auto* part = dynamic_cast<Part*>(pPrimitive.get());
+        if (part and pPrimitive->view == renderer.getCurrentView() and
+            part->m_part_name == part_name) {
+          part->visible = false; // Hidden until nesting places it
+          auto poly_part = collectOutsideContours(part);
+          m_dxf_nest.pushUnplacedPolyPart(poly_part,
+                                          &part->m_control.offset.x,
+                                          &part->m_control.offset.y,
+                                          &part->m_control.angle,
+                                          &part->visible);
         }
       }
-    }
 
-    // Setup nesting with imported parts
-    for (auto& pPrimitive : renderer.getPrimitiveStack()) {
-      auto* part = dynamic_cast<Part*>(pPrimitive.get());
-      if (part and pPrimitive->view == renderer.getCurrentView() and
-          part->m_part_name == m_dxf_creation_interface->m_filename) {
-        part->visible = false; // Hidden until nesting places it
-        auto poly_part = collectOutsideContours(part);
-        m_dxf_nest.pushUnplacedPolyPart(poly_part,
-                                        &part->m_control.offset.x,
-                                        &part->m_control.offset.y,
-                                        &part->m_control.angle,
-                                        &part->visible);
-      }
-    }
+      // Import complete
+      m_operation.in_progress = false;
 
-    // Import complete
-    m_operation.in_progress = false;
+      // Smart pointers automatically handle cleanup
+      m_dxf_fp.reset();
+      m_dxf_creation_interface.reset();
+      m_dl_dxf.reset();
+      m_svg_creation_interface.reset();
 
-    // Smart pointers automatically handle cleanup
-    m_dxf_fp.reset();
-    m_dxf_creation_interface.reset();
-    m_dl_dxf.reset();
-
-    // Chain to nesting operation
-    m_dxf_nest.beginPlaceUnplacedPolyParts();
-    startNestingThread();
-  });
+      // Chain to nesting operation
+      m_dxf_nest.beginPlaceUnplacedPolyParts();
+      startNestingThread();
+    });
 }
 
 bool NcCamView::dxfFileOpen(std::string filename,
@@ -1999,14 +2005,70 @@ bool NcCamView::dxfFileOpen(std::string filename,
     m_dxf_creation_interface->setFilename(name);
     m_dxf_creation_interface->setImportScale(import_scale);
     m_dxf_creation_interface->setImportQuality(import_quality);
+    m_dxf_creation_interface->setProgressTracking(&m_operation.progress);
 
     // START THREADED IMPORT (replaces synchronous parseDxfFile())
-    startImportThread();
+    startImportThread(BackgroundOperationType::DxfImport,
+                      "Processing DXF geometry...",
+                      name,
+                      [this]() {
+                        // Parse DXF file (blocking while loop reading groups)
+                        while (m_dl_dxf->readDxfGroups(
+                          m_dxf_fp.get(), m_dxf_creation_interface.get())) {
+                          // Progress updates happen in finish()
+                        }
+                        LOG_F(INFO, "Successfully parsed DXF groups.");
+                        m_dxf_creation_interface->finish();
+                      });
 
     LOG_F(INFO, "Started DXF import thread for: %s", filename.c_str());
     return true;
   }
   return false;
+}
+
+bool NcCamView::svgFileOpen(std::string filename,
+                            std::string name,
+                            int         import_quality,
+                            float       import_scale)
+{
+  if (!m_app)
+    return false;
+  auto& renderer = m_app->getRenderer();
+
+  // nanosvg opens the file itself, so there's no FILE* to hold here.
+  resetNesting();
+  forEachPart([&](Part* part) {
+    auto poly_part = collectOutsideContours(part);
+    m_dxf_nest.pushPlacedPolyPart(poly_part,
+                                  &part->m_control.offset.x,
+                                  &part->m_control.offset.y,
+                                  &part->m_control.angle,
+                                  &part->visible);
+  });
+
+  m_svg_creation_interface = std::make_unique<SvgParsePathAdaptor>(
+    &renderer,
+    getTransformCallback(),
+    [this](Primitive* c, const Primitive::MouseEventData& e) {
+      mouseEventCallback(c, e);
+    },
+    this);
+  m_svg_creation_interface->setFilename(name);
+  m_svg_creation_interface->setImportScale(import_scale);
+  m_svg_creation_interface->setImportQuality(import_quality);
+  m_svg_creation_interface->setProgressTracking(&m_operation.progress);
+
+  startImportThread(BackgroundOperationType::SvgImport,
+                    "Processing SVG geometry...",
+                    name,
+                    [this, filename]() {
+                      m_svg_creation_interface->parse(filename);
+                      m_svg_creation_interface->finish();
+                    });
+
+  LOG_F(INFO, "Started SVG import thread for: %s", filename.c_str());
+  return true;
 }
 
 void NcCamView::preInit()

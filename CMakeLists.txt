@@ -40,10 +40,15 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/${CMAKE_BUILD_TYPE}
 # Compiler flags
 # ------------------------------------------------------------
 #
-set(BASE_COMPILE_FLAGS "-std=c++20")
-
-set(CMAKE_CXX_FLAGS_DEBUG   "${BASE_COMPILE_FLAGS} -O0 -g -DDEBUG -DLOGURU_DEBUG_LOGGING")
-set(CMAKE_CXX_FLAGS_RELEASE "${BASE_COMPILE_FLAGS} -DNDEBUG -O3")
+# The C++ standard is set via CMAKE_CXX_STANDARD above; don't hardcode
+# -std=c++20 here or MSVC warns (D9002) on the GCC-style flag.
+if(MSVC)
+  set(CMAKE_CXX_FLAGS_DEBUG   "/Od /Zi /DDEBUG /DLOGURU_DEBUG_LOGGING")
+  set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
+else()
+  set(CMAKE_CXX_FLAGS_DEBUG   "-O0 -g -DDEBUG -DLOGURU_DEBUG_LOGGING")
+  set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
+endif()
 
 #
 # ------------------------------------------------------------

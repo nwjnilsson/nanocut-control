@@ -20,6 +20,7 @@
 // Local includes
 #include "DXFParsePathAdaptor/DXFParsePathAdaptor.h"
 #include "PolyNest/PolyNest.h"
+#include "SvgParsePathAdaptor/SvgParsePathAdaptor.h"
 
 // Forward declarations
 class NcApp;
@@ -47,6 +48,7 @@ enum class BackgroundOperationType {
   None,
   Nesting,
   DxfImport,
+  SvgImport,
   ToolpathGeneration // Future extensibility
 };
 
@@ -235,7 +237,12 @@ private:
   std::unique_ptr<DL_Dxf>              m_dl_dxf;
   PolyNest::PolyNest                   m_dxf_nest;
   std::unique_ptr<DXFParsePathAdaptor> m_dxf_creation_interface;
+  std::unique_ptr<SvgParsePathAdaptor> m_svg_creation_interface;
   bool                                 dxfFileOpen(std::string filename,
+                                                   std::string name,
+                                                   int         import_quality,
+                                                   float       import_scale);
+  bool                                 svgFileOpen(std::string filename,
                                                    std::string name,
                                                    int         import_quality,
                                                    float       import_scale);
@@ -244,7 +251,13 @@ private:
   std::unique_ptr<std::thread> m_background_thread;
   BackgroundOperationState     m_operation;
   void                         startNestingThread();
-  void                         startImportThread();
+  // Runs `do_import` (parse + finish) on the background thread, then performs
+  // the common post-import work (nesting setup for the part, cleanup, chaining
+  // to nesting). Shared by the DXF and SVG importers.
+  void startImportThread(BackgroundOperationType type,
+                         std::string             status_text,
+                         std::string             part_name,
+                         std::function<void()>   do_import);
 
 public:
   Part*  m_mouse_over_part = nullptr;

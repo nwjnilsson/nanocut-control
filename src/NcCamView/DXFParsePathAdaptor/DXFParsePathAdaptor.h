@@ -127,19 +127,12 @@ public:
              m_mouse_callback;
   NcCamView* m_cam_view;
 
-  void printAttributes();
   void setFilename(std::string f);
   void setImportScale(double scale);
   void setImportQuality(int quality);
   void setSmoothing(float smoothing);
   void setChainTolerance(double chain_tolerance);
   void setProgressTracking(std::atomic<float>* progress);
-  void getApproxBoundingBox(Point2d& bbox_min,
-                            Point2d& bbox_max,
-                            size_t&  vertex_count);
-  bool checkIfPointIsInsidePath(std::vector<Point2d> path, Point2d point);
-  bool checkIfPathIsInsidePath(std::vector<Point2d> path1,
-                               std::vector<Point2d> path2);
   std::vector<std::vector<Point2d>>
        chainify(const std::vector<DxfLine>& lines, double tolerance);
   void scaleAllPoints(double scale);
@@ -160,10 +153,6 @@ public:
                              int    num_segments);
 
 private:
-  void getBoundingBox(const std::vector<std::vector<Point2d>>& path_stack,
-                      Point2d&                                 bbox_min,
-                      Point2d&                                 bbox_max);
-
   /**
    * Check if current entity should be skipped based on:
    * 1. Layer name (skip "Construction" layer)

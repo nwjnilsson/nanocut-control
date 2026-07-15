@@ -45,7 +45,7 @@ The codebase has changed quite a bit since then, with many new features having b
 - Setting THC target voltage with e.g `$T=100.0`
 - Built-in Toolpath workbench:
   * Setup job options such as material size
-  * Supports multi-layer .dxf
+  * Supports multi-layer .dxf and .svg imports
   * Lay parts out in any configuration (scale/rotate)
   * Automatic nesting to minimize material usage
   * Post GCode ready to run on the machine
@@ -58,6 +58,9 @@ The codebase has changed quite a bit since then, with many new features having b
 ## Important notes on using this software
 - NanoCut works in millimeters. DXF drawings in inches (or cm/m) are auto-detected
 and converted to millimeters on import, so you can still design in imperial units.
+- SVG imports are assumed to be in millimeters (use the Scale field to correct
+drawings authored in pixels). Text must be converted to paths before export, and
+all SVG geometry is imported onto a single layer.
 - Negative machine extents is not supported.
 Positioning in the negative quadrant is apparently common traditionally for CNC machines, and GRBL
 reports positions like this by default.
