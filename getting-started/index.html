@@ -438,10 +438,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-import-a-dxf-file" class="md-nav__link">
+  <a href="#2-import-a-part" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Import a DXF File
+        2. Import a Part
       
     </span>
   </a>
@@ -767,10 +767,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-import-a-dxf-file" class="md-nav__link">
+  <a href="#2-import-a-part" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Import a DXF File
+        2. Import a Part
       
     </span>
   </a>
@@ -897,13 +897,14 @@
 <li>A CNC plasma cutting machine with a compatible grbl controller</li>
 <li><a href="https://github.com/nwjnilsson/nanocut-firmware">NanoCut firmware</a> flashed on the controller</li>
 <li>A USB connection between the controller and your computer</li>
-<li>A DXF file to cut (or you can use any DXF editor to create one)</li>
+<li>A DXF or SVG file to cut (or you can use any DXF/vector editor to create one)</li>
 </ul>
 <h2 id="a-note-on-units">A Note on Units</h2>
 <p>NanoCut Control works exclusively in <strong>metric units (millimeters)</strong>. There is no
 imperial mode. If you design in inches, you don't need to do anything special: the DXF
 importer auto-detects a drawing's units (inches, centimeters, or meters) and converts
-it to millimeters on import.</p>
+it to millimeters on import. SVG files are assumed to be in millimeters; use the Scale
+field in the import dialog to correct drawings authored in pixels.</p>
 <h2 id="first-launch">First Launch</h2>
 <ol>
 <li>Connect your CNC controller to the computer via USB.</li>
@@ -915,9 +916,10 @@ it to millimeters on import.</p>
 <p>A typical cutting job follows these steps:</p>
 <h3 id="1-switch-to-cam-view">1. Switch to CAM View</h3>
 <p>Press <strong>Tab</strong> to switch to <a href="../cam-view/">CAM View</a>, the toolpath design workspace.</p>
-<h3 id="2-import-a-dxf-file">2. Import a DXF File</h3>
+<h3 id="2-import-a-part">2. Import a Part</h3>
 <p>Use <strong>File &gt; Import Part</strong> (or the import button in the left pane) to load your DXF
-file. The importer will auto-detect units and convert geometry.</p>
+or SVG file. The importer will detect DXF units (or assume millimeters for SVG) and
+convert geometry.</p>
 <h3 id="3-set-up-job-options">3. Set Up Job Options</h3>
 <p>Configure the <strong>material size</strong> (width and height) to match your sheet metal. Choose
 the origin corner to match your work zero location.</p>

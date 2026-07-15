@@ -420,22 +420,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#importing-a-dxf" class="md-nav__link">
+  <a href="#importing-a-part" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Importing a DXF
+        Importing a Part
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Importing a DXF">
+    <nav class="md-nav" aria-label="Importing a Part">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#dxf-importer-dialog" class="md-nav__link">
+  <a href="#importer-dialog" class="md-nav__link">
     <span class="md-ellipsis">
       
-        DXF Importer Dialog
+        Importer Dialog
       
     </span>
   </a>
@@ -801,22 +801,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#importing-a-dxf" class="md-nav__link">
+  <a href="#importing-a-part" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Importing a DXF
+        Importing a Part
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Importing a DXF">
+    <nav class="md-nav" aria-label="Importing a Part">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#dxf-importer-dialog" class="md-nav__link">
+  <a href="#importer-dialog" class="md-nav__link">
     <span class="md-ellipsis">
       
-        DXF Importer Dialog
+        Importer Dialog
       
     </span>
   </a>
@@ -1050,24 +1050,26 @@
 
 <h1 id="cam-view-toolpath-workbench">CAM View (Toolpath Workbench)</h1>
 <h2 id="overview">Overview</h2>
-<p>CAM View is where you design toolpaths from DXF files. Here you import parts, configure
-cutting tools, create operations, arrange parts on the material sheet, and generate
-G-code for the controller.</p>
+<p>CAM View is where you design toolpaths from DXF and SVG files. Here you import parts,
+configure cutting tools, create operations, arrange parts on the material sheet, and
+generate G-code for the controller.</p>
 <p>Switch to CAM View by pressing <strong>Tab</strong> from Control View.</p>
-<h2 id="importing-a-dxf">Importing a DXF</h2>
+<h2 id="importing-a-part">Importing a Part</h2>
 <p>Open <strong>File &gt; Import Part</strong> (or use the import button in the left pane) to load a DXF
-file.</p>
-<h3 id="dxf-importer-dialog">DXF Importer Dialog</h3>
+or SVG file.</p>
+<h3 id="importer-dialog">Importer Dialog</h3>
 <p>When importing, you can configure:</p>
 <ul>
 <li><strong>Quality</strong> (8--16): Controls curve approximation resolution. Higher values produce
   smoother curves with more line segments.</li>
 <li><strong>Scale factor</strong>: Multiplier applied to the imported geometry.</li>
-<li><strong>Unit auto-detection</strong>: The importer reads the DXF header to determine whether the
-  file uses millimeters or inches and converts accordingly.</li>
+<li><strong>Unit handling</strong>: For DXF, the importer reads the file header to determine whether
+  the file uses millimeters or inches and converts accordingly. SVG files are assumed
+  to be in millimeters; if a drawing was authored in pixels and comes in the wrong
+  size, correct it with the Scale factor.</li>
 </ul>
 <h3 id="supported-geometry">Supported Geometry</h3>
-<p>The importer handles the following DXF entities:</p>
+<p>For <strong>DXF</strong>, the importer handles the following entities:</p>
 <ul>
 <li>Lines</li>
 <li>Arcs</li>
@@ -1076,9 +1078,15 @@ file.</p>
 <li>Splines</li>
 <li>Ellipses</li>
 </ul>
+<p>For <strong>SVG</strong>, all standard shapes (path, rect, circle, ellipse, line, polyline,
+polygon), curves and transforms are supported. Two limitations to be aware of:</p>
+<ul>
+<li><strong>Text is not imported.</strong> Convert text to paths in your design tool before exporting.</li>
+<li><strong>Layers/groups are flattened.</strong> All SVG geometry is imported onto a single layer.</li>
+</ul>
 <h3 id="layer-filtering">Layer Filtering</h3>
-<p>Layers named "Construction" and entities with non-continuous linetypes are automatically
-skipped during import.</p>
+<p>For DXF, layers named "Construction" and entities with non-continuous linetypes are
+automatically skipped during import.</p>
 <h2 id="parts-panel-left-pane">Parts Panel (Left Pane)</h2>
 <p>The left pane shows a tree view of all imported parts.</p>
 <ul>
